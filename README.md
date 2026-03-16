@@ -113,7 +113,7 @@ Robinhood aggressively rate-limits authentication. If login fails:
 - **Do NOT retry immediately** — wait at least 5 minutes
 - 2-3 failed attempts will lock out your account's API access for 5-10 minutes
 - Each login attempt generates a new device approval — old approvals don't carry over
-- See [RATE_LIMITS.md](RATE_LIMITS.md) for details
+- See the [Rate Limits](https://jamestford.github.io/hood/rate-limits/) documentation for details
 
 ## Install
 
