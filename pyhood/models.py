@@ -85,6 +85,12 @@ class Order:
     status: str  # 'pending', 'filled', 'cancelled', 'rejected'
     created_at: datetime | None = None
     filled_at: datetime | None = None
+    stop_price: float | None = None
+    time_in_force: str = "gtc"  # 'gtc', 'gtd', 'ioc', 'fok'
+    trigger: str = "immediate"  # 'immediate', 'stop'
+    instrument_type: str = "stock"  # 'stock', 'option'
+    average_price: float | None = None
+    fees: float | None = None
 
 
 @dataclass(frozen=True)

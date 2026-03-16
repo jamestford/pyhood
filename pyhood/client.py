@@ -6,14 +6,15 @@ All methods return typed dataclasses, not raw dicts.
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
 from pyhood import urls
 from pyhood.auth import get_session
-from pyhood.exceptions import SymbolNotFound
+from pyhood.exceptions import OrderError, SymbolNotFound
 from pyhood.http import Session
-from pyhood.models import Earnings, OptionContract, OptionsChain, Position, Quote
+from pyhood.models import Earnings, OptionContract, OptionsChain, Order, Position, Quote
 
 logger = logging.getLogger("pyhood")
 
@@ -249,6 +250,663 @@ class PyhoodClient:
         if data:
             return float(data[0].get("buying_power", 0))
         return 0.0
+
+    # ── Orders ──────────────────────────────────────────────────────────
+
+    def _get_account_url(self, account_number: str | None = None) -> str:
+        """Get the account URL from ACCOUNTS endpoint."""
+        data = self._session.get_paginated(urls.ACCOUNTS)
+        if not data:
+            raise OrderError("No accounts found")
+
+        if account_number:
+            for account in data:
+                if account.get("account_number") == account_number:
+                    return account.get("url", "")
+            raise OrderError(f"Account {account_number} not found")
+
+        # Use the first account if no account_number specified
+        return data[0].get("url", "")
+
+    def _get_instrument_url(self, symbol: str) -> str:
+        """Get instrument URL from INSTRUMENTS endpoint."""
+        data = self._session.get(urls.INSTRUMENTS, params={"symbol": symbol.upper()})
+        results = data.get("results", [])
+        if not results:
+            raise SymbolNotFound(f"Instrument not found for symbol: {symbol}")
+        return results[0].get("url", "")
+
+    def _get_option_id(self, symbol: str, expiration: str, strike: float, option_type: str) -> str:
+        """Find option instrument ID."""
+        params = {
+            "chain_symbol": symbol.upper(),
+            "expiration_dates": expiration,
+            "type": option_type.lower(),
+            "strike_price": str(strike),
+            "state": "active",
+        }
+        instruments = self._session.get_paginated(urls.OPTIONS_INSTRUMENTS, params=params)
+
+        if not instruments:
+            raise SymbolNotFound(
+                f"Option not found: {symbol} {expiration} ${strike} {option_type}"
+            )
+
+        return instruments[0].get("url", "")
+
+    def buy_stock(
+        self,
+        symbol: str,
+        quantity: float,
+        price: float | None = None,
+        stop_price: float | None = None,
+        time_in_force: str = "gtc",
+        extended_hours: bool = False,
+    ) -> Order:
+        """Buy stock shares.
+
+        Args:
+            symbol: Stock ticker symbol.
+            quantity: Number of shares to buy.
+            price: Limit price. If None, places market order.
+            stop_price: Stop price for stop/stop-limit orders.
+            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+            extended_hours: Whether to allow extended hours trading.
+
+        Returns:
+            Order object with details.
+        """
+        return self.order_stock(
+            symbol=symbol,
+            quantity=quantity,
+            side="buy",
+            price=price,
+            stop_price=stop_price,
+            time_in_force=time_in_force,
+            extended_hours=extended_hours,
+        )
+
+    def sell_stock(
+        self,
+        symbol: str,
+        quantity: float,
+        price: float | None = None,
+        stop_price: float | None = None,
+        time_in_force: str = "gtc",
+        extended_hours: bool = False,
+    ) -> Order:
+        """Sell stock shares.
+
+        Args:
+            symbol: Stock ticker symbol.
+            quantity: Number of shares to sell.
+            price: Limit price. If None, places market order.
+            stop_price: Stop price for stop/stop-limit orders.
+            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+            extended_hours: Whether to allow extended hours trading.
+
+        Returns:
+            Order object with details.
+        """
+        return self.order_stock(
+            symbol=symbol,
+            quantity=quantity,
+            side="sell",
+            price=price,
+            stop_price=stop_price,
+            time_in_force=time_in_force,
+            extended_hours=extended_hours,
+        )
+
+    def order_stock(
+        self,
+        symbol: str,
+        quantity: float,
+        side: str,
+        price: float | None = None,
+        stop_price: float | None = None,
+        time_in_force: str = "gtc",
+        extended_hours: bool = False,
+    ) -> Order:
+        """Place a stock order (core method).
+
+        Args:
+            symbol: Stock ticker symbol.
+            quantity: Number of shares.
+            side: 'buy' or 'sell'.
+            price: Limit price. If None, places market order.
+            stop_price: Stop price for stop/stop-limit orders.
+            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+            extended_hours: Whether to allow extended hours trading.
+
+        Returns:
+            Order object with details.
+        """
+        # Determine order type and trigger
+        if price is None and stop_price is None:
+            order_type = "market"
+            trigger = "immediate"
+        elif price is not None and stop_price is None:
+            order_type = "limit"
+            trigger = "immediate"
+        elif price is None and stop_price is not None:
+            order_type = "market"
+            trigger = "stop"
+            price = stop_price  # For stop market orders, price = stop_price
+        else:  # both price and stop_price
+            order_type = "limit"
+            trigger = "stop"
+
+        payload = {
+            "account": self._get_account_url(),
+            "instrument": self._get_instrument_url(symbol),
+            "symbol": symbol.upper(),
+            "price": str(price) if price else None,
+            "stop_price": str(stop_price) if stop_price else None,
+            "quantity": str(quantity),
+            "side": side,
+            "time_in_force": time_in_force,
+            "trigger": trigger,
+            "type": order_type,
+            "extended_hours": extended_hours,
+            "override_day_trade_checks": False,
+            "override_dtbp_checks": False,
+            "ref_id": str(uuid.uuid4()),
+        }
+
+        # Remove None values
+        payload = {k: v for k, v in payload.items() if v is not None}
+
+        try:
+            data = self._session.post(urls.ORDERS, data=payload, accept_codes=(400,))
+        except Exception as e:
+            if hasattr(e, 'response') and e.response:
+                error_details = e.response
+                if isinstance(error_details, dict):
+                    # Extract error message from Robinhood response
+                    detail = error_details.get("detail", "Order failed")
+                    raise OrderError(f"Order failed: {detail}") from e
+            raise OrderError(f"Order failed: {e}") from e
+
+        # Check for error response
+        if "detail" in data or "error" in data:
+            error_msg = data.get("detail") or data.get("error") or "Unknown order error"
+            raise OrderError(f"Order rejected: {error_msg}")
+
+        # Parse successful response
+        created_at = None
+        if data.get("created_at"):
+            try:
+                created_at = datetime.fromisoformat(data["created_at"].replace("Z", "+00:00"))
+            except ValueError:
+                pass
+
+        return Order(
+            order_id=data.get("id", ""),
+            symbol=symbol.upper(),
+            side=side,
+            order_type=order_type,
+            quantity=float(quantity),
+            price=price,
+            status=data.get("state", "unknown"),
+            created_at=created_at,
+            stop_price=stop_price,
+            time_in_force=time_in_force,
+            trigger=trigger,
+            instrument_type="stock",
+        )
+
+    def buy_option(
+        self,
+        symbol: str,
+        strike: float,
+        expiration: str,
+        option_type: str,
+        quantity: int,
+        price: float,
+        position_effect: str = "open",
+        time_in_force: str = "gtc",
+    ) -> Order:
+        """Buy option contracts.
+
+        Args:
+            symbol: Underlying stock symbol.
+            strike: Strike price.
+            expiration: Expiration date (YYYY-MM-DD).
+            option_type: 'call' or 'put'.
+            quantity: Number of contracts.
+            price: Limit price per contract.
+            position_effect: 'open' or 'close'.
+            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+
+        Returns:
+            Order object with details.
+        """
+        return self.order_option(
+            symbol=symbol,
+            strike=strike,
+            expiration=expiration,
+            option_type=option_type,
+            quantity=quantity,
+            price=price,
+            side="buy",
+            position_effect=position_effect,
+            time_in_force=time_in_force,
+        )
+
+    def sell_option(
+        self,
+        symbol: str,
+        strike: float,
+        expiration: str,
+        option_type: str,
+        quantity: int,
+        price: float,
+        position_effect: str = "close",
+        time_in_force: str = "gtc",
+    ) -> Order:
+        """Sell option contracts.
+
+        Args:
+            symbol: Underlying stock symbol.
+            strike: Strike price.
+            expiration: Expiration date (YYYY-MM-DD).
+            option_type: 'call' or 'put'.
+            quantity: Number of contracts.
+            price: Limit price per contract.
+            position_effect: 'open' or 'close'.
+            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+
+        Returns:
+            Order object with details.
+        """
+        return self.order_option(
+            symbol=symbol,
+            strike=strike,
+            expiration=expiration,
+            option_type=option_type,
+            quantity=quantity,
+            price=price,
+            side="sell",
+            position_effect=position_effect,
+            time_in_force=time_in_force,
+        )
+
+    def order_option(
+        self,
+        symbol: str,
+        strike: float,
+        expiration: str,
+        option_type: str,
+        quantity: int,
+        price: float,
+        side: str,
+        position_effect: str,
+        credit_or_debit: str = "debit",
+        time_in_force: str = "gtc",
+    ) -> Order:
+        """Place an option order (core method).
+
+        Args:
+            symbol: Underlying stock symbol.
+            strike: Strike price.
+            expiration: Expiration date (YYYY-MM-DD).
+            option_type: 'call' or 'put'.
+            quantity: Number of contracts.
+            price: Limit price per contract.
+            side: 'buy' or 'sell'.
+            position_effect: 'open' or 'close'.
+            credit_or_debit: 'debit' or 'credit'.
+            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+
+        Returns:
+            Order object with details.
+        """
+        option_instrument_url = self._get_option_id(symbol, expiration, strike, option_type)
+
+        legs = [{
+            "position_effect": position_effect,
+            "side": side,
+            "ratio_quantity": 1,
+            "option": option_instrument_url,
+        }]
+
+        payload = {
+            "account": self._get_account_url(),
+            "legs": legs,
+            "price": str(price),
+            "quantity": str(quantity),
+            "side": credit_or_debit,
+            "time_in_force": time_in_force,
+            "trigger": "immediate",
+            "type": "limit",
+            "override_day_trade_checks": False,
+            "override_dtbp_checks": False,
+            "ref_id": str(uuid.uuid4()),
+        }
+
+        try:
+            data = self._session.post(urls.OPTIONS_ORDERS, json_data=payload, accept_codes=(400,))
+        except Exception as e:
+            if hasattr(e, 'response') and e.response:
+                error_details = e.response
+                if isinstance(error_details, dict):
+                    detail = error_details.get("detail", "Option order failed")
+                    raise OrderError(f"Option order failed: {detail}") from e
+            raise OrderError(f"Option order failed: {e}") from e
+
+        # Check for error response
+        if "detail" in data or "error" in data:
+            error_msg = data.get("detail") or data.get("error") or "Unknown option order error"
+            raise OrderError(f"Option order rejected: {error_msg}")
+
+        # Parse successful response
+        created_at = None
+        if data.get("created_at"):
+            try:
+                created_at = datetime.fromisoformat(data["created_at"].replace("Z", "+00:00"))
+            except ValueError:
+                pass
+
+        return Order(
+            order_id=data.get("id", ""),
+            symbol=symbol.upper(),
+            side=side,
+            order_type="limit",
+            quantity=float(quantity),
+            price=price,
+            status=data.get("state", "unknown"),
+            created_at=created_at,
+            time_in_force=time_in_force,
+            trigger="immediate",
+            instrument_type="option",
+        )
+
+    def get_stock_orders(self) -> list[Order]:
+        """Get all stock orders (not options).
+
+        Returns:
+            List of Order objects for stock orders.
+        """
+        data = self._session.get_paginated(urls.ORDERS)
+        orders = []
+
+        for item in data:
+            # Skip option orders (they have legs)
+            if "legs" in item or item.get("legs"):
+                continue
+
+            created_at = None
+            filled_at = None
+
+            if item.get("created_at"):
+                try:
+                    created_at = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
+                except ValueError:
+                    pass
+
+            if item.get("updated_at") and item.get("state") == "filled":
+                try:
+                    filled_at = datetime.fromisoformat(item["updated_at"].replace("Z", "+00:00"))
+                except ValueError:
+                    pass
+
+            avg_price = None
+            if item.get("average_filled_price"):
+                avg_price = float(item["average_filled_price"])
+
+            fees = None
+            if item.get("fees"):
+                fees = float(item["fees"])
+
+            orders.append(Order(
+                order_id=item.get("id", ""),
+                symbol=item.get("symbol", "").upper(),
+                side=item.get("side", ""),
+                order_type=item.get("type", ""),
+                quantity=float(item.get("quantity", 0)),
+                price=float(item["price"]) if item.get("price") else None,
+                status=item.get("state", "unknown"),
+                created_at=created_at,
+                filled_at=filled_at,
+                stop_price=float(item["stop_price"]) if item.get("stop_price") else None,
+                time_in_force=item.get("time_in_force", "gtc"),
+                trigger=item.get("trigger", "immediate"),
+                instrument_type="stock",
+                average_price=avg_price,
+                fees=fees,
+            ))
+
+        return orders
+
+    def get_option_orders(self) -> list[Order]:
+        """Get all option orders.
+
+        Returns:
+            List of Order objects for option orders.
+        """
+        data = self._session.get_paginated(urls.OPTIONS_ORDERS)
+        orders = []
+
+        for item in data:
+            created_at = None
+            filled_at = None
+
+            if item.get("created_at"):
+                try:
+                    created_at = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
+                except ValueError:
+                    pass
+
+            if item.get("updated_at") and item.get("state") == "filled":
+                try:
+                    filled_at = datetime.fromisoformat(item["updated_at"].replace("Z", "+00:00"))
+                except ValueError:
+                    pass
+
+            # Extract symbol from legs if available
+            symbol = ""
+            legs = item.get("legs", [])
+            if legs and len(legs) > 0:
+                leg = legs[0]
+                option_url = leg.get("option", "")
+                if option_url:
+                    try:
+                        option_data = self._session.get(option_url)
+                        chain_symbol = option_data.get("chain_symbol", "")
+                        symbol = chain_symbol.upper()
+                    except Exception:
+                        pass
+
+            avg_price = None
+            if item.get("average_filled_price"):
+                avg_price = float(item["average_filled_price"])
+
+            fees = None
+            if item.get("fees"):
+                fees = float(item["fees"])
+
+            orders.append(Order(
+                order_id=item.get("id", ""),
+                symbol=symbol,
+                side=item.get("direction", ""),  # options use 'direction' not 'side'
+                order_type=item.get("type", ""),
+                quantity=float(item.get("quantity", 0)),
+                price=float(item["price"]) if item.get("price") else None,
+                status=item.get("state", "unknown"),
+                created_at=created_at,
+                filled_at=filled_at,
+                time_in_force=item.get("time_in_force", "gtc"),
+                trigger=item.get("trigger", "immediate"),
+                instrument_type="option",
+                average_price=avg_price,
+                fees=fees,
+            ))
+
+        return orders
+
+    def get_order(self, order_id: str) -> Order:
+        """Get a specific order by ID.
+
+        Args:
+            order_id: The order ID to fetch.
+
+        Returns:
+            Order object with details.
+        """
+        # Try stock orders first
+        try:
+            data = self._session.get(f"{urls.ORDERS}{order_id}/")
+
+            created_at = None
+            filled_at = None
+
+            if data.get("created_at"):
+                try:
+                    created_at = datetime.fromisoformat(
+                        data["created_at"].replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    pass
+
+            if data.get("updated_at") and data.get("state") == "filled":
+                try:
+                    filled_at = datetime.fromisoformat(
+                        data["updated_at"].replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    pass
+
+            avg_price = None
+            if data.get("average_filled_price"):
+                avg_price = float(data["average_filled_price"])
+
+            fees = None
+            if data.get("fees"):
+                fees = float(data["fees"])
+
+            return Order(
+                order_id=data.get("id", ""),
+                symbol=data.get("symbol", "").upper(),
+                side=data.get("side", ""),
+                order_type=data.get("type", ""),
+                quantity=float(data.get("quantity", 0)),
+                price=float(data["price"]) if data.get("price") else None,
+                status=data.get("state", "unknown"),
+                created_at=created_at,
+                filled_at=filled_at,
+                stop_price=float(data["stop_price"]) if data.get("stop_price") else None,
+                time_in_force=data.get("time_in_force", "gtc"),
+                trigger=data.get("trigger", "immediate"),
+                instrument_type="stock",
+                average_price=avg_price,
+                fees=fees,
+            )
+        except Exception:
+            # Try option orders
+            try:
+                data = self._session.get(f"{urls.OPTIONS_ORDERS}{order_id}/")
+
+                created_at = None
+                filled_at = None
+
+                if data.get("created_at"):
+                    try:
+                        created_at = datetime.fromisoformat(
+                            data["created_at"].replace("Z", "+00:00")
+                        )
+                    except ValueError:
+                        pass
+
+                if data.get("updated_at") and data.get("state") == "filled":
+                    try:
+                        filled_at = datetime.fromisoformat(
+                            data["updated_at"].replace("Z", "+00:00")
+                        )
+                    except ValueError:
+                        pass
+
+                # Extract symbol from legs if available
+                symbol = ""
+                legs = data.get("legs", [])
+                if legs and len(legs) > 0:
+                    leg = legs[0]
+                    option_url = leg.get("option", "")
+                    if option_url:
+                        try:
+                            option_data = self._session.get(option_url)
+                            chain_symbol = option_data.get("chain_symbol", "")
+                            symbol = chain_symbol.upper()
+                        except Exception:
+                            pass
+
+                avg_price = None
+                if data.get("average_filled_price"):
+                    avg_price = float(data["average_filled_price"])
+
+                fees = None
+                if data.get("fees"):
+                    fees = float(data["fees"])
+
+                return Order(
+                    order_id=data.get("id", ""),
+                    symbol=symbol,
+                    side=data.get("direction", ""),
+                    order_type=data.get("type", ""),
+                    quantity=float(data.get("quantity", 0)),
+                    price=float(data["price"]) if data.get("price") else None,
+                    status=data.get("state", "unknown"),
+                    created_at=created_at,
+                    filled_at=filled_at,
+                    time_in_force=data.get("time_in_force", "gtc"),
+                    trigger=data.get("trigger", "immediate"),
+                    instrument_type="option",
+                    average_price=avg_price,
+                    fees=fees,
+                )
+            except Exception as e:
+                raise OrderError(f"Order {order_id} not found") from e
+
+    def cancel_order(self, order_id: str) -> dict:
+        """Cancel a specific order.
+
+        Args:
+            order_id: The order ID to cancel.
+
+        Returns:
+            Response dict from the cancellation.
+        """
+        # Try stock orders first
+        try:
+            data = self._session.post(f"{urls.ORDERS}{order_id}/cancel/")
+            return data
+        except Exception:
+            # Try option orders
+            try:
+                data = self._session.post(f"{urls.OPTIONS_ORDERS}{order_id}/cancel/")
+                return data
+            except Exception as e:
+                raise OrderError(f"Failed to cancel order {order_id}") from e
+
+    def cancel_all_stock_orders(self) -> list[dict]:
+        """Cancel all pending stock orders.
+
+        Returns:
+            List of response dicts from cancellations.
+        """
+        orders = self.get_stock_orders()
+        results = []
+
+        for order in orders:
+            if order.status in ("pending", "unconfirmed", "queued"):
+                try:
+                    result = self.cancel_order(order.order_id)
+                    results.append(result)
+                except Exception as e:
+                    logger.warning(f"Failed to cancel order {order.order_id}: {e}")
+                    results.append({"error": str(e), "order_id": order.order_id})
+
+        return results
 
 
 def _safe_float(val: Any) -> float | None:

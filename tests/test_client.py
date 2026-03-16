@@ -5,9 +5,9 @@ import responses
 
 from pyhood import urls
 from pyhood.client import PyhoodClient
-from pyhood.exceptions import SymbolNotFoundError
+from pyhood.exceptions import OrderError, SymbolNotFoundError
 from pyhood.http import Session
-from pyhood.models import OptionContract, OptionsChain, Quote
+from pyhood.models import OptionContract, OptionsChain, Order, Quote
 
 
 BASE = "https://api.robinhood.com"
@@ -303,3 +303,373 @@ class TestGetBuyingPower:
 
         power = client.get_buying_power()
         assert power == 0.0
+
+
+class TestStockOrders:
+    @responses.activate
+    def test_buy_stock_market(self, client):
+        """Test placing a market buy order for stock."""
+        # Mock account endpoint
+        responses.add(
+            responses.GET,
+            urls.ACCOUNTS,
+            json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
+            status=200,
+        )
+        
+        # Mock instrument endpoint
+        responses.add(
+            responses.GET,
+            urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        
+        # Mock order placement
+        responses.add(
+            responses.POST,
+            urls.ORDERS,
+            json={
+                "id": "order-12345",
+                "symbol": "AAPL",
+                "side": "buy",
+                "type": "market",
+                "quantity": "10",
+                "state": "pending",
+                "created_at": "2024-01-01T12:00:00Z",
+            },
+            status=201,
+        )
+
+        order = client.buy_stock("AAPL", 10)
+        assert isinstance(order, Order)
+        assert order.order_id == "order-12345"
+        assert order.symbol == "AAPL"
+        assert order.side == "buy"
+        assert order.order_type == "market"
+        assert order.quantity == 10
+        assert order.price is None
+        assert order.status == "pending"
+        assert order.instrument_type == "stock"
+
+    @responses.activate
+    def test_buy_stock_limit(self, client):
+        """Test placing a limit buy order for stock."""
+        # Mock account endpoint
+        responses.add(
+            responses.GET,
+            urls.ACCOUNTS,
+            json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
+            status=200,
+        )
+        
+        # Mock instrument endpoint
+        responses.add(
+            responses.GET,
+            urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        
+        # Mock order placement
+        responses.add(
+            responses.POST,
+            urls.ORDERS,
+            json={
+                "id": "order-12345",
+                "symbol": "AAPL",
+                "side": "buy",
+                "type": "limit",
+                "quantity": "5",
+                "price": "150.00",
+                "state": "pending",
+                "created_at": "2024-01-01T12:00:00Z",
+            },
+            status=201,
+        )
+
+        order = client.buy_stock("AAPL", 5, price=150.00)
+        assert isinstance(order, Order)
+        assert order.order_id == "order-12345"
+        assert order.symbol == "AAPL"
+        assert order.side == "buy"
+        assert order.order_type == "limit"
+        assert order.quantity == 5
+        assert order.price == 150.00
+        assert order.status == "pending"
+        assert order.instrument_type == "stock"
+
+    @responses.activate
+    def test_sell_stock_market(self, client):
+        """Test placing a market sell order for stock."""
+        # Mock account endpoint
+        responses.add(
+            responses.GET,
+            urls.ACCOUNTS,
+            json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
+            status=200,
+        )
+        
+        # Mock instrument endpoint
+        responses.add(
+            responses.GET,
+            urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "TSLA"}]},
+            status=200,
+        )
+        
+        # Mock order placement
+        responses.add(
+            responses.POST,
+            urls.ORDERS,
+            json={
+                "id": "order-54321",
+                "symbol": "TSLA",
+                "side": "sell",
+                "type": "market",
+                "quantity": "20",
+                "state": "filled",
+                "created_at": "2024-01-01T12:00:00Z",
+                "updated_at": "2024-01-01T12:05:00Z",
+                "average_filled_price": "200.50",
+            },
+            status=201,
+        )
+
+        order = client.sell_stock("TSLA", 20)
+        assert isinstance(order, Order)
+        assert order.order_id == "order-54321"
+        assert order.symbol == "TSLA"
+        assert order.side == "sell"
+        assert order.order_type == "market"
+        assert order.quantity == 20
+        assert order.price is None
+        assert order.status == "filled"
+        assert order.instrument_type == "stock"
+
+
+class TestOptionOrders:
+    @responses.activate
+    def test_buy_option(self, client):
+        """Test placing a buy order for option."""
+        # Mock account endpoint
+        responses.add(
+            responses.GET,
+            urls.ACCOUNTS,
+            json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
+            status=200,
+        )
+        
+        # Mock option instrument search
+        responses.add(
+            responses.GET,
+            urls.OPTIONS_INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/options/instruments/opt123/", "chain_symbol": "AAPL"}]},
+            status=200,
+        )
+        
+        # Mock option order placement
+        responses.add(
+            responses.POST,
+            urls.OPTIONS_ORDERS,
+            json={
+                "id": "opt-order-123",
+                "direction": "buy",
+                "type": "limit",
+                "quantity": "2",
+                "price": "5.50",
+                "state": "pending",
+                "created_at": "2024-01-01T12:00:00Z",
+            },
+            status=201,
+        )
+
+        order = client.buy_option("AAPL", 150.0, "2024-12-20", "call", 2, 5.50)
+        assert isinstance(order, Order)
+        assert order.order_id == "opt-order-123"
+        assert order.symbol == "AAPL"
+        assert order.side == "buy"
+        assert order.order_type == "limit"
+        assert order.quantity == 2
+        assert order.price == 5.50
+        assert order.status == "pending"
+        assert order.instrument_type == "option"
+
+    @responses.activate
+    def test_sell_option(self, client):
+        """Test placing a sell order for option."""
+        # Mock account endpoint
+        responses.add(
+            responses.GET,
+            urls.ACCOUNTS,
+            json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
+            status=200,
+        )
+        
+        # Mock option instrument search
+        responses.add(
+            responses.GET,
+            urls.OPTIONS_INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/options/instruments/opt456/", "chain_symbol": "SPY"}]},
+            status=200,
+        )
+        
+        # Mock option order placement
+        responses.add(
+            responses.POST,
+            urls.OPTIONS_ORDERS,
+            json={
+                "id": "opt-order-456",
+                "direction": "sell",
+                "type": "limit",
+                "quantity": "1",
+                "price": "3.25",
+                "state": "pending",
+                "created_at": "2024-01-01T12:00:00Z",
+            },
+            status=201,
+        )
+
+        order = client.sell_option("SPY", 400.0, "2024-12-20", "put", 1, 3.25)
+        assert isinstance(order, Order)
+        assert order.order_id == "opt-order-456"
+        assert order.symbol == "SPY"
+        assert order.side == "sell"
+        assert order.order_type == "limit"
+        assert order.quantity == 1
+        assert order.price == 3.25
+        assert order.status == "pending"
+        assert order.instrument_type == "option"
+
+
+class TestOrderManagement:
+    @responses.activate
+    def test_get_stock_orders(self, client):
+        """Test getting all stock orders."""
+        responses.add(
+            responses.GET,
+            urls.ORDERS,
+            json={
+                "results": [
+                    {
+                        "id": "order-1",
+                        "symbol": "AAPL",
+                        "side": "buy",
+                        "type": "limit",
+                        "quantity": "10",
+                        "price": "150.00",
+                        "state": "filled",
+                        "created_at": "2024-01-01T12:00:00Z",
+                        "updated_at": "2024-01-01T12:05:00Z",
+                        "average_filled_price": "149.50",
+                        "fees": "1.25",
+                    },
+                    {
+                        "id": "order-2",
+                        "symbol": "TSLA",
+                        "side": "sell",
+                        "type": "market",
+                        "quantity": "5",
+                        "state": "pending",
+                        "created_at": "2024-01-01T13:00:00Z",
+                    }
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+
+        orders = client.get_stock_orders()
+        assert len(orders) == 2
+        assert all(isinstance(order, Order) for order in orders)
+        
+        order1 = orders[0]
+        assert order1.order_id == "order-1"
+        assert order1.symbol == "AAPL"
+        assert order1.side == "buy"
+        assert order1.quantity == 10
+        assert order1.average_price == 149.50
+        assert order1.fees == 1.25
+        
+        order2 = orders[1]
+        assert order2.order_id == "order-2"
+        assert order2.symbol == "TSLA"
+        assert order2.side == "sell"
+        assert order2.status == "pending"
+
+    @responses.activate
+    def test_get_order(self, client):
+        """Test getting a specific order by ID."""
+        responses.add(
+            responses.GET,
+            f"{urls.ORDERS}order-123/",
+            json={
+                "id": "order-123",
+                "symbol": "NVDA",
+                "side": "buy",
+                "type": "limit",
+                "quantity": "8",
+                "price": "800.00",
+                "stop_price": "750.00",
+                "state": "pending",
+                "created_at": "2024-01-01T12:00:00Z",
+                "time_in_force": "gtc",
+                "trigger": "stop",
+            },
+            status=200,
+        )
+
+        order = client.get_order("order-123")
+        assert isinstance(order, Order)
+        assert order.order_id == "order-123"
+        assert order.symbol == "NVDA"
+        assert order.side == "buy"
+        assert order.quantity == 8
+        assert order.price == 800.00
+        assert order.stop_price == 750.00
+        assert order.time_in_force == "gtc"
+        assert order.trigger == "stop"
+
+    @responses.activate
+    def test_cancel_order(self, client):
+        """Test cancelling an order."""
+        responses.add(
+            responses.POST,
+            f"{urls.ORDERS}order-123/cancel/",
+            json={"id": "order-123", "state": "cancelled"},
+            status=200,
+        )
+
+        result = client.cancel_order("order-123")
+        assert result["id"] == "order-123"
+        assert result["state"] == "cancelled"
+
+    @responses.activate 
+    def test_order_error_handling(self, client):
+        """Test order error handling."""
+        # Mock account endpoint
+        responses.add(
+            responses.GET,
+            urls.ACCOUNTS,
+            json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
+            status=200,
+        )
+        
+        # Mock instrument endpoint
+        responses.add(
+            responses.GET,
+            urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        
+        # Mock order placement with error
+        responses.add(
+            responses.POST,
+            urls.ORDERS,
+            json={"detail": "Insufficient buying power"},
+            status=400,
+        )
+
+        with pytest.raises(OrderError, match="Insufficient buying power"):
+            client.buy_stock("AAPL", 100000, price=150.00)
