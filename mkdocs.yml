@@ -29,6 +29,8 @@ theme:
     - content.code.annotate
     - search.highlight
     - search.suggest
+  logo: assets/logo-docs.png
+  favicon: assets/favicon-32.png
   icon:
     repo: fontawesome/brands/github
 
