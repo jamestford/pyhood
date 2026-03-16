@@ -1,7 +1,7 @@
 # pyhood
 
 <p align="center">
-  <img src="assets/logo-200.png" alt="pyhood logo" width="200">
+  <img src="assets/logo-256.png" alt="pyhood logo" width="256">
 </p>
 
 <p align="center">
