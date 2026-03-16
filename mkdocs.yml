@@ -1,0 +1,81 @@
+site_name: hood
+site_description: A modern, reliable Python client for the Robinhood API
+site_url: https://jamestford.github.io/hood
+repo_url: https://github.com/jamestford/hood
+repo_name: jamestford/hood
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: green
+      accent: lime
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: green
+      accent: lime
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.highlight
+    - search.suggest
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Authentication: authentication.md
+  - Usage:
+    - Stock Quotes: quotes.md
+    - Options Chains: options.md
+    - Account & Positions: account.md
+  - Error Handling: error-handling.md
+  - Rate Limits: rate-limits.md
+  - API Reference:
+    - HoodClient: api/client.md
+    - Authentication: api/auth.md
+    - Models: api/models.md
+    - Exceptions: api/exceptions.md
+  - Contributing: contributing.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+            show_root_heading: true
+            heading_level: 2
+            members_order: source
+            docstring_style: google
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jamestford/hood

@@ -1,6 +1,7 @@
 # hood
 
 [![CI](https://github.com/jamestford/hood/actions/workflows/ci.yml/badge.svg)](https://github.com/jamestford/hood/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-jamestford.github.io%2Fhood-blue)](https://jamestford.github.io/hood)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Coverage](https://img.shields.io/badge/coverage-79%25-yellow.svg)](#)
