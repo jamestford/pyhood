@@ -3,11 +3,11 @@
 import pytest
 import responses
 
-from hood import urls
-from hood.client import HoodClient
-from hood.exceptions import SymbolNotFoundError
-from hood.http import Session
-from hood.models import OptionContract, OptionsChain, Quote
+from pyhood import urls
+from pyhood.client import HoodClient
+from pyhood.exceptions import SymbolNotFoundError
+from pyhood.http import Session
+from pyhood.models import OptionContract, OptionsChain, Quote
 
 
 BASE = "https://api.robinhood.com"

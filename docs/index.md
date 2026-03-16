@@ -16,10 +16,10 @@ Built for automated trading — with auth that doesn't break, proper error handl
 ## Quick Example
 
 ```python
-import hood
-from hood.client import HoodClient
+import pyhood
+from pyhood.client import HoodClient
 
-session = hood.login(username="you@email.com", password="...", timeout=90)
+session = pyhood.login(username="you@email.com", password="...", timeout=90)
 client = HoodClient(session)
 
 quote = client.get_quote("AAPL")

@@ -9,13 +9,13 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from hood import urls
-from hood.auth import get_session
-from hood.exceptions import SymbolNotFound
-from hood.http import Session
-from hood.models import Earnings, OptionContract, OptionsChain, Position, Quote
+from pyhood import urls
+from pyhood.auth import get_session
+from pyhood.exceptions import SymbolNotFound
+from pyhood.http import Session
+from pyhood.models import Earnings, OptionContract, OptionsChain, Position, Quote
 
-logger = logging.getLogger("hood")
+logger = logging.getLogger("pyhood")
 
 
 class HoodClient:
@@ -23,7 +23,7 @@ class HoodClient:
 
     Usage:
         client = HoodClient(session)  # explicit session
-        client = HoodClient()         # uses active session from hood.login()
+        client = HoodClient()         # uses active session from pyhood.login()
     """
 
     def __init__(self, session: Session | None = None):

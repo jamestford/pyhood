@@ -23,11 +23,11 @@ Built for automated trading — with auth that doesn't break, proper error handl
 ## Quick Start
 
 ```python
-import hood
-from hood.client import HoodClient
+import pyhood
+from pyhood.client import HoodClient
 
 # Login (with timeout — never hangs)
-session = hood.login(username="you@email.com", password="...", timeout=90)
+session = pyhood.login(username="you@email.com", password="...", timeout=90)
 client = HoodClient(session)
 
 # Stock data
@@ -51,15 +51,15 @@ Robinhood requires **device approval** on first login. After that, hood keeps yo
 ### First Login
 
 1. Have the **Robinhood mobile app** open on your phone
-2. Call `hood.login()` — it will trigger a device approval request
+2. Call `pyhood.login()` — it will trigger a device approval request
 3. Tap **"Yes, it's me"** in the Robinhood app when prompted
 4. hood saves the session token to `~/.hood/session.json` for reuse
 
 ```python
-import hood
+import pyhood
 
 # First login — will wait up to 90s for you to approve on phone
-session = hood.login(
+session = pyhood.login(
     username="you@email.com",
     password="your_password",
     timeout=90,  # seconds to wait for device approval
@@ -72,10 +72,10 @@ Once you've approved the device, hood handles the rest:
 
 ```python
 # Reuses cached session — no approval needed
-session = hood.login(username="you@email.com", password="your_password")
+session = pyhood.login(username="you@email.com", password="your_password")
 
 # Or refresh explicitly — no credentials needed at all
-session = hood.refresh()
+session = pyhood.refresh()
 ```
 
 Sessions last several days (observed 5-8 days). When the access token expires, hood automatically refreshes it using the stored refresh token — **no device approval, no credentials, no human interaction**. This is what makes hood safe for automated scripts and cron jobs.
@@ -84,10 +84,10 @@ Device approval is only needed again if the refresh token itself expires (typica
 
 ### Error Handling
 
-hood raises specific exceptions so you know exactly what went wrong:
+pyhood raises specific exceptions so you know exactly what went wrong:
 
 ```python
-from hood.exceptions import (
+from pyhood.exceptions import (
     LoginTimeoutError,            # Timed out waiting for device approval
     DeviceApprovalRequiredError,  # Approval prompt sent but not completed
     MFARequiredError,             # SMS/email code needed — pass mfa_code parameter
@@ -96,12 +96,12 @@ from hood.exceptions import (
 )
 
 try:
-    session = hood.login(username="...", password="...", timeout=90)
+    session = pyhood.login(username="...", password="...", timeout=90)
 except LoginTimeoutError:
     print("Open Robinhood app and approve the device, then try again")
 except MFARequiredError:
     code = input("Enter the code from SMS/email: ")
-    session = hood.login(username="...", password="...", mfa_code=code)
+    session = pyhood.login(username="...", password="...", mfa_code=code)
 except AuthError as e:
     print(f"Login failed: {e}")
 ```

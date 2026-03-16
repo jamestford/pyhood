@@ -27,9 +27,9 @@ Open the Robinhood app on your phone. You'll need to tap "Yes, it's me" when pro
 ### Step 2: Login
 
 ```python
-import hood
+import pyhood
 
-session = hood.login(
+session = pyhood.login(
     username="you@email.com",
     password="your_password",
     timeout=90,  # seconds to wait for device approval
@@ -41,7 +41,7 @@ When you run this, Robinhood will send a device approval push notification to yo
 ### Step 3: Use the Client
 
 ```python
-from hood.client import HoodClient
+from pyhood.client import HoodClient
 
 client = HoodClient(session)
 
@@ -56,11 +56,11 @@ print(f"Buying power: ${power:,.2f}")
 
 ### Step 4: There Is No Step 4
 
-Your session is cached at `~/.hood/session.json`. Next time you call `hood.login()` or `hood.refresh()`, it reuses or refreshes the cached token automatically. No device approval needed.
+Your session is cached at `~/.pyhood/session.json`. Next time you call `pyhood.login()` or `pyhood.refresh()`, it reuses or refreshes the cached token automatically. No device approval needed.
 
 ```python
 # Subsequent runs — instant, no approval
-session = hood.refresh()
+session = pyhood.refresh()
 client = HoodClient(session)
 ```
 
@@ -76,11 +76,11 @@ RH_PASSWORD=your_password
 
 ```python
 import os
-import hood
+import pyhood
 from dotenv import load_dotenv
 
 load_dotenv()
-session = hood.login(
+session = pyhood.login(
     username=os.getenv("RH_USERNAME"),
     password=os.getenv("RH_PASSWORD"),
 )

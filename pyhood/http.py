@@ -8,9 +8,9 @@ from typing import Any
 
 import requests
 
-from hood.exceptions import APIError, RateLimitError
+from pyhood.exceptions import APIError, RateLimitError
 
-logger = logging.getLogger("hood")
+logger = logging.getLogger("pyhood")
 
 # Defaults
 DEFAULT_TIMEOUT = 16  # seconds

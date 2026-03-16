@@ -25,7 +25,7 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 
 ### Credential Storage
 
-- hood stores OAuth tokens in `~/.hood/session.json` with standard file permissions
+- pyhood stores OAuth tokens in `~/.pyhood/session.json` with standard file permissions
 - **Never commit** token files, `.env` files, or credentials to version control
 - hood's `.gitignore` blocks `*.json` and `.env` by default
 - Tokens are stored as plaintext JSON — ensure your machine has appropriate access controls
@@ -40,7 +40,7 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 ### Network Security
 
 - All API communication uses HTTPS (TLS) to `api.robinhood.com`
-- hood does not disable certificate verification
+- pyhood does not disable certificate verification
 - No credentials are sent in URL parameters — all auth data is in POST bodies or headers
 
 ### Dependencies
@@ -49,8 +49,8 @@ We will acknowledge receipt within 48 hours and aim to provide a fix within 7 da
 - Dependencies are monitored via GitHub Dependabot (see `.github/dependabot.yml`)
 - We recommend running `pip audit` periodically to check for known vulnerabilities
 
-### What hood Does NOT Do
+### What pyhood Does NOT Do
 
-- hood does not store your Robinhood username or password
-- hood does not transmit data to any server other than `api.robinhood.com`
-- hood does not include telemetry, analytics, or tracking of any kind
+- pyhood does not store your Robinhood username or password
+- pyhood does not transmit data to any server other than `api.robinhood.com`
+- pyhood does not include telemetry, analytics, or tracking of any kind

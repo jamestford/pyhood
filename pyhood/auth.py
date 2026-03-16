@@ -17,23 +17,23 @@ import time
 from pathlib import Path
 from typing import Any
 
-from hood import urls
-from hood.exceptions import (
+from pyhood import urls
+from pyhood.exceptions import (
     AuthError,
     DeviceApprovalRequired,
     LoginTimeout,
     MFARequired,
     RateLimitError,
 )
-from hood.http import Session
+from pyhood.http import Session
 
-logger = logging.getLogger("hood")
+logger = logging.getLogger("pyhood")
 
 # Robinhood's public OAuth client ID
 CLIENT_ID = "c82SH0WZOsabOXGP2sxqcj34FxkvfnWRZBKlBjFS"
 
 # Default token storage
-DEFAULT_TOKEN_DIR = Path.home() / ".hood"
+DEFAULT_TOKEN_DIR = Path.home() / ".pyhood"
 DEFAULT_TOKEN_FILE = "session.json"
 
 
@@ -261,7 +261,7 @@ def login(
         timeout: Max seconds to wait for login (including device approval).
             Set to 0 to disable timeout. Default: 60s.
         store_session: Cache tokens to disk for reuse. Default: True.
-        token_path: Custom path for token storage. Default: ~/.hood/session.json.
+        token_path: Custom path for token storage. Default: ~/.pyhood/session.json.
         expires_in: Token lifetime in seconds. Default: 86400 (24h).
 
     Returns:
@@ -389,7 +389,7 @@ def refresh(
     The refresh token is exchanged for a new access_token + refresh_token pair.
 
     Args:
-        token_path: Custom path for token storage. Default: ~/.hood/session.json.
+        token_path: Custom path for token storage. Default: ~/.pyhood/session.json.
         timeout: Max seconds to wait. Default: 30s.
 
     Returns:
@@ -435,7 +435,7 @@ def refresh(
 
     # If Robinhood demands verification, the refresh token may be expired
     if "verification_workflow" in data:
-        from hood.exceptions import TokenExpiredError
+        from pyhood.exceptions import TokenExpiredError
         raise TokenExpiredError(
             "Refresh token expired — Robinhood is requesting device approval. "
             "Call hood.login() with username and password."

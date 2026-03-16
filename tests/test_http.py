@@ -4,8 +4,8 @@ import time
 
 import responses
 
-from hood.exceptions import APIError, RateLimitError
-from hood.http import Session
+from pyhood.exceptions import APIError, RateLimitError
+from pyhood.http import Session
 
 import pytest
 

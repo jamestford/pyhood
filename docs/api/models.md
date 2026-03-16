@@ -2,14 +2,14 @@
 
 Typed dataclass responses returned by HoodClient methods.
 
-::: hood.models.Quote
+::: pyhood.models.Quote
 
-::: hood.models.OptionContract
+::: pyhood.models.OptionContract
 
-::: hood.models.OptionsChain
+::: pyhood.models.OptionsChain
 
-::: hood.models.Position
+::: pyhood.models.Position
 
-::: hood.models.Order
+::: pyhood.models.Order
 
-::: hood.models.Earnings
+::: pyhood.models.Earnings

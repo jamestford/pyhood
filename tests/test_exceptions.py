@@ -1,6 +1,6 @@
 """Tests for exception hierarchy and attributes."""
 
-from hood.exceptions import (
+from pyhood.exceptions import (
     APIError,
     AuthError,
     DeviceApprovalRequired,

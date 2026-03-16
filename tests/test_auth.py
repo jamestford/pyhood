@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 import responses
 
-from hood import urls
-from hood.auth import TokenStore, generate_device_token, login, logout, refresh, get_session
-from hood.exceptions import AuthError, LoginTimeoutError, TokenExpiredError
+from pyhood import urls
+from pyhood.auth import TokenStore, generate_device_token, login, logout, refresh, get_session
+from pyhood.exceptions import AuthError, LoginTimeoutError, TokenExpiredError
 
 
 class TestGenerateDeviceToken:
@@ -451,7 +451,7 @@ class TestGetSession:
     def test_no_session(self):
         """get_session without login should raise."""
         # Reset module state
-        import hood.auth
-        hood.auth._active_session = None
+        import pyhood.auth
+        pyhood.auth._active_session = None
         with pytest.raises(AuthError, match="Not logged in"):
             get_session()

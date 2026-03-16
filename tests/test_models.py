@@ -1,6 +1,6 @@
 """Basic model tests."""
 
-from hood.models import OptionContract, Quote
+from pyhood.models import OptionContract, Quote
 
 
 def test_quote_creation():

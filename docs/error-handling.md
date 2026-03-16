@@ -1,6 +1,6 @@
 # Error Handling
 
-hood uses a clear exception hierarchy so you can catch errors at the right level of specificity.
+pyhood uses a clear exception hierarchy so you can catch errors at the right level of specificity.
 
 ## Exception Hierarchy
 
@@ -22,7 +22,7 @@ HoodError
 ### Catch Everything
 
 ```python
-from hood.exceptions import HoodError
+from pyhood.exceptions import HoodError
 
 try:
     quote = client.get_quote("AAPL")
@@ -33,15 +33,15 @@ except HoodError as e:
 ### Catch Specific Auth Errors
 
 ```python
-from hood.exceptions import LoginTimeoutError, MFARequiredError, TokenExpiredError
+from pyhood.exceptions import LoginTimeoutError, MFARequiredError, TokenExpiredError
 
 try:
-    session = hood.login(username="...", password="...", timeout=90)
+    session = pyhood.login(username="...", password="...", timeout=90)
 except LoginTimeoutError:
     print("Timed out — approve on your phone and try again")
 except MFARequiredError:
     code = input("Enter MFA code: ")
-    session = hood.login(username="...", password="...", mfa_code=code)
+    session = pyhood.login(username="...", password="...", mfa_code=code)
 except TokenExpiredError:
     print("Refresh token expired — full re-login needed")
 ```
@@ -49,7 +49,7 @@ except TokenExpiredError:
 ### Handle Rate Limits
 
 ```python
-from hood.exceptions import RateLimitError
+from pyhood.exceptions import RateLimitError
 
 try:
     quote = client.get_quote("AAPL")
@@ -60,7 +60,7 @@ except RateLimitError as e:
 ### API Errors
 
 ```python
-from hood.exceptions import APIError
+from pyhood.exceptions import APIError
 
 try:
     data = client.get_fundamentals("INVALID")
@@ -74,7 +74,7 @@ except APIError as e:
 For those who prefer shorter names:
 
 ```python
-from hood.exceptions import (
+from pyhood.exceptions import (
     LoginTimeout,          # → LoginTimeoutError
     TokenExpired,          # → TokenExpiredError
     DeviceApprovalRequired,# → DeviceApprovalRequiredError
@@ -88,13 +88,13 @@ from hood.exceptions import (
 For unattended scripts (cron jobs, scanners), use this pattern:
 
 ```python
-import hood
-from hood.exceptions import TokenExpiredError, AuthError
+import pyhood
+from pyhood.exceptions import TokenExpiredError, AuthError
 
 def get_session():
     """Get an authenticated session, refreshing if needed."""
     try:
-        return hood.refresh()
+        return pyhood.refresh()
     except TokenExpiredError:
         # Refresh token expired — need human intervention
         # Alert via email/SMS/Telegram
@@ -104,5 +104,5 @@ def get_session():
         raise
 
 session = get_session()
-client = hood.HoodClient(session)
+client = pyhood.HoodClient(session)
 ```

@@ -2,12 +2,12 @@
 
 Login, logout, token refresh, and session management.
 
-::: hood.auth.login
+::: pyhood.auth.login
 
-::: hood.auth.refresh
+::: pyhood.auth.refresh
 
-::: hood.auth.logout
+::: pyhood.auth.logout
 
-::: hood.auth.get_session
+::: pyhood.auth.get_session
 
-::: hood.auth.TokenStore
+::: pyhood.auth.TokenStore

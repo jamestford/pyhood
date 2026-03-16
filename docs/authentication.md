@@ -1,19 +1,19 @@
 # Authentication
 
-hood handles Robinhood's OAuth2 authentication with three layers of session management:
+pyhood handles Robinhood's OAuth2 authentication with three layers of session management:
 
 1. **Cached session** — Reuse a valid stored token (instant)
 2. **Token refresh** — Exchange a refresh token for new credentials (no human needed)
 3. **Full login** — Username + password + device approval (requires phone)
 
-When you call `hood.login()`, it tries each layer in order, falling back only when necessary.
+When you call `pyhood.login()`, it tries each layer in order, falling back only when necessary.
 
 ## Login Flow
 
 ```python
-import hood
+import pyhood
 
-session = hood.login(
+session = pyhood.login(
     username="you@email.com",
     password="your_password",
     timeout=90,
@@ -22,31 +22,31 @@ session = hood.login(
 
 What happens internally:
 
-1. Check `~/.hood/session.json` for a cached token
+1. Check `~/.pyhood/session.json` for a cached token
 2. If found, validate it against Robinhood's API
 3. If expired, try refreshing with the stored refresh token
 4. If refresh fails, perform a full login with device approval
 
 ## Token Refresh
 
-This is hood's killer feature. The refresh token lets you renew your session without any human interaction:
+This is pyhood's killer feature. The refresh token lets you renew your session without any human interaction:
 
 ```python
-import hood
+import pyhood
 
 # No username or password needed
-session = hood.refresh()
+session = pyhood.refresh()
 ```
 
 Under the hood, this:
 
 - Sends the stored `refresh_token` to Robinhood's OAuth endpoint
 - Receives a **new** `access_token` and **new** `refresh_token`
-- Saves both to `~/.hood/session.json`
+- Saves both to `~/.pyhood/session.json`
 - Invalidates the old tokens (they rotate on each refresh)
 
-!!! tip "Use `hood.refresh()` in cron jobs and automation"
-    Since refresh requires no credentials and no device approval, it's the ideal entry point for unattended scripts. Only fall back to `hood.login()` if refresh raises `TokenExpiredError`.
+!!! tip "Use `pyhood.refresh()` in cron jobs and automation"
+    Since refresh requires no credentials and no device approval, it's the ideal entry point for unattended scripts. Only fall back to `pyhood.login()` if refresh raises `TokenExpiredError`.
 
 ## Token Lifetime
 
@@ -56,33 +56,33 @@ Under the hood, this:
 | Refresh token | Unknown (weeks+) | Expires eventually; triggers `TokenExpiredError` |
 
 !!! note
-    Robinhood's token lifetimes are not documented and may change. hood handles expiration gracefully regardless of the actual lifetime.
+    Robinhood's token lifetimes are not documented and may change. pyhood handles expiration gracefully regardless of the actual lifetime.
 
 ## Device Approval
 
 On first login (or when the refresh token expires), Robinhood requires device approval:
 
-1. hood sends your credentials to Robinhood
+1. pyhood sends your credentials to Robinhood
 2. Robinhood pushes a notification to your phone
 3. You tap **"Yes, it's me"** in the Robinhood app
-4. hood detects the approval and completes login
+4. pyhood detects the approval and completes login
 
 Device approval is **phone app only** — it's not available through the web interface.
 
 ### Timeouts
 
-The `timeout` parameter controls how long hood waits for approval:
+The `timeout` parameter controls how long pyhood waits for approval:
 
 ```python
 # Wait up to 2 minutes
-session = hood.login(username="...", password="...", timeout=120)
+session = pyhood.login(username="...", password="...", timeout=120)
 ```
 
 If you don't approve in time, hood raises `LoginTimeoutError`.
 
 ## Session Storage
 
-Tokens are stored in `~/.hood/session.json`:
+Tokens are stored in `~/.pyhood/session.json`:
 
 ```json
 {
@@ -103,21 +103,21 @@ Tokens are stored in `~/.hood/session.json`:
 To revoke tokens and delete stored credentials:
 
 ```python
-hood.logout()
+pyhood.logout()
 ```
 
-This clears the session, removes `~/.hood/session.json`, and attempts to revoke the token server-side.
+This clears the session, removes `~/.pyhood/session.json`, and attempts to revoke the token server-side.
 
 ## MFA / Two-Factor Authentication
 
 If your Robinhood account uses SMS or email-based MFA:
 
 ```python
-from hood.exceptions import MFARequiredError
+from pyhood.exceptions import MFARequiredError
 
 try:
-    session = hood.login(username="...", password="...")
+    session = pyhood.login(username="...", password="...")
 except MFARequiredError:
     code = input("Enter MFA code: ")
-    session = hood.login(username="...", password="...", mfa_code=code)
+    session = pyhood.login(username="...", password="...", mfa_code=code)
 ```

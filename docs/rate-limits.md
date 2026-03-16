@@ -18,7 +18,7 @@ Robinhood has no documented rate limits. Everything here is based on observed be
 
 1. **One login attempt at a time** — never run concurrent logins
 2. **Wait for explicit approval** — don't assume device approval succeeded
-3. **Use `hood.refresh()`** — avoids the login flow entirely
+3. **Use `pyhood.refresh()`** — avoids the login flow entirely
 4. **If rate limited, stop** — wait 5+ minutes, don't keep hitting the endpoint
 
 ## Market Data
@@ -31,9 +31,9 @@ Robinhood has no documented rate limits. Everything here is based on observed be
 | Earnings | ~10 req/sec |
 | Positions/Account | ~5 req/sec |
 
-hood enforces a **250ms minimum** between all requests by default, which keeps you well within safe limits.
+pyhood enforces a **250ms minimum** between all requests by default, which keeps you well within safe limits.
 
-## How hood Handles Rate Limits
+## How pyhood Handles Rate Limits
 
 1. **Minimum delay** — 250ms between all requests (configurable)
 2. **429 detection** — Automatically retries with backoff when rate limited
