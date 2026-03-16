@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-pip install hood
+pip install pyhood
 ```
 
 For development:

@@ -1,4 +1,4 @@
-site_name: hood
+site_name: pyhood
 site_description: A modern, reliable Python client for the Robinhood API
 site_url: https://jamestford.github.io/pyhood
 repo_url: https://github.com/jamestford/pyhood

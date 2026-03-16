@@ -1,4 +1,4 @@
-# hood
+# pyhood
 
 **A modern, reliable Python client for the Robinhood API.**
 
