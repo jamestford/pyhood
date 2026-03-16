@@ -50,11 +50,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e .
           pip install pip-audit
+          pip install requests python-dotenv cryptography
 
       - name: Run pip-audit
-        run: pip-audit --strict --desc --ignore-vuln PYSEC-0 --skip-editable
+        run: pip-audit --strict --desc
 
   codeql:
     name: CodeQL (Static Analysis)
