@@ -1,6 +1,15 @@
 # pyhood
 
+<p align="center">
+  <img src="assets/logo-minimal-hood.svg" alt="pyhood logo" width="180">
+</p>
+
+<p align="center">
+  <strong>A modern, reliable Python client for the Robinhood API.</strong>
+</p>
+
 [![CI](https://github.com/jamestford/pyhood/actions/workflows/ci.yml/badge.svg)](https://github.com/jamestford/pyhood/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/pyhood.svg)](https://pypi.org/project/pyhood/)
 [![Docs](https://img.shields.io/badge/docs-jamestford.github.io%2Fpyhood-blue)](https://jamestford.github.io/pyhood)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -47,7 +56,7 @@ balance = client.get_buying_power()
 
 ## Authentication
 
-Robinhood requires **device approval** on first login. After that, hood keeps your session alive automatically.
+Robinhood requires **device approval** on first login. After that, pyhood keeps your session alive automatically.
 
 ### First Login
 
@@ -128,13 +137,13 @@ pip install pyhood
 
 ## Acknowledgments
 
-hood stands on the shoulders of the community that figured out Robinhood's unofficial API:
+pyhood stands on the shoulders of the community that figured out Robinhood's unofficial API:
 
-- [**robin_stocks**](https://github.com/jmfernandes/robin_stocks) by [Josh Fernandes](https://github.com/jmfernandes) — The most widely used Python library for Robinhood. Its auth flow, endpoint mapping, and API patterns laid the groundwork that hood builds from.
+- [**robin_stocks**](https://github.com/jmfernandes/robin_stocks) by [Josh Fernandes](https://github.com/jmfernandes) — The most widely used Python library for Robinhood. Its auth flow, endpoint mapping, and API patterns laid the groundwork that pyhood builds from.
 - [**pyrh**](https://github.com/robinhood-unofficial/pyrh) by [Robinhood Unofficial](https://github.com/robinhood-unofficial) — An early Python client that pioneered OAuth token refresh and session management patterns for the Robinhood API.
 - [**Robinhood**](https://github.com/sanko/Robinhood) by [Sanko](https://github.com/sanko) — The original unofficial API documentation that mapped out Robinhood's endpoints and made all of these libraries possible.
 
-These projects made Robinhood accessible to developers. hood continues that mission with a focus on reliability and automation.
+These projects made Robinhood accessible to developers. pyhood continues that mission with a focus on reliability and automation.
 
 ## License
 
