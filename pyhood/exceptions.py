@@ -1,11 +1,11 @@
 """hood exceptions — clear error types instead of silent failures."""
 
 
-class HoodError(Exception):
+class PyhoodError(Exception):
     """Base exception for all hood errors."""
 
 
-class AuthError(HoodError):
+class AuthError(PyhoodError):
     """Authentication failed."""
 
 
@@ -37,7 +37,7 @@ class MFARequiredError(AuthError):
 MFARequired = MFARequiredError  # convenience alias
 
 
-class RateLimitError(HoodError):
+class RateLimitError(PyhoodError):
     """Too many requests — slow down."""
 
     def __init__(self, message: str = "Rate limited", retry_after: float | None = None):
@@ -45,7 +45,7 @@ class RateLimitError(HoodError):
         self.retry_after = retry_after
 
 
-class APIError(HoodError):
+class APIError(PyhoodError):
     """Robinhood API returned an error."""
 
     def __init__(self, message: str, status_code: int | None = None, response: dict | None = None):
@@ -54,11 +54,11 @@ class APIError(HoodError):
         self.response = response
 
 
-class OrderError(HoodError):
+class OrderError(PyhoodError):
     """Order placement or modification failed."""
 
 
-class SymbolNotFoundError(HoodError):
+class SymbolNotFoundError(PyhoodError):
     """Ticker symbol not recognized."""
 
 

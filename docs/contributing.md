@@ -43,7 +43,7 @@ pyhood/
 ├── pyhood/
 │   ├── __init__.py      # Public API (login, logout, refresh)
 │   ├── auth.py          # Authentication + token management
-│   ├── client.py        # HoodClient — high-level API
+│   ├── client.py        # PyhoodClient — high-level API
 │   ├── exceptions.py    # Exception hierarchy
 │   ├── http.py          # HTTP session, rate limiting, retries
 │   ├── models.py        # Typed dataclasses

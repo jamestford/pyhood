@@ -5,7 +5,7 @@ from pyhood.exceptions import (
     AuthError,
     DeviceApprovalRequired,
     DeviceApprovalRequiredError,
-    HoodError,
+    PyhoodError,
     LoginTimeout,
     LoginTimeoutError,
     MFARequired,
@@ -20,16 +20,16 @@ from pyhood.exceptions import (
 
 
 def test_hierarchy():
-    """All exceptions inherit from HoodError."""
-    assert issubclass(AuthError, HoodError)
+    """All exceptions inherit from PyhoodError."""
+    assert issubclass(AuthError, PyhoodError)
     assert issubclass(LoginTimeoutError, AuthError)
     assert issubclass(TokenExpiredError, AuthError)
     assert issubclass(DeviceApprovalRequiredError, AuthError)
     assert issubclass(MFARequiredError, AuthError)
-    assert issubclass(RateLimitError, HoodError)
-    assert issubclass(APIError, HoodError)
-    assert issubclass(OrderError, HoodError)
-    assert issubclass(SymbolNotFoundError, HoodError)
+    assert issubclass(RateLimitError, PyhoodError)
+    assert issubclass(APIError, PyhoodError)
+    assert issubclass(OrderError, PyhoodError)
+    assert issubclass(SymbolNotFoundError, PyhoodError)
 
 
 def test_aliases():
@@ -58,8 +58,8 @@ def test_rate_limit_default():
     assert err.retry_after is None
 
 
-def test_exceptions_catchable_as_hood_error():
-    """All can be caught with except HoodError."""
+def test_exceptions_catchable_as_pyhood_error():
+    """All can be caught with except PyhoodError."""
     for exc_class in [
         AuthError, LoginTimeoutError, TokenExpiredError,
         DeviceApprovalRequiredError, MFARequiredError,
@@ -67,5 +67,5 @@ def test_exceptions_catchable_as_hood_error():
     ]:
         try:
             raise exc_class("test")
-        except HoodError:
+        except PyhoodError:
             pass  # Expected

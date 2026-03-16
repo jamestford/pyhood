@@ -24,11 +24,11 @@ Built for automated trading — with auth that doesn't break, proper error handl
 
 ```python
 import pyhood
-from pyhood.client import HoodClient
+from pyhood.client import PyhoodClient
 
 # Login (with timeout — never hangs)
 session = pyhood.login(username="you@email.com", password="...", timeout=90)
-client = HoodClient(session)
+client = PyhoodClient(session)
 
 # Stock data
 quote = client.get_quote("AAPL")

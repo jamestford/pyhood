@@ -1,10 +1,10 @@
-"""Tests for HoodClient — quotes, options, positions, earnings."""
+"""Tests for PyhoodClient — quotes, options, positions, earnings."""
 
 import pytest
 import responses
 
 from pyhood import urls
-from pyhood.client import HoodClient
+from pyhood.client import PyhoodClient
 from pyhood.exceptions import SymbolNotFoundError
 from pyhood.http import Session
 from pyhood.models import OptionContract, OptionsChain, Quote
@@ -18,7 +18,7 @@ def client():
     """Create a client with a mock authenticated session."""
     session = Session(timeout=5)
     session.set_auth("Bearer", "test-token")
-    return HoodClient(session=session)
+    return PyhoodClient(session=session)
 
 
 class TestGetQuote:

@@ -43,7 +43,7 @@ nav:
   - Error Handling: error-handling.md
   - Rate Limits: rate-limits.md
   - API Reference:
-    - HoodClient: api/client.md
+    - PyhoodClient: api/client.md
     - Authentication: api/auth.md
     - Models: api/models.md
     - Exceptions: api/exceptions.md

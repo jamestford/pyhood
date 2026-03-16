@@ -1,6 +1,6 @@
 # Models
 
-Typed dataclass responses returned by HoodClient methods.
+Typed dataclass responses returned by PyhoodClient methods.
 
 ::: pyhood.models.Quote
 

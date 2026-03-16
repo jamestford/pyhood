@@ -5,7 +5,7 @@ pyhood uses a clear exception hierarchy so you can catch errors at the right lev
 ## Exception Hierarchy
 
 ```
-HoodError
+PyhoodError
 ├── AuthError
 │   ├── LoginTimeoutError      — Login hung (device approval timeout)
 │   ├── TokenExpiredError       — Refresh token expired, full re-login needed
@@ -22,11 +22,11 @@ HoodError
 ### Catch Everything
 
 ```python
-from pyhood.exceptions import HoodError
+from pyhood.exceptions import PyhoodError
 
 try:
     quote = client.get_quote("AAPL")
-except HoodError as e:
+except PyhoodError as e:
     print(f"Something went wrong: {e}")
 ```
 
@@ -104,5 +104,5 @@ def get_session():
         raise
 
 session = get_session()
-client = pyhood.HoodClient(session)
+client = pyhood.PyhoodClient(session)
 ```

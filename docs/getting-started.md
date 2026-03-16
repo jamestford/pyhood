@@ -41,9 +41,9 @@ When you run this, Robinhood will send a device approval push notification to yo
 ### Step 3: Use the Client
 
 ```python
-from pyhood.client import HoodClient
+from pyhood.client import PyhoodClient
 
-client = HoodClient(session)
+client = PyhoodClient(session)
 
 # Get a stock quote
 quote = client.get_quote("AAPL")
@@ -61,7 +61,7 @@ Your session is cached at `~/.pyhood/session.json`. Next time you call `pyhood.l
 ```python
 # Subsequent runs — instant, no approval
 session = pyhood.refresh()
-client = HoodClient(session)
+client = PyhoodClient(session)
 ```
 
 ## Environment Variables

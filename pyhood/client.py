@@ -1,4 +1,4 @@
-"""HoodClient — high-level API for Robinhood operations.
+"""PyhoodClient — high-level API for Robinhood operations.
 
 All methods return typed dataclasses, not raw dicts.
 """
@@ -18,12 +18,12 @@ from pyhood.models import Earnings, OptionContract, OptionsChain, Position, Quot
 logger = logging.getLogger("pyhood")
 
 
-class HoodClient:
+class PyhoodClient:
     """High-level Robinhood API client.
 
     Usage:
-        client = HoodClient(session)  # explicit session
-        client = HoodClient()         # uses active session from pyhood.login()
+        client = PyhoodClient(session)  # explicit session
+        client = PyhoodClient()         # uses active session from pyhood.login()
     """
 
     def __init__(self, session: Session | None = None):

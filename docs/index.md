@@ -17,10 +17,10 @@ Built for automated trading — with auth that doesn't break, proper error handl
 
 ```python
 import pyhood
-from pyhood.client import HoodClient
+from pyhood.client import PyhoodClient
 
 session = pyhood.login(username="you@email.com", password="...", timeout=90)
-client = HoodClient(session)
+client = PyhoodClient(session)
 
 quote = client.get_quote("AAPL")
 print(f"AAPL: ${quote.price:.2f} ({quote.change_pct:+.1f}%)")

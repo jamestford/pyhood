@@ -38,7 +38,7 @@ import pyhood
 session = pyhood.refresh()
 ```
 
-Under the hood, this:
+Internally, this:
 
 - Sends the stored `refresh_token` to Robinhood's OAuth endpoint
 - Receives a **new** `access_token` and **new** `refresh_token`

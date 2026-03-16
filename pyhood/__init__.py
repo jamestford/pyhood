@@ -3,6 +3,6 @@
 __version__ = "0.1.0"
 
 from pyhood.auth import login, logout, refresh
-from pyhood.client import HoodClient
+from pyhood.client import PyhoodClient
 
-__all__ = ["login", "logout", "refresh", "HoodClient"]
+__all__ = ["login", "logout", "refresh", "PyhoodClient"]
