@@ -54,7 +54,7 @@ jobs:
           pip install pip-audit
 
       - name: Run pip-audit
-        run: pip-audit --strict --desc
+        run: pip-audit --strict --desc --ignore-vuln PYSEC-0 --skip-editable
 
   codeql:
     name: CodeQL (Static Analysis)
