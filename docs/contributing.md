@@ -5,7 +5,7 @@ hood is in early development and we welcome contributions.
 ## Development Setup
 
 ```bash
-git clone https://github.com/jamestford/hood.git
+git clone https://github.com/jamestford/pyhood.git
 cd hood
 python -m venv .venv
 source .venv/bin/activate
@@ -65,6 +65,6 @@ hood/
 
 ## Reporting Issues
 
-- **Bugs**: Open a [GitHub issue](https://github.com/jamestford/hood/issues)
-- **Security**: See [SECURITY.md](https://github.com/jamestford/hood/blob/main/SECURITY.md)
+- **Bugs**: Open a [GitHub issue](https://github.com/jamestford/pyhood/issues)
+- **Security**: See [SECURITY.md](https://github.com/jamestford/pyhood/blob/main/SECURITY.md)
 - **Questions**: Open a discussion or issue

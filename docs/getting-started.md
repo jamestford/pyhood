@@ -9,7 +9,7 @@ pip install hood
 For development:
 
 ```bash
-git clone https://github.com/jamestford/hood.git
+git clone https://github.com/jamestford/pyhood.git
 cd hood
 python -m venv .venv
 source .venv/bin/activate

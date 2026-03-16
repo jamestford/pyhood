@@ -12,7 +12,7 @@ If you discover a security vulnerability in hood, please report it responsibly.
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
-Instead, please email **security@hood.dev** (or use [GitHub's private vulnerability reporting](https://github.com/jamestford/hood/security/advisories/new)) with:
+Instead, please email **security@hood.dev** (or use [GitHub's private vulnerability reporting](https://github.com/jamestford/pyhood/security/advisories/new)) with:
 
 1. A description of the vulnerability
 2. Steps to reproduce
