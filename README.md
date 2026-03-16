@@ -1,6 +1,10 @@
 # pyhood
 
-<p align="center"><img src="assets/logo-trimmed.png" alt="pyhood logo" width="300"><br><strong>A modern, reliable Python client for the Robinhood API.</strong></p>
+<div align="center">
+<img src="assets/logo-source.png" alt="pyhood logo" width="280">
+
+**A modern, reliable Python client for the Robinhood API.**
+</div>
 
 [![CI](https://github.com/jamestford/pyhood/actions/workflows/ci.yml/badge.svg)](https://github.com/jamestford/pyhood/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/pyhood.svg)](https://pypi.org/project/pyhood/)
