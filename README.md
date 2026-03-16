@@ -1,7 +1,7 @@
 # pyhood
 
 <div align="center">
-<img src="assets/logo-source.png" alt="pyhood logo" width="280">
+<img src="assets/logo-tight.png" alt="pyhood logo" width="200">
 
 **A modern, reliable Python client for the Robinhood API.**
 </div>
