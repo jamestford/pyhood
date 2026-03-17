@@ -43,6 +43,7 @@ nav:
     - Options Chains: options.md
     - Account & Positions: account.md
     - Crypto Trading: crypto.md
+    - Backtesting: backtesting.md
   - Error Handling: error-handling.md
   - Rate Limits: rate-limits.md
   - API Reference:
@@ -50,6 +51,7 @@ nav:
     - CryptoClient: api/crypto.md
     - Authentication: api/auth.md
     - Models: api/models.md
+    - Backtester: api/backtest.md
     - Exceptions: api/exceptions.md
   - Contributing: contributing.md
 
