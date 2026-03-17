@@ -168,7 +168,7 @@ Generate your API keys at [robinhood.com/account/crypto](https://robinhood.com/a
 - ✅ Stocks/options market data (unofficial API) — functional
 - ✅ Crypto trading (official API) — functional
 - ✅ Authentication with automatic token refresh — functional
-- 🔨 Full order management for stocks/options — in progress
+- ✅ Full order management for stocks/options — functional
 - 📋 Backtesting integration — planned
 - 📋 Pine Script strategy integration — planned
 - 💡 Shared base client refactor — under consideration
