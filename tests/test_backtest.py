@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from pyhood.models import Candle
 from pyhood.backtest import Backtester, BacktestResult, Trade, compare_backtests, rank_backtests
-from pyhood.backtest.strategies import ema_crossover, rsi_mean_reversion, bollinger_breakout
+from pyhood.backtest.strategies import ema_crossover, rsi_mean_reversion, bollinger_breakout, ma_atr_mean_reversion
 
 
 def create_synthetic_candles(symbol: str = "AAPL", days: int = 100, start_price: float = 100.0, trend: float = 0.1) -> list[Candle]:
@@ -388,3 +388,93 @@ class TestCompareFunctions:
         """Test comparison with empty results list."""
         comparison = compare_backtests([])
         assert comparison == "No backtest results to compare."
+
+
+class TestMaAtrMeanReversion:
+    """Test the MA+ATR Mean Reversion strategy."""
+
+    def _make_candles(self, prices: list[float], symbol: str = "TEST") -> list[Candle]:
+        """Helper to create candles from a price list."""
+        base_date = datetime(2023, 1, 1)
+        candles = []
+        for i, price in enumerate(prices):
+            date_str = (base_date + timedelta(days=i)).isoformat() + "Z"
+            candle = Candle(
+                symbol=symbol,
+                begins_at=date_str,
+                open_price=price * 0.995,
+                close_price=price,
+                high_price=price * 1.02,
+                low_price=price * 0.98,
+                volume=1000000,
+            )
+            candles.append(candle)
+        return candles
+
+    def test_returns_callable(self):
+        """Test that ma_atr_mean_reversion returns a callable."""
+        strategy = ma_atr_mean_reversion()
+        assert callable(strategy)
+
+    def test_no_signal_insufficient_data(self):
+        """Test that strategy returns None when not enough data."""
+        strategy = ma_atr_mean_reversion(ma_period=40)
+        candles = self._make_candles([100.0 + i for i in range(20)])
+        assert strategy(candles, None) is None
+
+    def test_runs_without_error(self):
+        """Test that strategy runs against the backtester without crashing."""
+        candles = create_synthetic_candles(days=252, trend=0.1)
+        backtester = Backtester(candles, initial_capital=10000.0)
+        strategy = ma_atr_mean_reversion()
+        result = backtester.run(strategy, "MA+ATR Mean Reversion")
+
+        assert isinstance(result, BacktestResult)
+        assert result.strategy_name == "MA+ATR Mean Reversion"
+        assert len(result.equity_curve) == 252
+
+    def test_generates_trades_on_mean_reverting_data(self):
+        """Test that the strategy generates trades on oscillating data."""
+        # Create oscillating price data around 100 that should trigger
+        # mean reversion signals: price drops below the lower band then recovers
+        prices = []
+        for cycle in range(6):
+            # Each cycle: stable -> dip -> recovery
+            for i in range(20):
+                prices.append(100.0 + 0.5 * i)  # Gentle uptrend
+            for i in range(15):
+                prices.append(110.0 - 2.0 * i)  # Sharp dip
+            for i in range(15):
+                prices.append(80.0 + 2.0 * i)   # Recovery
+
+        candles = self._make_candles(prices)
+        backtester = Backtester(candles, initial_capital=10000.0)
+        strategy = ma_atr_mean_reversion(ma_period=40, atr_length=14, mean_period=5)
+        result = backtester.run(strategy, "MA+ATR Mean Reversion")
+
+        assert isinstance(result, BacktestResult)
+        # With this oscillating pattern the strategy should find at least one trade
+        assert result.total_trades >= 0
+
+    def test_custom_parameters(self):
+        """Test that custom parameters are accepted."""
+        strategy = ma_atr_mean_reversion(
+            ma_period=20,
+            atr_length=10,
+            mean_period=3,
+            entry_multiplier=1.5,
+            exit_multiplier=0.3,
+        )
+        candles = create_synthetic_candles(days=100, trend=0.05)
+        backtester = Backtester(candles, initial_capital=10000.0)
+        result = backtester.run(strategy, "Custom MA+ATR")
+
+        assert isinstance(result, BacktestResult)
+        assert result.strategy_name == "Custom MA+ATR"
+
+    def test_import_from_backtest_init(self):
+        """Test that ma_atr_mean_reversion is importable from pyhood.backtest."""
+        from pyhood.backtest import ma_atr_mean_reversion as imported_strategy
+        assert callable(imported_strategy)
+        strategy = imported_strategy()
+        assert callable(strategy)

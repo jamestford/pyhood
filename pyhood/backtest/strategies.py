@@ -214,6 +214,67 @@ def rsi_mean_reversion(period: int = 14, oversold: float = 30, overbought: float
     return strategy_fn
 
 
+def _calculate_sma(prices: list[float], period: int) -> list[float]:
+    """Calculate Simple Moving Average.
+
+    Args:
+        prices: List of prices
+        period: SMA period
+
+    Returns:
+        List of SMA values (None for insufficient data)
+    """
+    if not prices or period <= 0:
+        return []
+
+    sma_values = []
+    for i in range(len(prices)):
+        if i < period - 1:
+            sma_values.append(None)
+        else:
+            sma_values.append(sum(prices[i - period + 1:i + 1]) / period)
+
+    return sma_values
+
+
+def _calculate_atr(candles: list, period: int = 14) -> list[float]:
+    """Calculate Average True Range.
+
+    Args:
+        candles: List of Candle objects with high_price, low_price, close_price
+        period: ATR period
+
+    Returns:
+        List of ATR values (None for insufficient data)
+    """
+    if len(candles) < 2:
+        return [None] * len(candles)
+
+    # Calculate True Range for each bar
+    true_ranges = [None]  # First bar has no previous close
+    for i in range(1, len(candles)):
+        high = candles[i].high_price
+        low = candles[i].low_price
+        prev_close = candles[i - 1].close_price
+
+        tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
+        true_ranges.append(tr)
+
+    # Calculate ATR as SMA of True Range
+    atr_values = []
+    for i in range(len(true_ranges)):
+        if i < period:
+            atr_values.append(None)
+        else:
+            valid_trs = [tr for tr in true_ranges[i - period + 1:i + 1] if tr is not None]
+            if len(valid_trs) == period:
+                atr_values.append(sum(valid_trs) / period)
+            else:
+                atr_values.append(None)
+
+    return atr_values
+
+
 def bollinger_breakout(period: int = 20, std_dev: float = 2.0) -> Callable:
     """Bollinger Bands Breakout Strategy.
 
@@ -247,6 +308,96 @@ def bollinger_breakout(period: int = 20, std_dev: float = 2.0) -> Callable:
 
         # Sell signal: price falls below middle band (SMA)
         if current_price < middle and position and position['side'] == 'long':
+            return 'sell'
+
+        return None
+
+    return strategy_fn
+
+
+def ma_atr_mean_reversion(
+    ma_period: int = 40,
+    atr_length: int = 14,
+    mean_period: int = 5,
+    entry_multiplier: float = 1.0,
+    exit_multiplier: float = 0.5,
+) -> Callable:
+    """MA + ATR Mean Reversion Strategy (Triple Nested MA + ATR Bands).
+
+    Based on Liran Nachman's QQQ Swing Trading Strategy. Uses triple nested
+    moving averages to confirm uptrend, then buys pullbacks using ATR-scaled
+    bands around a short-term mean. Exits when price bounces back above mean.
+
+    Trend filter (triple nested MAs):
+        MA1 = SMA(close, ma_period)
+        MA2 = SMA(MA1, ma_period)
+        MA3 = SMA(MA2, ma_period)
+        Uptrend = MA1 > MA2 AND MA2 > MA3 AND close > MA3
+
+    Entry: uptrend AND close < mean - entry_multiplier * ATR
+    Exit: close > mean + exit_multiplier * ATR
+
+    Source: https://lirannh.medium.com/forget-50-indicators-this-3-line-qqq-strategy-beats-90-of-traders-85eb3edbddc2
+
+    Args:
+        ma_period: SMA period for triple nested MAs (default 40)
+        atr_length: ATR period (default 14)
+        mean_period: Short-term mean period (default 5)
+        entry_multiplier: ATR multiplier for entry band (default 1.0)
+        exit_multiplier: ATR multiplier for exit band (default 0.5)
+
+    Returns:
+        Strategy function compatible with Backtester.run()
+    """
+    # Need 3x ma_period for triple nesting (MA3 needs 3*ma_period - 2 bars)
+    min_bars = max(3 * ma_period, atr_length, mean_period) + 1
+
+    def strategy_fn(candles: list[Candle], position: dict | None) -> str | None:
+        if len(candles) < min_bars:
+            return None
+
+        prices = [c.close_price for c in candles]
+
+        # Triple Nested Moving Averages
+        ma1 = _calculate_sma(prices, ma_period)
+        if ma1[-1] is None:
+            return None
+        ma2 = _calculate_sma(
+            [v if v is not None else 0.0 for v in ma1], ma_period
+        )
+        if ma2[-1] is None:
+            return None
+        ma3 = _calculate_sma(
+            [v if v is not None else 0.0 for v in ma2], ma_period
+        )
+        if ma3[-1] is None:
+            return None
+
+        # ATR
+        atr_values = _calculate_atr(candles, atr_length)
+        if atr_values[-1] is None:
+            return None
+
+        # Short-term mean
+        if len(prices) < mean_period:
+            return None
+        mean_now = sum(prices[-mean_period:]) / mean_period
+
+        current_price = prices[-1]
+        atr_now = atr_values[-1]
+
+        # Trend determination
+        uptrend = (ma1[-1] > ma2[-1] and ma2[-1] > ma3[-1]
+                   and current_price > ma3[-1])
+
+        # Entry: uptrend AND close < mean - entry_multiplier * ATR
+        entry_level = mean_now - (entry_multiplier * atr_now)
+        if uptrend and current_price < entry_level and position is None:
+            return 'buy'
+
+        # Exit: close > mean + exit_multiplier * ATR
+        exit_level = mean_now + (exit_multiplier * atr_now)
+        if current_price > exit_level and position and position['side'] == 'long':
             return 'sell'
 
         return None
