@@ -24,12 +24,15 @@ class Backtester:
         bt = Backtester.from_yfinance("GME", start="2019-01-01", end="2021-06-01")
     """
 
-    def __init__(self, candles: list[Candle], initial_capital: float = 10000.0):
+    def __init__(self, candles: list[Candle], initial_capital: float = 10000.0, slippage_pct: float = 0.0):
         """Initialize with historical candle data.
 
         Args:
             candles: List of historical price candles
             initial_capital: Starting portfolio value
+            slippage_pct: Slippage per trade as a percentage of price (e.g. 0.01 means
+                0.01%). Buys execute at a slightly higher price, sells at a slightly
+                lower price. Recommended value for Robinhood stock/ETF trades: 0.01.
         """
         if not candles:
             raise ValueError("Cannot backtest with empty candle data")
@@ -37,6 +40,7 @@ class Backtester:
         # Sort candles by date to ensure chronological order
         self.candles = sorted(candles, key=lambda c: c.begins_at)
         self.initial_capital = initial_capital
+        self.slippage_pct = slippage_pct
         self.symbol = candles[0].symbol
 
     @classmethod
@@ -47,6 +51,7 @@ class Backtester:
         start: str | None = None,
         end: str | None = None,
         initial_capital: float = 10000.0,
+        slippage_pct: float = 0.0,
     ) -> Backtester:
         """Create a Backtester using Yahoo Finance historical data.
 
@@ -62,6 +67,8 @@ class Backtester:
             start: Start date string 'YYYY-MM-DD'. Overrides period.
             end: End date string 'YYYY-MM-DD'. Overrides period.
             initial_capital: Starting portfolio value. Default $10,000.
+            slippage_pct: Slippage per trade as a percentage of price.
+                Recommended: 0.01 for Robinhood stock/ETF trades.
 
         Returns:
             Backtester instance loaded with historical data.
@@ -108,7 +115,7 @@ class Backtester:
                 volume=int(row["Volume"]),
             ))
 
-        return cls(candles, initial_capital)
+        return cls(candles, initial_capital, slippage_pct=slippage_pct)
 
     def run(self, strategy_fn, strategy_name: str = "Strategy") -> BacktestResult:
         """Run a strategy function against the candle data.
@@ -139,21 +146,25 @@ class Backtester:
             # Get strategy signal
             signal = strategy_fn(candles_so_far, position)
 
-            # Process signal
+            # Process signal — apply slippage to execution prices
+            slip = self.slippage_pct / 100  # convert percentage to fraction
+
             if signal == 'buy' and position is None:
-                # Enter long position
-                shares = cash / candle.close_price
+                # Enter long position (pay slightly more due to slippage)
+                effective_buy = candle.close_price * (1 + slip)
+                shares = cash / effective_buy
                 position = {
                     'side': 'long',
                     'quantity': shares,
-                    'entry_price': candle.close_price,
+                    'entry_price': effective_buy,
                     'entry_date': candle.begins_at
                 }
                 cash = 0.0  # All cash invested
 
             elif signal == 'sell' and position and position['side'] == 'long':
-                # Exit long position
-                exit_value = position['quantity'] * candle.close_price
+                # Exit long position (receive slightly less due to slippage)
+                effective_sell = candle.close_price * (1 - slip)
+                exit_value = position['quantity'] * effective_sell
                 pnl = exit_value - (position['quantity'] * position['entry_price'])
                 pnl_pct = (pnl / (position['quantity'] * position['entry_price'])) * 100
 
@@ -162,7 +173,7 @@ class Backtester:
                     exit_date=candle.begins_at,
                     side=position['side'],
                     entry_price=position['entry_price'],
-                    exit_price=candle.close_price,
+                    exit_price=effective_sell,
                     quantity=position['quantity'],
                     pnl=pnl,
                     pnl_pct=pnl_pct
@@ -173,20 +184,22 @@ class Backtester:
                 position = None
 
             elif signal == 'short' and position is None:
-                # Enter short position
-                shares = cash / candle.close_price
+                # Enter short position (receive slightly less due to slippage)
+                effective_short = candle.close_price * (1 - slip)
+                shares = cash / candle.close_price  # position sizing uses market price
                 position = {
                     'side': 'short',
                     'quantity': shares,
-                    'entry_price': candle.close_price,
+                    'entry_price': effective_short,
                     'entry_date': candle.begins_at
                 }
                 # For short selling, we assume we receive cash from the sale
                 # but we track the liability
 
             elif signal == 'cover' and position and position['side'] == 'short':
-                # Exit short position
-                cost_to_cover = position['quantity'] * candle.close_price
+                # Exit short position (pay slightly more due to slippage)
+                effective_cover = candle.close_price * (1 + slip)
+                cost_to_cover = position['quantity'] * effective_cover
                 initial_proceeds = position['quantity'] * position['entry_price']
                 pnl = initial_proceeds - cost_to_cover
                 pnl_pct = (pnl / initial_proceeds) * 100
@@ -196,7 +209,7 @@ class Backtester:
                     exit_date=candle.begins_at,
                     side=position['side'],
                     entry_price=position['entry_price'],
-                    exit_price=candle.close_price,
+                    exit_price=effective_cover,
                     quantity=position['quantity'],
                     pnl=pnl,
                     pnl_pct=pnl_pct
@@ -337,5 +350,6 @@ class Backtester:
             buy_hold_return=buy_hold_return,
             alpha=alpha,
             trades=trades,
-            equity_curve=equity_curve
+            equity_curve=equity_curve,
+            slippage_pct=self.slippage_pct,
         )

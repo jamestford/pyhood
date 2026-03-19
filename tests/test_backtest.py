@@ -1113,6 +1113,106 @@ class TestBullFlagBreakout:
         assert callable(imported)
 
 
+class TestSlippage:
+    """Test slippage modeling in the backtesting engine."""
+
+    def _make_candles(self, prices: list[float], symbol: str = "TEST") -> list[Candle]:
+        base_date = datetime(2023, 1, 1)
+        candles = []
+        for i, price in enumerate(prices):
+            date_str = (base_date + timedelta(days=i)).isoformat() + "Z"
+            candles.append(Candle(
+                symbol=symbol,
+                begins_at=date_str,
+                open_price=price * 0.995,
+                close_price=price,
+                high_price=price * 1.02,
+                low_price=price * 0.98,
+                volume=1000000,
+            ))
+        return candles
+
+    def _buy_sell_strategy(self, buy_day: int, sell_day: int):
+        """Strategy that buys on buy_day and sells on sell_day."""
+        def strategy(candles_so_far, position):
+            day = len(candles_so_far)
+            if day == buy_day and position is None:
+                return 'buy'
+            elif day == sell_day and position is not None:
+                return 'sell'
+            return None
+        return strategy
+
+    def test_slippage_reduces_returns(self):
+        """Slippage should reduce returns compared to zero slippage."""
+        prices = [100.0 + i * 0.5 for i in range(50)]  # gentle uptrend
+        candles = self._make_candles(prices)
+
+        bt_no_slip = Backtester(candles, initial_capital=10000.0, slippage_pct=0.0)
+        bt_with_slip = Backtester(candles, initial_capital=10000.0, slippage_pct=0.01)
+
+        strategy = self._buy_sell_strategy(buy_day=5, sell_day=40)
+
+        result_no_slip = bt_no_slip.run(strategy, "No Slippage")
+        result_with_slip = bt_with_slip.run(strategy, "With Slippage")
+
+        assert result_no_slip.total_return > result_with_slip.total_return
+
+    def test_slippage_pct_recorded_in_result(self):
+        """BacktestResult should record the slippage_pct used."""
+        candles = self._make_candles([100.0 + i for i in range(20)])
+        bt = Backtester(candles, initial_capital=10000.0, slippage_pct=0.05)
+        result = bt.run(lambda c, p: None, "Test")
+        assert result.slippage_pct == 0.05
+
+    def test_higher_slippage_lower_returns(self):
+        """Higher slippage should produce lower returns."""
+        prices = [100.0 + i * 0.5 for i in range(50)]
+        candles = self._make_candles(prices)
+        strategy = self._buy_sell_strategy(buy_day=5, sell_day=40)
+
+        results = []
+        for slip in [0.0, 0.01, 0.1, 1.0]:
+            bt = Backtester(candles, initial_capital=10000.0, slippage_pct=slip)
+            results.append(bt.run(strategy, f"slip={slip}"))
+
+        for i in range(len(results) - 1):
+            assert results[i].total_return >= results[i + 1].total_return, (
+                f"Expected return with slippage {results[i].slippage_pct} >= "
+                f"return with slippage {results[i+1].slippage_pct}"
+            )
+
+    def test_backward_compat_default_slippage_zero(self):
+        """Default slippage_pct should be 0.0 for backward compatibility."""
+        candles = self._make_candles([100.0 + i for i in range(20)])
+        bt = Backtester(candles, initial_capital=10000.0)
+        assert bt.slippage_pct == 0.0
+        result = bt.run(lambda c, p: None, "Test")
+        assert result.slippage_pct == 0.0
+
+    def test_backtest_result_default_slippage_field(self):
+        """BacktestResult should default slippage_pct to 0.0."""
+        result = _make_result()
+        assert result.slippage_pct == 0.0
+
+    def test_slippage_affects_trade_prices(self):
+        """Trade entry/exit prices should reflect slippage."""
+        # Fixed prices for predictable results
+        prices = [100.0] * 5 + [110.0] * 5 + [120.0] * 10
+        candles = self._make_candles(prices)
+
+        bt = Backtester(candles, initial_capital=10000.0, slippage_pct=1.0)  # 1% slippage
+        strategy = self._buy_sell_strategy(buy_day=1, sell_day=10)
+        result = bt.run(strategy, "Slippage Price Test")
+
+        assert result.total_trades == 1
+        trade = result.trades[0]
+        # Buy at day 1: close=100, effective = 100 * 1.01 = 101
+        assert abs(trade.entry_price - 101.0) < 0.01
+        # Sell at day 10 (index 9): close=110, effective = 110 * 0.99 = 108.9
+        assert abs(trade.exit_price - 108.9) < 0.01
+
+
 class TestSensitivityTest:
     """Test the sensitivity_test and sensitivity_report functions."""
 
