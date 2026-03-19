@@ -14,6 +14,14 @@ class Backtester:
 
     Takes historical candle data and runs strategy functions against it,
     tracking portfolio performance and generating detailed metrics.
+
+    Usage with pyhood data:
+        candles = client.get_stock_historicals("AAPL", span="5year")
+        bt = Backtester(candles)
+
+    Usage with yfinance (recommended for backtesting — 30+ years of data):
+        bt = Backtester.from_yfinance("AAPL", period="10y")
+        bt = Backtester.from_yfinance("GME", start="2019-01-01", end="2021-06-01")
     """
 
     def __init__(self, candles: list[Candle], initial_capital: float = 10000.0):
@@ -30,6 +38,77 @@ class Backtester:
         self.candles = sorted(candles, key=lambda c: c.begins_at)
         self.initial_capital = initial_capital
         self.symbol = candles[0].symbol
+
+    @classmethod
+    def from_yfinance(
+        cls,
+        symbol: str,
+        period: str = "10y",
+        start: str | None = None,
+        end: str | None = None,
+        initial_capital: float = 10000.0,
+    ) -> Backtester:
+        """Create a Backtester using Yahoo Finance historical data.
+
+        This is the recommended way to create a Backtester for serious
+        backtesting — yfinance provides 30+ years of daily data, adjusted
+        for splits and dividends, with no API key required.
+
+        Args:
+            symbol: Ticker symbol (e.g., 'AAPL', 'GME')
+            period: Data period. One of '1d', '5d', '1mo', '3mo', '6mo',
+                '1y', '2y', '5y', '10y', 'ytd', 'max'. Default '10y'.
+                Ignored if start/end are provided.
+            start: Start date string 'YYYY-MM-DD'. Overrides period.
+            end: End date string 'YYYY-MM-DD'. Overrides period.
+            initial_capital: Starting portfolio value. Default $10,000.
+
+        Returns:
+            Backtester instance loaded with historical data.
+
+        Raises:
+            ImportError: If yfinance is not installed.
+            ValueError: If no data is returned for the symbol.
+
+        Example:
+            bt = Backtester.from_yfinance("AAPL", period="10y")
+            bt = Backtester.from_yfinance("GME", start="2019-01-01")
+            result = bt.run(my_strategy, "My Strategy")
+        """
+        try:
+            import yfinance as yf
+        except ImportError:
+            raise ImportError(
+                "yfinance is required for from_yfinance(). "
+                "Install it with: pip install yfinance"
+            )
+
+        ticker = yf.Ticker(symbol.upper())
+
+        if start:
+            df = ticker.history(start=start, end=end)
+        else:
+            df = ticker.history(period=period)
+
+        if df.empty:
+            raise ValueError(
+                f"No historical data returned for {symbol}. "
+                f"Check the symbol and date range."
+            )
+
+        candles: list[Candle] = []
+        for date, row in df.iterrows():
+            candles.append(Candle(
+                symbol=symbol.upper(),
+                begins_at=date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                open_price=float(row["Open"]),
+                close_price=float(row["Close"]),
+                high_price=float(row["High"]),
+                low_price=float(row["Low"]),
+                volume=int(row["Volume"]),
+            ))
+
+        return cls(candles, initial_capital)
 
     def run(self, strategy_fn, strategy_name: str = "Strategy") -> BacktestResult:
         """Run a strategy function against the candle data.

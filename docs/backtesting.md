@@ -4,18 +4,19 @@ pyhood includes a built-in backtesting engine for testing trading strategies aga
 
 ## Quick Start
 
+The recommended way to backtest is with Yahoo Finance data — 30+ years of history, no API key needed:
+
 ```python
-import pyhood
 from pyhood.backtest import Backtester, compare_backtests
 from pyhood.backtest.strategies import ema_crossover, rsi_mean_reversion, bollinger_breakout
 
-# Get historical data
-session = pyhood.refresh()
-client = pyhood.PyhoodClient(session)
-candles = client.get_stock_historicals("AAPL", interval="day", span="5year")
+# Load 10 years of daily data from Yahoo Finance (recommended)
+bt = Backtester.from_yfinance("AAPL", period="10y")
+
+# Or use a specific date range
+bt = Backtester.from_yfinance("GME", start="2019-01-01", end="2021-06-01")
 
 # Run a strategy
-bt = Backtester(candles, initial_capital=10000)
 result = bt.run(ema_crossover(fast=9, slow=21), "EMA 9/21")
 
 # View results
@@ -27,12 +28,26 @@ print(f"Total Trades:  {result.total_trades}")
 print(f"vs Buy & Hold: {result.alpha:+.1f}%")
 ```
 
+You can also use pyhood's own historical data (limited to 5 years):
+
+```python
+import pyhood
+
+session = pyhood.refresh()
+client = pyhood.PyhoodClient(session)
+candles = client.get_stock_historicals("AAPL", interval="day", span="5year")
+bt = Backtester(candles, initial_capital=10000)
+```
+
+!!! tip "Use `from_yfinance()` for backtesting"
+    Yahoo Finance provides 30+ years of split/dividend-adjusted daily data with no API key. Robinhood only provides 5 years. For serious backtesting, always use `from_yfinance()`.
+
 ## Comparing Strategies
 
 Run multiple strategies and compare them side by side:
 
 ```python
-bt = Backtester(candles, initial_capital=10000)
+bt = Backtester.from_yfinance("AAPL", period="10y")
 
 results = [
     bt.run(ema_crossover(fast=9, slow=21), "EMA 9/21"),

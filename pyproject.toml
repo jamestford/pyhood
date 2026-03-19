@@ -36,11 +36,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+backtest = [
+    "yfinance>=0.2",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.1",
     "responses>=0.23.0",
+    "yfinance>=0.2",
 ]
 
 [tool.ruff]
