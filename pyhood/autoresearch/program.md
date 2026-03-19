@@ -28,7 +28,7 @@ researcher = AutoResearcher(ticker='SPY', total_period='10y')
 
 ## Rules
 
-- **Minimum 10 trades required** — avoid degenerate strategies
+- **Minimum trades per split** — Train: 20, Test: 10, Validate: 10. Strategies with fewer trades are noise.
 - **Results must be stable** — if changing a parameter by ±10% kills performance, it's overfitting
 - **Train and Test Sharpe should be within 30% of each other** — big gap = overfitting
 - **Round number parameters only** — no 13.7, use 14

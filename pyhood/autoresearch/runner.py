@@ -42,7 +42,8 @@ class AutoResearcher:
         test_pct: Fraction of data for testing (default 0.25).
         validate_pct: Fraction of data for validation (default 0.25).
         metric: BacktestResult attribute used to rank experiments.
-        min_trades: Minimum completed trades for a result to count.
+        min_trades_train: Minimum trades on train split (default 20).
+        min_trades_test: Minimum trades on test/validate splits (default 10).
         candles: Pre-loaded candle list. Overrides *ticker*/*total_period*.
         initial_capital: Starting capital for each backtest.
         top_n: Number of top train results to forward to test (default 3).
@@ -56,7 +57,9 @@ class AutoResearcher:
         test_pct: float = 0.25,
         validate_pct: float = 0.25,
         metric: str = 'sharpe_ratio',
-        min_trades: int = 10,
+        min_trades: int | None = None,
+        min_trades_train: int = 20,
+        min_trades_test: int = 10,
         candles: list[Candle] | None = None,
         initial_capital: float = 10000.0,
         top_n: int = 3,
@@ -66,7 +69,13 @@ class AutoResearcher:
 
         self.ticker = ticker
         self.metric = metric
-        self.min_trades = min_trades
+        # Backward compat: if old min_trades is passed, use it for both
+        if min_trades is not None:
+            self.min_trades_train = min_trades
+            self.min_trades_test = min_trades
+        else:
+            self.min_trades_train = min_trades_train
+            self.min_trades_test = min_trades_test
         self.initial_capital = initial_capital
         self.top_n = top_n
         self._train_pct = train_pct
@@ -183,9 +192,9 @@ class AutoResearcher:
         reason = ''
 
         # Check min_trades
-        if train_result.total_trades < self.min_trades:
+        if train_result.total_trades < self.min_trades_train:
             reason = (f"Discarded: only {train_result.total_trades} trades "
-                      f"(min {self.min_trades})")
+                      f"(min {self.min_trades_train})")
         elif train_metric <= self.log.best_train_sharpe:
             reason = (f"Discarded: train {self.metric}={train_metric:.4f} "
                       f"<= best {self.log.best_train_sharpe:.4f}")
@@ -194,9 +203,9 @@ class AutoResearcher:
             test_result = self.evaluate(strategy_fn, strategy_name, 'test')
             test_metric = getattr(test_result, self.metric)
 
-            if test_result.total_trades < self.min_trades:
+            if test_result.total_trades < self.min_trades_test:
                 reason = (f"Discarded: test trades={test_result.total_trades} "
-                          f"< min {self.min_trades}")
+                          f"< min {self.min_trades_test}")
             elif test_metric > self.log.best_test_sharpe:
                 kept = True
                 self.log.best_train_sharpe = train_metric
@@ -282,7 +291,7 @@ class AutoResearcher:
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
             experiments.append(exp)
-            if train_result.total_trades >= self.min_trades:
+            if train_result.total_trades >= self.min_trades_train:
                 train_scores.append((train_metric, exp_id, exp))
 
         # Phase 2 — test top N
@@ -294,9 +303,9 @@ class AutoResearcher:
             test_metric = getattr(test_result, self.metric)
             exp.test_result = test_result
 
-            if test_result.total_trades < self.min_trades:
+            if test_result.total_trades < self.min_trades_test:
                 exp.reason = (f"Discarded: test trades={test_result.total_trades} "
-                              f"< min {self.min_trades}")
+                              f"< min {self.min_trades_test}")
             elif test_metric > self.log.best_test_sharpe:
                 exp.kept = True
                 self.log.best_train_sharpe = score
@@ -377,7 +386,7 @@ class AutoResearcher:
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
             experiments.append(exp)
-            if train_result.total_trades >= self.min_trades:
+            if train_result.total_trades >= self.min_trades_train:
                 train_scores.append((train_metric, exp))
 
         # Phase 2 — test top N
@@ -389,9 +398,9 @@ class AutoResearcher:
             test_metric = getattr(test_result, self.metric)
             exp.test_result = test_result
 
-            if test_result.total_trades < self.min_trades:
+            if test_result.total_trades < self.min_trades_test:
                 exp.reason = (f"Discarded: test trades={test_result.total_trades} "
-                              f"< min {self.min_trades}")
+                              f"< min {self.min_trades_test}")
             elif test_metric > self.log.best_test_sharpe:
                 exp.kept = True
                 self.log.best_train_sharpe = score
