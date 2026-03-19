@@ -256,6 +256,78 @@ EMA Crossover, MACD, RSI Mean Reversion, RSI(2) Connors, Bollinger Breakout,
 Donchian Breakout, MA+ATR Mean Reversion, Golden Cross, Keltner Squeeze,
 Volume Confirmed Breakout, Bull Flag Breakout.
 
+## Screening — Fundamental-Filtered Discovery
+
+Use `StockScreener` to find candidates by fundamentals before running technical strategy sweeps.
+
+### Quick Example
+
+```python
+from pyhood.autoresearch import AutoResearcher
+from pyhood.screener import StockScreener
+
+# Screen for undervalued growth stocks
+screener = StockScreener('sp500')
+tickers = screener.screen_for_autoresearch(
+    filters={
+        'pe_ratio': {'max': 25},
+        'revenue_growth': {'min': 0.10},
+        'market_cap': {'min': 10_000_000_000},
+    },
+    max_tickers=5,
+    sort_by='revenue_growth',
+)
+# tickers → ['NVDA', 'AVGO', 'CRM', ...]
+```
+
+### Combined: Screen + Sweep
+
+```python
+researcher = AutoResearcher(ticker='SPY', total_period='10y')
+results = researcher.run_with_screening(
+    filters={'pe_ratio': {'max': 30}, 'revenue_growth': {'min': 0.05}},
+    universe='sp500',
+    max_tickers=5,
+)
+# results['tickers'] → screened tickers
+# results['ranked'] → all experiments sorted by test Sharpe
+```
+
+### Fundamental Filter on Strategies
+
+Wrap any strategy so it only trades tickers that pass fundamental checks:
+
+```python
+from pyhood.fundamentals import fundamental_filter
+from pyhood.backtest.strategies import ema_crossover
+
+strategy = fundamental_filter(
+    ema_crossover(fast=9, slow=21),
+    ticker='AAPL',
+    filters={'pe_ratio': {'max': 30}, 'revenue_growth': {'min': 0.05}}
+)
+# If AAPL fails the filter, strategy always returns None (no trades)
+```
+
+### Available Universes
+
+- `'sp500'` — Top ~100 S&P 500 stocks by market cap
+- `'nasdaq100'` — Top ~90 Nasdaq 100 stocks
+- Or pass a custom list: `['AAPL', 'MSFT', 'GOOGL']`
+
+### Filter Syntax
+
+```python
+filters = {
+    'pe_ratio': {'max': 25},          # PE ratio ≤ 25
+    'revenue_growth': {'min': 0.10},   # Revenue growth ≥ 10%
+    'market_cap': {'min': 1e9},        # Market cap ≥ $1B
+    'beta': {'min': 0.5, 'max': 2.0},  # Beta between 0.5 and 2.0
+}
+```
+
+Available filter properties: `pe_ratio`, `forward_pe`, `pb_ratio`, `debt_to_equity`, `revenue_growth`, `profit_margin`, `market_cap`, `beta`, `dividend_yield`, `insider_buy_pct`, `institutional_pct`, `short_ratio`, `earnings_growth`, `current_ratio`, `free_cash_flow`.
+
 ## Anti-Overfitting Checklist
 
 Before declaring a strategy "found":

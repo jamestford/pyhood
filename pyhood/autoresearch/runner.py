@@ -616,6 +616,88 @@ class AutoResearcher:
         return results
 
     # ------------------------------------------------------------------
+    # Screening integration
+    # ------------------------------------------------------------------
+
+    def run_with_screening(
+        self,
+        filters: dict,
+        universe: str | list[str] = 'sp500',
+        max_tickers: int = 5,
+        strategy_factories: list | None = None,
+    ) -> dict:
+        """Screen for tickers, then run autoresearch on each.
+
+        1. Screen *universe* with fundamental *filters*.
+        2. For the top *max_tickers* results, create a new AutoResearcher
+           per ticker and run parameter sweeps.
+        3. Aggregate and rank results across all tickers.
+
+        Args:
+            filters: Fundamental filter dict (same format as
+                ``FundamentalData.passes_filter``).
+            universe: ``'sp500'``, ``'nasdaq100'``, or a list of tickers.
+            max_tickers: Maximum tickers to research.
+            strategy_factories: List of ``(factory, param_grid, name)``
+                tuples.  Defaults to EMA crossover + MACD grids.
+
+        Returns:
+            Dict with ``'tickers'``, ``'results'`` (per-ticker experiment
+            lists), and ``'ranked'`` (all experiments sorted by test metric).
+        """
+        from pyhood.screener import StockScreener
+
+        screener = StockScreener(universe)
+        tickers = screener.screen_for_autoresearch(
+            filters, max_tickers=max_tickers
+        )
+
+        if not tickers:
+            return {'tickers': [], 'results': {}, 'ranked': []}
+
+        if strategy_factories is None:
+            from pyhood.backtest.strategies import ema_crossover, macd_crossover
+            strategy_factories = [
+                (ema_crossover, {'fast': [5, 9, 13], 'slow': [21, 30, 50]}, 'EMA'),
+                (macd_crossover, {'fast': [10, 12], 'slow': [24, 26], 'signal': [7, 9]}, 'MACD'),
+            ]
+
+        all_results: dict[str, list] = {}
+        all_experiments = []
+
+        for ticker in tickers:
+            try:
+                researcher = AutoResearcher(
+                    ticker=ticker,
+                    total_period='10y',
+                    initial_capital=self.initial_capital,
+                )
+                ticker_experiments = []
+                for factory, grid, name in strategy_factories:
+                    exps = researcher.multi_param_sweep(
+                        factory, grid, strategy_name=f'{name} ({ticker})'
+                    )
+                    ticker_experiments.extend(exps)
+                all_results[ticker] = ticker_experiments
+                all_experiments.extend(ticker_experiments)
+            except Exception as exc:
+                logger.warning("Screening research failed for %s: %s", ticker, exc)
+
+        # Rank all experiments by test metric
+        def _sort_key(e):
+            if e.test_result is not None:
+                return (1, getattr(e.test_result, self.metric))
+            return (0, getattr(e.train_result, self.metric))
+
+        all_experiments.sort(key=_sort_key, reverse=True)
+
+        return {
+            'tickers': tickers,
+            'results': all_results,
+            'ranked': all_experiments,
+        }
+
+    # ------------------------------------------------------------------
     # Reporting
     # ------------------------------------------------------------------
 
