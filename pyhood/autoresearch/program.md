@@ -35,6 +35,11 @@ researcher = AutoResearcher(ticker='SPY', total_period='10y')
 - **Multi-regime profitability** — Strategy must be profitable in at least 2 out of 4 regimes (bull/bear/recovery/correction)
 - **Regime dependency check** — If 80%+ of total P&L comes from one regime, flag as regime-dependent. These strategies are fragile and will blow up in different market conditions.
 - **Check regime_breakdown** — Always inspect `result.regime_breakdown` before declaring a strategy "found". Use `regime_report(result)` for a formatted view.
+- **Cross-validation required** — After a strategy passes train/test/validate, it must also pass cross-validation on related tickers.
+  - Default cross-validation for equity index ETFs: SPY + QQQ + DIA (must pass 2 out of 3, excluding primary ticker)
+  - Default cross-validation for crypto: BTC-USD + ETH-USD + SOL-USD (same rule)
+  - Cross-validation minimum: Sharpe > 0.5 and positive returns on each cross-validation ticker
+  - If cross-validation fails, the strategy is **ticker-specific** and should be noted as such — it may work on one instrument but not generalise
 
 ## Available Strategies
 
@@ -197,3 +202,5 @@ Before declaring a strategy "found":
 8. ☐ Profitable in ≥2 regimes (`regime_breakdown` check)
 9. ☐ Not regime-dependent (no single regime contributes 80%+ of P&L)
 10. ☐ `regime_report(result)` reviewed — no warning flags
+11. ☐ Cross-validation passed on related tickers (Sharpe > 0.5, positive returns)
+12. ☐ Strategy is not ticker-specific — generalises across at least 2 related instruments

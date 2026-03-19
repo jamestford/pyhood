@@ -20,6 +20,24 @@ from pyhood.models import Candle
 
 from .models import ExperimentLog, ExperimentResult
 
+logger = logging.getLogger(__name__)
+
+# Ticker groups for automatic cross-validation defaults
+_EQUITY_INDEX_ETFS = {'SPY', 'QQQ', 'DIA', 'IWM', 'VOO'}
+_EQUITY_CV_DEFAULTS = ['SPY', 'QQQ', 'DIA']
+_CRYPTO_TICKERS = {'BTC-USD', 'ETH-USD', 'SOL-USD'}
+_CRYPTO_CV_DEFAULTS = ['BTC-USD', 'ETH-USD', 'SOL-USD']
+
+
+def _default_cross_validate_tickers(ticker: str) -> list[str] | None:
+    """Return default cross-validation tickers based on the primary ticker."""
+    upper = ticker.upper()
+    if upper in _EQUITY_INDEX_ETFS:
+        return [t for t in _EQUITY_CV_DEFAULTS if t != upper]
+    if upper in _CRYPTO_TICKERS:
+        return [t for t in _CRYPTO_CV_DEFAULTS if t != upper]
+    return None
+
 
 class AutoResearcher:
     """Automated trading strategy discovery engine.
@@ -64,6 +82,9 @@ class AutoResearcher:
         candles: list[Candle] | None = None,
         initial_capital: float = 10000.0,
         top_n: int = 3,
+        cross_validate_tickers: list[str] | None = None,
+        cross_validate_min_pass: int = 2,
+        cross_validate_min_sharpe: float = 0.5,
     ):
         if abs(train_pct + test_pct + validate_pct - 1.0) > 1e-6:
             raise ValueError("train_pct + test_pct + validate_pct must equal 1.0")
@@ -82,6 +103,8 @@ class AutoResearcher:
         self._train_pct = train_pct
         self._test_pct = test_pct
         self._validate_pct = validate_pct
+        self.cross_validate_min_pass = cross_validate_min_pass
+        self.cross_validate_min_sharpe = cross_validate_min_sharpe
 
         # Fetch or accept candles
         if candles is not None:
@@ -96,11 +119,45 @@ class AutoResearcher:
         self.train_candles, self.test_candles, self.validate_candles = \
             self.split_data(all_candles)
 
+        # Cross-validation setup
+        self._cross_validators: dict[str, Backtester] = {}
+        self._cross_validate_tickers: list[str] | None = cross_validate_tickers
+        # Resolve defaults if not explicitly provided
+        if cross_validate_tickers is None:
+            self._cross_validate_tickers = _default_cross_validate_tickers(self.ticker)
+        # Fetch cross-validation data
+        if self._cross_validate_tickers:
+            self._init_cross_validators(total_period)
+
         # Experiment log
         self.log = ExperimentLog(
             ticker=self.ticker,
         )
         self._next_id = 1
+
+    def _init_cross_validators(self, total_period: str = '10y') -> None:
+        """Initialize Backtester instances for cross-validation tickers."""
+        for cv_ticker in (self._cross_validate_tickers or []):
+            try:
+                bt = Backtester.from_yfinance(
+                    cv_ticker, period=total_period,
+                    initial_capital=self.initial_capital,
+                )
+                self._cross_validators[cv_ticker] = bt
+            except Exception as exc:
+                logger.warning(
+                    "Failed to fetch cross-validation data for %s: %s",
+                    cv_ticker, exc,
+                )
+
+    def set_cross_validators(self, validators: dict[str, Backtester]) -> None:
+        """Manually set cross-validation Backtester instances (e.g. for testing).
+
+        Args:
+            validators: Dict mapping ticker symbol to a Backtester instance.
+        """
+        self._cross_validators = dict(validators)
+        self._cross_validate_tickers = list(validators.keys())
 
     # ------------------------------------------------------------------
     # Data splitting
@@ -432,6 +489,71 @@ class AutoResearcher:
         return experiments
 
     # ------------------------------------------------------------------
+    # Cross-validation
+    # ------------------------------------------------------------------
+
+    def cross_validate(self, strategy_fn, strategy_name: str) -> dict:
+        """Run strategy on all cross-validation tickers.
+
+        Runs the strategy on the FULL data of each cross-validation ticker
+        (not split — this is a robustness check, not optimization).
+
+        A ticker passes if:
+        - sharpe >= cross_validate_min_sharpe
+        - total_return > 0
+        - total_trades >= min_trades_test
+
+        Returns:
+            Dict with keys: 'passed', 'results', 'pass_count', 'required'.
+        """
+        if not self._cross_validators:
+            return {
+                'passed': True,
+                'results': {},
+                'pass_count': 0,
+                'required': 0,
+            }
+
+        results: dict[str, dict] = {}
+        pass_count = 0
+
+        for ticker, bt in self._cross_validators.items():
+            try:
+                backtest_result = bt.run(strategy_fn, strategy_name)
+                ticker_passed = (
+                    backtest_result.sharpe_ratio >= self.cross_validate_min_sharpe
+                    and backtest_result.total_return > 0
+                    and backtest_result.total_trades >= self.min_trades_test
+                )
+                results[ticker] = {
+                    'sharpe': round(backtest_result.sharpe_ratio, 4),
+                    'return': round(backtest_result.total_return, 2),
+                    'trades': backtest_result.total_trades,
+                    'passed': ticker_passed,
+                }
+                if ticker_passed:
+                    pass_count += 1
+            except Exception as exc:
+                logger.warning(
+                    "Cross-validation failed for %s: %s", ticker, exc,
+                )
+                results[ticker] = {
+                    'sharpe': 0.0,
+                    'return': 0.0,
+                    'trades': 0,
+                    'passed': False,
+                    'error': str(exc),
+                }
+
+        required = self.cross_validate_min_pass
+        return {
+            'passed': pass_count >= required,
+            'results': results,
+            'pass_count': pass_count,
+            'required': required,
+        }
+
+    # ------------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------------
 
@@ -472,6 +594,19 @@ class AutoResearcher:
             exp.validate_result = validate_result
             val_metric = getattr(validate_result, self.metric)
             exp.reason += f' | validate {self.metric}={val_metric:.4f}'
+
+            # Cross-validation
+            if self._cross_validators:
+                cv_result = self.cross_validate(strategy_fn, exp.strategy_name)
+                exp.cross_validation = cv_result
+                if cv_result['passed']:
+                    exp.reason += ' | cross-validation PASSED'
+                else:
+                    exp.reason += (
+                        f' | cross-validation FAILED '
+                        f'({cv_result["pass_count"]}/{cv_result["required"]} passed)'
+                    )
+
             results.append(exp)
 
         results.sort(
@@ -526,6 +661,23 @@ class AutoResearcher:
                 lines.append(f'     Trades: train={e.train_result.total_trades}'
                              + (f' test={e.test_result.total_trades}' if e.test_result else '')
                              + (f' val={e.validate_result.total_trades}' if e.validate_result else ''))
+                # Cross-validation results
+                if e.cross_validation and e.cross_validation.get('results'):
+                    cv = e.cross_validation
+                    status = '✅ PASSED' if cv['passed'] else '❌ FAILED'
+                    lines.append(f'     Cross-validation: {status} '
+                                 f'({cv["pass_count"]}/{cv["required"]} required)')
+                    for cv_ticker, cv_data in cv['results'].items():
+                        tick_status = '✅' if cv_data['passed'] else '❌'
+                        lines.append(
+                            f'       {tick_status} {cv_ticker}: '
+                            f'Sharpe={cv_data["sharpe"]:.4f} '
+                            f'Return={cv_data["return"]:.2f}% '
+                            f'Trades={cv_data["trades"]}'
+                        )
+                    if not cv['passed']:
+                        lines.append('     ⚠️ Strategy is ticker-specific — '
+                                     'failed cross-validation robustness check')
                 lines.append('')
         else:
             lines.append('')
@@ -724,6 +876,7 @@ def _experiment_to_dict(e: ExperimentResult) -> dict:
         'kept': e.kept,
         'reason': e.reason,
         'timestamp': e.timestamp,
+        'cross_validation': e.cross_validation,
     }
 
 
@@ -740,6 +893,7 @@ def _dict_to_experiment(d: dict) -> ExperimentResult:
         kept=d.get('kept', False),
         reason=d.get('reason', ''),
         timestamp=d.get('timestamp', ''),
+        cross_validation=d.get('cross_validation'),
     )
 
 

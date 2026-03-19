@@ -13,7 +13,11 @@ import pytest
 from pyhood.models import Candle
 from pyhood.backtest.models import BacktestResult
 from pyhood.autoresearch import AutoResearcher, ExperimentResult, ExperimentLog
-from pyhood.autoresearch.runner import _log_to_dict, _dict_to_log
+from pyhood.autoresearch.runner import (
+    _log_to_dict, _dict_to_log,
+    _default_cross_validate_tickers,
+)
+from pyhood.backtest.engine import Backtester
 from pyhood.backtest.strategies import ema_crossover, rsi_mean_reversion, macd_crossover
 
 
@@ -385,3 +389,278 @@ class TestImports:
         assert callable(AutoResearcher)
         assert ExperimentResult is not None
         assert ExperimentLog is not None
+
+
+# ---------------------------------------------------------------------------
+# Tests — cross-validation defaults
+# ---------------------------------------------------------------------------
+
+class TestCrossValidateDefaults:
+
+    def test_equity_etf_defaults_spy(self):
+        result = _default_cross_validate_tickers('SPY')
+        assert result is not None
+        assert 'SPY' not in result
+        assert 'QQQ' in result
+        assert 'DIA' in result
+
+    def test_equity_etf_defaults_qqq(self):
+        result = _default_cross_validate_tickers('QQQ')
+        assert result is not None
+        assert 'QQQ' not in result
+        assert 'SPY' in result
+        assert 'DIA' in result
+
+    def test_equity_etf_defaults_dia(self):
+        result = _default_cross_validate_tickers('DIA')
+        assert result is not None
+        assert 'DIA' not in result
+        assert 'SPY' in result
+        assert 'QQQ' in result
+
+    def test_equity_etf_defaults_iwm(self):
+        result = _default_cross_validate_tickers('IWM')
+        assert result is not None
+        assert 'IWM' not in result
+        # IWM is not in the default cv list, so all 3 are present
+        assert 'SPY' in result
+        assert 'QQQ' in result
+        assert 'DIA' in result
+
+    def test_crypto_defaults_btc(self):
+        result = _default_cross_validate_tickers('BTC-USD')
+        assert result is not None
+        assert 'BTC-USD' not in result
+        assert 'ETH-USD' in result
+        assert 'SOL-USD' in result
+
+    def test_crypto_defaults_eth(self):
+        result = _default_cross_validate_tickers('ETH-USD')
+        assert result is not None
+        assert 'ETH-USD' not in result
+        assert 'BTC-USD' in result
+
+    def test_unknown_ticker_returns_none(self):
+        result = _default_cross_validate_tickers('AAPL')
+        assert result is None
+
+    def test_unknown_ticker_returns_none_random(self):
+        result = _default_cross_validate_tickers('TSLA')
+        assert result is None
+
+    def test_case_insensitive(self):
+        # The function uppercases internally
+        result = _default_cross_validate_tickers('spy')
+        assert result is not None
+        assert 'SPY' not in result
+
+
+# ---------------------------------------------------------------------------
+# Tests — cross-validation init
+# ---------------------------------------------------------------------------
+
+class TestCrossValidateInit:
+
+    def test_empty_cross_validate_tickers(self):
+        """Passing empty list means no cross-validators initialized."""
+        candles = _make_candles(400)
+        ar = AutoResearcher(candles=candles, cross_validate_tickers=[])
+        assert ar._cross_validators == {}
+        assert ar._cross_validate_tickers == []
+
+    def test_unknown_ticker_no_default_cv(self):
+        """Unknown ticker with None cross_validate_tickers => no CV."""
+        candles = _make_candles(400, symbol='AAPL')
+        ar = AutoResearcher(candles=candles, ticker='AAPL')
+        # AAPL is not in equity ETF or crypto groups
+        assert ar._cross_validate_tickers is None
+        assert ar._cross_validators == {}
+
+    def test_set_cross_validators(self):
+        """set_cross_validators() populates _cross_validators."""
+        candles = _make_candles(400)
+        ar = AutoResearcher(candles=candles, cross_validate_tickers=[])
+        cv_candles = _make_candles(300, symbol='QQQ')
+        cv_bt = Backtester(cv_candles)
+        ar.set_cross_validators({'QQQ': cv_bt})
+        assert 'QQQ' in ar._cross_validators
+        assert ar._cross_validate_tickers == ['QQQ']
+
+
+# ---------------------------------------------------------------------------
+# Tests — cross_validate() method
+# ---------------------------------------------------------------------------
+
+class TestCrossValidateMethod:
+
+    def test_returns_correct_structure(self):
+        candles = _make_candles(500)
+        ar = AutoResearcher(candles=candles, cross_validate_tickers=[])
+
+        # Set up cross-validators manually
+        cv1 = Backtester(_make_candles(400, symbol='QQQ'))
+        cv2 = Backtester(_make_candles(400, symbol='DIA'))
+        ar.set_cross_validators({'QQQ': cv1, 'DIA': cv2})
+        ar.cross_validate_min_pass = 1
+
+        strategy = ema_crossover(fast=5, slow=20)
+        result = ar.cross_validate(strategy, 'EMA 5/20')
+
+        assert 'passed' in result
+        assert 'results' in result
+        assert 'pass_count' in result
+        assert 'required' in result
+        assert isinstance(result['passed'], bool)
+        assert isinstance(result['results'], dict)
+        assert 'QQQ' in result['results']
+        assert 'DIA' in result['results']
+
+        # Each ticker result should have expected keys
+        for ticker_data in result['results'].values():
+            assert 'sharpe' in ticker_data
+            assert 'return' in ticker_data
+            assert 'trades' in ticker_data
+            assert 'passed' in ticker_data
+
+    def test_no_cross_validators_passes(self):
+        """When no cross-validators, cross_validate returns passed=True."""
+        candles = _make_candles(400)
+        ar = AutoResearcher(candles=candles, cross_validate_tickers=[])
+        strategy = ema_crossover(fast=5, slow=20)
+        result = ar.cross_validate(strategy, 'EMA')
+        assert result['passed'] is True
+        assert result['results'] == {}
+        assert result['pass_count'] == 0
+        assert result['required'] == 0
+
+    def test_cross_validate_with_explicit_tickers(self):
+        candles = _make_candles(500)
+        ar = AutoResearcher(candles=candles, cross_validate_tickers=[])
+
+        cv_candles = _make_candles(400, trend=0.15, symbol='CUSTOM')
+        cv_bt = Backtester(cv_candles)
+        ar.set_cross_validators({'CUSTOM': cv_bt})
+        ar.cross_validate_min_pass = 1
+
+        strategy = ema_crossover(fast=5, slow=20)
+        result = ar.cross_validate(strategy, 'EMA')
+        assert 'CUSTOM' in result['results']
+
+    def test_cross_validate_min_pass_logic(self):
+        """Test that pass_count vs required determines overall passed."""
+        candles = _make_candles(500)
+        ar = AutoResearcher(candles=candles, cross_validate_tickers=[])
+
+        # Create 3 cross-validators
+        cv1 = Backtester(_make_candles(400, trend=0.20, symbol='A'))
+        cv2 = Backtester(_make_candles(400, trend=0.20, symbol='B'))
+        cv3 = Backtester(_make_candles(400, trend=0.20, symbol='C'))
+        ar.set_cross_validators({'A': cv1, 'B': cv2, 'C': cv3})
+
+        strategy = ema_crossover(fast=5, slow=20)
+
+        # Require all 3 to pass
+        ar.cross_validate_min_pass = 3
+        result = ar.cross_validate(strategy, 'EMA')
+        # pass_count may or may not be 3 depending on data, but structure is correct
+        assert result['required'] == 3
+        assert isinstance(result['pass_count'], int)
+        assert result['passed'] == (result['pass_count'] >= 3)
+
+        # Require only 1 to pass
+        ar.cross_validate_min_pass = 1
+        result = ar.cross_validate(strategy, 'EMA')
+        assert result['required'] == 1
+        assert result['passed'] == (result['pass_count'] >= 1)
+
+    def test_cross_validate_min_sharpe_threshold(self):
+        """High min_sharpe threshold should cause failures."""
+        candles = _make_candles(500)
+        ar = AutoResearcher(candles=candles, cross_validate_tickers=[])
+        ar.cross_validate_min_sharpe = 100.0  # impossibly high
+        ar.cross_validate_min_pass = 1
+
+        cv_bt = Backtester(_make_candles(400, symbol='QQQ'))
+        ar.set_cross_validators({'QQQ': cv_bt})
+
+        strategy = ema_crossover(fast=5, slow=20)
+        result = ar.cross_validate(strategy, 'EMA')
+        # No ticker should pass with sharpe threshold of 100
+        assert result['pass_count'] == 0
+        assert result['passed'] is False
+
+
+# ---------------------------------------------------------------------------
+# Tests — validate_best with cross-validation
+# ---------------------------------------------------------------------------
+
+class TestValidateBestCrossValidation:
+
+    def test_validate_best_includes_cross_validation(self):
+        candles = _make_candles(600)
+        ar = AutoResearcher(candles=candles, min_trades=0,
+                            cross_validate_tickers=[])
+
+        # Set up cross-validators
+        cv_bt = Backtester(_make_candles(500, trend=0.15, symbol='QQQ'))
+        ar.set_cross_validators({'QQQ': cv_bt})
+        ar.cross_validate_min_pass = 1
+
+        # Run experiments to get something to validate
+        ar.parameter_sweep(
+            ema_crossover, 'fast', [5, 7, 9, 11],
+            base_params={'slow': 21},
+            strategy_name='EMA',
+        )
+        validated = ar.validate_best(n=2)
+
+        for exp in validated:
+            if exp.validate_result is not None:
+                # Should have cross_validation populated
+                assert exp.cross_validation is not None
+                assert 'passed' in exp.cross_validation
+                assert 'results' in exp.cross_validation
+                assert 'QQQ' in exp.cross_validation['results']
+
+    def test_validate_best_no_cv_when_no_validators(self):
+        candles = _make_candles(600)
+        ar = AutoResearcher(candles=candles, min_trades=0,
+                            cross_validate_tickers=[])
+
+        ar.parameter_sweep(
+            ema_crossover, 'fast', [5, 7],
+            base_params={'slow': 21},
+            strategy_name='EMA',
+        )
+        validated = ar.validate_best(n=1)
+        for exp in validated:
+            # With no cross-validators, cross_validation should be None
+            assert exp.cross_validation is None
+
+
+# ---------------------------------------------------------------------------
+# Tests — report with cross-validation
+# ---------------------------------------------------------------------------
+
+class TestReportCrossValidation:
+
+    def test_report_includes_cross_validation_section(self):
+        candles = _make_candles(600)
+        ar = AutoResearcher(candles=candles, min_trades=0,
+                            cross_validate_tickers=[])
+
+        cv_bt = Backtester(_make_candles(500, trend=0.15, symbol='QQQ'))
+        ar.set_cross_validators({'QQQ': cv_bt})
+        ar.cross_validate_min_pass = 1
+
+        # Run experiments and validate
+        ar.parameter_sweep(
+            ema_crossover, 'fast', [5, 9],
+            base_params={'slow': 21},
+            strategy_name='EMA',
+        )
+        ar.validate_best(n=1)
+        report = ar.report()
+        assert isinstance(report, str)
+        # The report should mention cross-validation if any validated strategy has it
+        # (may or may not depending on whether strategy was kept+validated)
