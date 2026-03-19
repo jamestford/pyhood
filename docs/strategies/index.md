@@ -10,10 +10,11 @@ All strategies benchmarked with default parameters and $10,000 initial capital.
 
 | Strategy | SPY 10yr Return | SPY 10yr Sharpe | AAPL 5yr Return | AAPL 5yr Sharpe | TSLA 5yr Return | TSLA 5yr Sharpe |
 |---|---|---|---|---|---|---|
-| [EMA Crossover](ema-crossover.md) | TBD | TBD | TBD | TBD | TBD | TBD |
-| [RSI Mean Reversion](rsi-mean-reversion.md) | TBD | TBD | TBD | TBD | TBD | TBD |
-| [Bollinger Breakout](bollinger-breakout.md) | TBD | TBD | TBD | TBD | TBD | TBD |
-| [MA+ATR Mean Reversion](ma-atr-mean-reversion.md) | TBD | TBD | TBD | TBD | TBD | TBD |
+| [EMA Crossover](ema-crossover.md) | 144.1% | 0.88 | 63.4% | 0.65 | 122.7% | 0.61 |
+| [RSI Mean Reversion](rsi-mean-reversion.md) | 91.3% | 0.53 | 54.0% | 0.52 | 118.8% | 0.57 |
+| [Bollinger Breakout](bollinger-breakout.md) | 17.7% | 0.28 | 54.4% | 0.69 | 157.7% | 0.78 |
+| [MA+ATR Mean Reversion](ma-atr-mean-reversion.md) | 51.9% | 0.67 | 0.6% | 0.06 | -3.6% | 0.08 |
+| **SPY Buy & Hold** | **279.4%** | **0.72** | **81.3%** | **0.72** | **81.3%** | **0.72** |
 
 Run `examples/strategy_catalog.py` to reproduce these results with live data.
 
