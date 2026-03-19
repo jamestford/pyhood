@@ -6,270 +6,394 @@ Base URL: `https://api.robinhood.com`
 
 ## Batch Limits
 
-| Endpoint | Max Batch Size | Limiting Factor |
-|----------|---------------|-----------------|
-| `/fundamentals/` | **100 symbols** | Hard count limit |
-| `/quotes/` | **~1,220 symbols** | URL length (~5,700 chars) |
-| `/marketdata/options/` | **17 instruments** | URL length |
+| Endpoint | Max Batch | Limiting Factor | Safe Default |
+|----------|-----------|-----------------|--------------|
+| `/fundamentals/` | 100 symbols | Hard count limit | 100 |
+| `/quotes/` | ~1,220 symbols | URL length (~5,700 chars) | 1,000 |
+| `/marketdata/options/` | ~17 instruments | URL length | 17 |
 
-Use 100 for fundamentals and 1,000 for quotes as safe defaults.
+---
 
 ## Market Data
 
-### Quotes
+### GET /quotes/
+
+Current price data for one or many symbols.
 
 ```
 GET /quotes/?symbols=AAPL,MSFT,TSLA
+GET /quotes/AAPL/
 ```
 
-Returns: `last_trade_price`, `previous_close`, `bid_price`, `ask_price`, `last_trade_volume`, `updated_at`
+**Batch:** ✅ Up to ~1,220 symbols (comma-separated)
 
-Batch: ✅ Up to ~1,220 symbols (comma-separated)
+**Returns:**
 
-### Fundamentals
+| Field | Type | Description |
+|-------|------|-------------|
+| `symbol` | string | Ticker symbol |
+| `last_trade_price` | string | Current/last trade price |
+| `previous_close` | string | Previous day's close |
+| `bid_price` | string | Current bid |
+| `ask_price` | string | Current ask |
+| `bid_size` | int | Bid size |
+| `ask_size` | int | Ask size |
+| `last_trade_volume` | string | Volume of last trade |
+| `last_extended_hours_trade_price` | string | After-hours price |
+| `updated_at` | string | Timestamp |
+| `instrument` | string | Instrument URL |
+
+---
+
+### GET /fundamentals/
+
+Fundamental data including valuation, 52-week range, and company info.
 
 ```
 GET /fundamentals/?symbols=AAPL,MSFT,TSLA
 GET /fundamentals/AAPL/
 ```
 
-Returns: `high_52_weeks`, `low_52_weeks`, `market_cap`, `pb_ratio`, `pe_ratio`, `shares_outstanding`, `float`, `volume`, `average_volume`, `average_volume_2_weeks`, `average_volume_30_days`, `sector`, `industry`, `description`, `ceo`, `num_employees`, `year_founded`, `dividend_yield`
+**Batch:** ✅ Up to 100 symbols (comma-separated)
 
-Batch: ✅ Up to 100 symbols
+**Returns:**
 
-### Historical Data
+| Field | Type | Description |
+|-------|------|-------------|
+| `high_52_weeks` | string | 52-week high price |
+| `high_52_weeks_date` | string | Date of 52-week high |
+| `low_52_weeks` | string | 52-week low price |
+| `low_52_weeks_date` | string | Date of 52-week low |
+| `market_cap` | string | Market capitalization |
+| `pb_ratio` | string | Price-to-book ratio |
+| `pe_ratio` | string | Price-to-earnings ratio |
+| `shares_outstanding` | string | Total shares outstanding |
+| `float` | string | Public float |
+| `dividend_yield` | string | Dividend yield |
+| `volume` | string | Today's volume |
+| `average_volume` | string | Average daily volume |
+| `average_volume_2_weeks` | string | 2-week average volume |
+| `average_volume_30_days` | string | 30-day average volume |
+| `open` | string | Today's open price |
+| `high` | string | Today's high |
+| `low` | string | Today's low |
+| `sector` | string | Company sector |
+| `industry` | string | Company industry |
+| `description` | string | Company description |
+| `ceo` | string | CEO name |
+| `headquarters_city` | string | HQ city |
+| `headquarters_state` | string | HQ state |
+| `num_employees` | int | Employee count |
+| `year_founded` | int | Year founded |
+
+---
+
+### GET /marketdata/historicals/
+
+Historical OHLCV candle data.
 
 ```
 GET /marketdata/historicals/?symbols=AAPL&interval=day&span=year&bounds=regular
 ```
 
+**Batch:** ❌ Single symbol only
+
+**Parameters:**
+
 | Param | Values |
 |-------|--------|
+| `symbols` | Single ticker |
 | `interval` | `5minute`, `10minute`, `hour`, `day`, `week` |
 | `span` | `day`, `week`, `month`, `3month`, `year`, `5year` |
 | `bounds` | `regular`, `extended`, `trading` |
 
-Returns: OHLCV candles with `begins_at`, `open_price`, `close_price`, `high_price`, `low_price`, `volume`
+**Returns (per candle):**
 
-Batch: ❌ Single symbol only
+| Field | Type | Description |
+|-------|------|-------------|
+| `begins_at` | string | Candle start timestamp |
+| `open_price` | string | Open price |
+| `close_price` | string | Close price |
+| `high_price` | string | High price |
+| `low_price` | string | Low price |
+| `volume` | int | Volume |
+| `session` | string | Trading session (`reg`, `pre`, `post`) |
+| `interpolated` | bool | Whether data was interpolated |
 
-### Earnings
+---
+
+### GET /marketdata/earnings/
+
+Earnings calendar with EPS estimates and actuals.
 
 ```
 GET /marketdata/earnings/?symbol=AAPL
 ```
 
-Returns: Earnings dates, EPS estimates, EPS actuals, timing (am/pm)
+**Batch:** ❌ Single symbol
 
-Batch: ❌ Single symbol
+**Returns:**
 
-### Ratings
+| Field | Type | Description |
+|-------|------|-------------|
+| `report.date` | string | Earnings date (YYYY-MM-DD) |
+| `report.timing` | string | `am` or `pm` |
+| `eps.estimate` | string | Consensus EPS estimate |
+| `eps.actual` | string | Actual EPS (after report) |
+
+---
+
+### GET /midlands/ratings/
+
+Analyst ratings and price targets.
 
 ```
 GET /midlands/ratings/?symbol=AAPL
 ```
 
-Returns: Analyst ratings and price targets
+**Batch:** ❌ Single symbol
 
-Batch: ❌ Single symbol
+---
 
-### News
+### GET /midlands/news/
+
+Recent news articles for a symbol.
 
 ```
 GET /midlands/news/?symbol=AAPL
 ```
 
-Returns: Recent news articles for the symbol
+**Batch:** ❌ Single symbol
 
-Batch: ❌ Single symbol
+---
+
+## Options
+
+### GET /options/chains/
+
+Available options expiration dates for a symbol.
+
+```
+GET /options/chains/?equity_instrument_ids={instrument_id}
+```
+
+!!! warning
+    Use `equity_instrument_ids` param, not `symbol`. Get the instrument ID from `/instruments/?symbol=AAPL` first.
+
+**Returns:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `expiration_dates` | list | Available expiration dates |
+| `symbol` | string | Underlying symbol |
+| `trade_value_multiplier` | string | Contract multiplier (usually 100) |
+
+---
+
+### GET /options/instruments/
+
+Option contracts filtered by symbol, expiration, and type.
+
+```
+GET /options/instruments/?chain_symbol=AAPL&expiration_dates=2026-04-17&state=active&type=call
+```
+
+**Returns (per contract):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Option instrument ID |
+| `url` | string | Full instrument URL |
+| `strike_price` | string | Strike price |
+| `expiration_date` | string | Expiration date |
+| `type` | string | `call` or `put` |
+| `state` | string | `active`, `expired` |
+
+---
+
+### GET /marketdata/options/
+
+Market data and Greeks for option instruments.
+
+```
+GET /marketdata/options/?instruments={url1},{url2},...
+```
+
+!!! warning
+    Pass **full instrument URLs**, not IDs. Max ~17 per request.
+
+**Returns:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `adjusted_mark_price` | string | Mid-market price |
+| `bid_price` | string | Bid price |
+| `ask_price` | string | Ask price |
+| `implied_volatility` | string | IV (decimal, e.g., 0.35 = 35%) |
+| `delta` | string | Delta |
+| `gamma` | string | Gamma |
+| `theta` | string | Theta |
+| `vega` | string | Vega |
+| `rho` | string | Rho |
+| `volume` | int | Day's volume |
+| `open_interest` | int | Open interest |
+| `chance_of_profit_long` | string | Estimated chance of profit (long) |
+| `chance_of_profit_short` | string | Estimated chance of profit (short) |
+
+---
 
 ## Discovery & Lists
 
-### S&P 500 Movers
+### GET /midlands/movers/sp500/
+
+Top 10 S&P 500 daily movers.
 
 ```
 GET /midlands/movers/sp500/?direction=up
 GET /midlands/movers/sp500/?direction=down
 ```
 
-Returns: Top 10 daily movers with `symbol`, `price_movement`, `description`
+**Returns:** 10 stocks with `symbol`, `price_movement`, `description`
 
-### Sector / Category Lists
+---
+
+### GET /midlands/tags/tag/{tag}/
+
+Pre-built stock lists by category.
 
 ```
-GET /midlands/tags/tag/{tag-name}/
+GET /midlands/tags/tag/upcoming-earnings/
 ```
 
-Returns: `instruments` (list of instrument URLs), `name`, `description`
+**Available tags:**
 
-| Tag | Stocks | Description |
+| Tag | ~Count | Description |
 |-----|--------|-------------|
-| `most-popular-under-25` | ~24 | Retail-popular cheap stocks |
-| `upcoming-earnings` | ~70 | Stocks with earnings in next 2 weeks |
-| `new-on-robinhood` | ~172 | Recently added stocks |
-| `etf` | ~500 | ETFs |
-| `technology` | ~500 | Tech stocks |
-| `finance` | ~500 | Financial stocks |
-| `energy` | ~386 | Energy stocks |
-| `healthcare` | ~212 | Healthcare stocks |
+| `most-popular-under-25` | 24 | Retail-popular cheap stocks |
+| `upcoming-earnings` | 70 | Earnings in next 2 weeks |
+| `new-on-robinhood` | 172 | Recently added |
+| `etf` | 500 | ETFs |
+| `technology` | 500 | Tech sector |
+| `finance` | 500 | Financial sector |
+| `energy` | 386 | Energy sector |
+| `healthcare` | 212 | Healthcare sector |
+
+**Returns:** `instruments` (list of instrument URLs), `name`, `description`
+
+---
 
 ## Instruments
 
-### List All Instruments
+### GET /instruments/
+
+List or search all instruments.
 
 ```
-GET /instruments/?active_instruments_only=true
+GET /instruments/?active_instruments_only=true    # All tradeable (~4,909 stocks)
+GET /instruments/?query=apple                      # Search by name
+GET /instruments/?symbol=AAPL                      # Exact symbol lookup
 ```
 
-Returns: Paginated list of all instruments. Each has `symbol`, `name`, `tradeable`, `state`, `type`, `tradable_chain_id`, `sector`, `industry`
+**Paginated:** ✅ 100 per page
 
-Paginated: ✅ (100 per page, ~50 pages for all stocks)
+**Returns:**
 
-### Search
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Instrument UUID |
+| `url` | string | Full instrument URL |
+| `symbol` | string | Ticker symbol |
+| `name` | string | Full company name |
+| `simple_name` | string | Short company name |
+| `tradeable` | bool | Currently tradeable |
+| `state` | string | `active`, `inactive` |
+| `type` | string | `stock`, `etp`, `adr` |
+| `tradable_chain_id` | string | Options chain ID (if available) |
+| `market` | string | Market URL |
+| `country` | string | Country code |
+| `list_date` | string | IPO / listing date |
 
-```
-GET /instruments/?query=apple
-```
-
-Returns: Instruments matching the search query
-
-## Options
-
-### Chains
-
-```
-GET /options/chains/?equity_instrument_ids={instrument_id}
-```
-
-Returns: `expiration_dates`, `trade_value_multiplier`, `underlying_instruments`
-
-Note: Use `equity_instrument_ids` param, not `symbol`. Get the instrument ID from `/instruments/?symbol=AAPL` first.
-
-### Options Instruments
-
-```
-GET /options/instruments/?chain_symbol=AAPL&expiration_dates=2026-04-17&state=active&type=call
-```
-
-Returns: Paginated list of option contracts with `strike_price`, `expiration_date`, `type`, `url`, `id`
-
-### Options Market Data
-
-```
-GET /marketdata/options/?instruments={url1},{url2},...
-```
-
-Returns: `adjusted_mark_price`, `bid_price`, `ask_price`, `implied_volatility`, `delta`, `gamma`, `theta`, `vega`, `volume`, `open_interest`
-
-**Important:** Pass full instrument URLs, not IDs. Max ~17 per request.
-
-## Orders
-
-### Stock Orders
-
-```
-GET /orders/
-POST /orders/
-```
-
-### Options Orders
-
-```
-GET /options/orders/
-POST /options/orders/
-```
+---
 
 ## Account
 
-### Positions
+### GET /positions/
+
+Current stock positions.
 
 ```
 GET /positions/?nonzero=true
 ```
 
-Returns: Current stock positions with `quantity`, `average_buy_price`, `instrument`
+**Returns:** `quantity`, `average_buy_price`, `instrument`, `created_at`
 
-### Options Positions
+### GET /options/aggregate_positions/
 
-```
-GET /options/aggregate_positions/
-```
+Current option positions.
 
-Returns: Current option positions
+### GET /portfolios/
 
-### Portfolios
+Portfolio summary with total value.
 
-```
-GET /portfolios/
-```
+### GET /accounts/
 
-Returns: Portfolio value, equity, market value
+Account details with buying power and cash balances.
 
-### Accounts
+### GET /orders/
 
-```
-GET /accounts/
-```
+Stock order history (paginated).
 
-Returns: Account details, buying power, cash balances
+### GET /options/orders/
 
-### Watchlists
+Options order history (paginated).
 
-```
-GET /midlands/lists/default/
-```
+### GET /midlands/lists/default/
 
-Returns: Stocks on your default watchlist
+Your default watchlist.
 
-### Dividends
+### GET /dividends/
 
-```
-GET /dividends/
-```
+Dividend payment history.
 
-Returns: Dividend history
+---
 
 ## Profile
 
-### User Profile
+### GET /user/
 
-```
-GET /user/
-```
+Basic account information (user ID, URLs).
 
-Returns: User ID, basic account info
+### GET /user/investment_profile/
 
-### Investment Profile
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_net_worth` | string | Self-reported net worth |
+| `annual_income` | string | Self-reported income |
+| `risk_tolerance` | string | Risk preference |
+| `investment_experience` | string | Experience level |
 
-```
-GET /user/investment_profile/
-```
-
-Returns: `total_net_worth`, `annual_income`, risk tolerance, experience level
+---
 
 ## Authentication
 
-### Login
+### POST /oauth2/token/
 
-```
-POST /oauth2/token/
-```
+Login (password grant) or refresh (refresh_token grant).
 
-See [Authentication docs](authentication.md) for details.
+See [Authentication](authentication.md) for details.
 
-### Logout
+### POST /oauth2/revoke_token/
 
-```
-POST /oauth2/revoke_token/
-```
+Logout and revoke tokens.
+
+---
 
 ## Markets
 
-### Market Hours
+### GET /markets/
 
-```
-GET /markets/
-GET /markets/{market}/hours/{date}/
-```
+List of available markets (NYSE, NASDAQ, etc.).
 
-Returns: Market open/close times, whether market is open today
+### GET /markets/{market}/hours/{date}/
+
+Market hours for a specific date. Returns open/close times and whether the market is open.
