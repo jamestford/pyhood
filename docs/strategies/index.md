@@ -36,7 +36,7 @@ All strategies benchmarked with default parameters, $10,000 initial capital, 10y
 
 | Strategy | SPY | QQQ | AAPL | TSLA | BTC |
 |---|---|---|---|---|---|
-| **Buy & Hold** | **279.3% / 0.84** | **485.6% / 0.91** | **926.3% / 0.95** | **2343.0% / 0.84** | **16751.0% / 0.91** |
+| **Buy & Hold** | **276.8% / 0.83** | **485.6% / 0.91** | **926.3% / 0.95** | **2343.0% / 0.84** | **16751.0% / 0.91** |
 
 ## Key Findings
 
