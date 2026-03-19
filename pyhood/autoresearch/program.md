@@ -156,6 +156,30 @@ r.report()
 r.save('my_research.json')
 ```
 
+## Logging Engine Limitations
+
+If you want to test something but the backtesting engine doesn't support it, **don't skip it silently**. Log it to `autoresearch_limitations.md` in the working directory:
+
+```markdown
+## Limitation: [short description]
+- **What I wanted to test:** [the idea]
+- **What's missing:** [what the engine can't do]
+- **Suggested fix:** [how the engine could be extended]
+- **Priority:** [high/medium/low based on expected impact]
+```
+
+Examples of things you might hit:
+- No commission/slippage modeling (results are too optimistic)
+- No stop-loss/take-profit as engine features (only signal-based exits)
+- No trailing stops
+- No multi-asset or hedged strategies
+- No intraday data (daily bars only)
+- No short selling with borrowing costs
+- Missing indicators (no VWAP, no order flow, no options Greeks)
+- Can't size positions dynamically (always 100% in or 100% out)
+
+This log is critical — it tells us exactly what to build next.
+
 ## Anti-Overfitting Checklist
 
 Before declaring a strategy "found":
