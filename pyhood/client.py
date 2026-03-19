@@ -61,10 +61,14 @@ class PyhoodClient:
         )
 
     def get_quotes(self, symbols: list[str]) -> dict[str, Quote]:
-        """Get quotes for multiple symbols (batched)."""
+        """Get quotes for multiple symbols (batched).
+
+        Robinhood's quotes endpoint supports up to ~1,000 symbols per
+        request (limited by URL length ~5,700 chars). We use 1,000 as
+        a safe batch size.
+        """
         results: dict[str, Quote] = {}
-        # Robinhood supports comma-separated symbols
-        batch_size = 25
+        batch_size = 1000
         for i in range(0, len(symbols), batch_size):
             batch = symbols[i : i + batch_size]
             data = self._session.get(
@@ -92,6 +96,69 @@ class PyhoodClient:
         """Get fundamental data for a symbol (PE, market cap, 52w range)."""
         data = self._session.get(f"{urls.FUNDAMENTALS}{symbol.upper()}/")
         return data or {}
+
+    def get_fundamentals_batch(
+        self, symbols: list[str],
+    ) -> dict[str, dict[str, Any]]:
+        """Get fundamental data for multiple symbols (batched).
+
+        Returns dict mapping symbol to fundamentals. Robinhood's
+        fundamentals endpoint supports exactly 100 symbols per request.
+
+        Returned fields include: high_52_weeks, low_52_weeks, market_cap,
+        pb_ratio, pe_ratio, shares_outstanding, float, volume,
+        average_volume, sector, industry, description, and more.
+        """
+        results: dict[str, dict[str, Any]] = {}
+        batch_size = 100  # Robinhood hard limit: exactly 100
+
+        for i in range(0, len(symbols), batch_size):
+            batch = symbols[i : i + batch_size]
+            data = self._session.get(
+                urls.FUNDAMENTALS,
+                params={"symbols": ",".join(s.upper() for s in batch)},
+            )
+            for j, fund in enumerate(data.get("results", [])):
+                if fund and j < len(batch):
+                    results[batch[j].upper()] = fund
+
+        return results
+
+    def get_all_instruments(
+        self, tradeable_only: bool = True,
+    ) -> list[str]:
+        """Get all stock symbols available on Robinhood.
+
+        Paginates through the instruments endpoint to collect every
+        tradeable stock symbol. Typically returns ~5,000 symbols.
+
+        Args:
+            tradeable_only: If True, only return actively tradeable stocks.
+
+        Returns:
+            List of ticker symbols.
+        """
+        symbols: list[str] = []
+        url: str | None = f"{urls.INSTRUMENTS}/"
+        params: dict[str, str] | None = (
+            {"active_instruments_only": "true"} if tradeable_only else None
+        )
+
+        while url:
+            data = self._session.get(url, params=params)
+            params = None  # Only on first request
+            for inst in data.get("results", []):
+                if tradeable_only:
+                    if (inst.get("tradeable")
+                            and inst.get("state") == "active"
+                            and inst.get("type") == "stock"):
+                        symbols.append(inst["symbol"])
+                else:
+                    if inst.get("symbol"):
+                        symbols.append(inst["symbol"])
+            url = data.get("next")
+
+        return symbols
 
     # ── Options ─────────────────────────────────────────────────────────
 
