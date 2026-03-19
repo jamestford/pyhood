@@ -10,6 +10,7 @@ from __future__ import annotations
 import inspect
 import itertools
 import json
+import logging
 import math
 from datetime import datetime, timezone
 
@@ -657,11 +658,13 @@ def _backtest_to_dict(r: BacktestResult) -> dict:
                 'quantity': t.quantity,
                 'pnl': t.pnl,
                 'pnl_pct': t.pnl_pct,
+                'regime': t.regime,
             }
             for t in r.trades
         ],
         # Omit equity_curve for size (can be large)
         'equity_curve_len': len(r.equity_curve),
+        'regime_breakdown': r.regime_breakdown,
     }
 
 
@@ -681,6 +684,7 @@ def _dict_to_backtest(d: dict) -> BacktestResult:
             quantity=t['quantity'],
             pnl=t['pnl'],
             pnl_pct=t['pnl_pct'],
+            regime=t.get('regime', 'unknown'),
         )
         for t in d.get('trades', [])
     ]
@@ -703,6 +707,7 @@ def _dict_to_backtest(d: dict) -> BacktestResult:
         alpha=d.get('alpha', 0.0),
         trades=trades,
         equity_curve=[],
+        regime_breakdown=d.get('regime_breakdown'),
     )
 
 

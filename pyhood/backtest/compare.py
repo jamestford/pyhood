@@ -104,6 +104,54 @@ def _fetch_spy_metrics(yf, period: str) -> tuple[float, float]:
     return spy_return, spy_sharpe
 
 
+def regime_report(result: BacktestResult) -> str:
+    """Format a per-regime performance breakdown for a backtest result.
+
+    Shows trades, wins, win rate, and P&L per regime. Flags if 80%+ of
+    total P&L comes from a single regime (regime-dependent strategy).
+
+    Args:
+        result: A BacktestResult with regime_breakdown populated.
+
+    Returns:
+        Formatted multi-line string.
+    """
+    if not result.regime_breakdown:
+        return f"{result.strategy_name}: No regime breakdown available (no trades or data)."
+
+    lines = [
+        f"=== Regime Report: {result.strategy_name} ===",
+        "",
+        f"  {'Regime':<14} {'Trades':>7} {'Wins':>6} {'Win Rate':>10} {'P&L':>12}",
+        f"  {'-'*14} {'-'*7} {'-'*6} {'-'*10} {'-'*12}",
+    ]
+
+    total_pnl = sum(d['pnl'] for d in result.regime_breakdown.values())
+
+    for regime in ['bull', 'bear', 'recovery', 'correction', 'unknown']:
+        if regime not in result.regime_breakdown:
+            continue
+        d = result.regime_breakdown[regime]
+        lines.append(
+            f"  {regime:<14} {d['trades']:>7} {d['wins']:>6} "
+            f"{d['win_rate']:>9.1f}% {d['pnl']:>11.2f}"
+        )
+
+    lines.append("")
+    lines.append(f"  Total P&L: ${total_pnl:,.2f}")
+
+    # Flag regime dependency
+    if total_pnl != 0:
+        for regime, d in result.regime_breakdown.items():
+            pct = abs(d['pnl']) / abs(total_pnl) * 100 if total_pnl != 0 else 0
+            if d['pnl'] != 0 and (d['pnl'] / total_pnl) > 0 and pct >= 80:
+                lines.append(
+                    f"  ⚠️  REGIME-DEPENDENT: {pct:.0f}% of P&L comes from '{regime}' regime"
+                )
+
+    return "\n".join(lines)
+
+
 def compare_backtests(results: list[BacktestResult]) -> str:
     """Format comparison table of multiple backtest results.
 

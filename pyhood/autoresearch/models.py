@@ -20,6 +20,7 @@ class ExperimentResult:
     kept: bool = False              # Whether this beat the previous best
     reason: str = ''                # Why kept/discarded
     timestamp: str = ''
+    cross_validation: dict | None = None  # Results from cross_validate()
 
 
 @dataclass

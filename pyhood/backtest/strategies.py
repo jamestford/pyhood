@@ -12,6 +12,49 @@ from collections.abc import Callable
 from pyhood.models import Candle
 
 
+def _classify_regime(candles: list[Candle], index: int, sma_period: int = 200) -> str:
+    """Classify market regime at a given candle index.
+
+    Uses the 200-period SMA and its slope to determine regime:
+      - bull: price > SMA and SMA rising
+      - bear: price < SMA and SMA falling
+      - recovery: price > SMA but SMA falling
+      - correction: price < SMA but SMA rising
+      - unknown: not enough data for SMA calculation
+
+    Args:
+        candles: Full list of candles (needs sma_period + 5 bars of context).
+        index: Index into candles at which to classify.
+        sma_period: SMA period for regime detection (default 200).
+
+    Returns:
+        One of 'bull', 'bear', 'recovery', 'correction', 'unknown'.
+    """
+    # Need at least sma_period bars up to and including index
+    if index < sma_period - 1:
+        return 'unknown'
+
+    # Also need index - 5 to have a valid SMA for slope comparison
+    if index < sma_period - 1 + 5:
+        return 'unknown'
+
+    # Calculate SMA at index
+    prices_to_index = [c.close_price for c in candles[index - sma_period + 1:index + 1]]
+    sma_now = sum(prices_to_index) / sma_period
+
+    # Calculate SMA at index - 5
+    prices_to_prev = [c.close_price for c in candles[index - 5 - sma_period + 1:index - 5 + 1]]
+    sma_prev = sum(prices_to_prev) / sma_period
+
+    price = candles[index].close_price
+    sma_rising = sma_now > sma_prev
+
+    if price > sma_now:
+        return 'bull' if sma_rising else 'recovery'
+    else:
+        return 'correction' if sma_rising else 'bear'
+
+
 def _calculate_ema(prices: list[float], period: int) -> list[float]:
     """Calculate Exponential Moving Average.
 

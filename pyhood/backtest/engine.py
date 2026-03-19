@@ -6,6 +6,7 @@ import math
 from datetime import datetime
 
 from pyhood.backtest.models import BacktestResult, Trade
+from pyhood.backtest.strategies import _classify_regime
 from pyhood.models import Candle
 
 
@@ -153,11 +154,13 @@ class Backtester:
                 # Enter long position (pay slightly more due to slippage)
                 effective_buy = candle.close_price * (1 + slip)
                 shares = cash / effective_buy
+                regime = _classify_regime(self.candles, i)
                 position = {
                     'side': 'long',
                     'quantity': shares,
                     'entry_price': effective_buy,
-                    'entry_date': candle.begins_at
+                    'entry_date': candle.begins_at,
+                    'regime': regime,
                 }
                 cash = 0.0  # All cash invested
 
@@ -176,7 +179,8 @@ class Backtester:
                     exit_price=effective_sell,
                     quantity=position['quantity'],
                     pnl=pnl,
-                    pnl_pct=pnl_pct
+                    pnl_pct=pnl_pct,
+                    regime=position.get('regime', 'unknown'),
                 )
                 trades.append(trade)
 
@@ -187,11 +191,13 @@ class Backtester:
                 # Enter short position (receive slightly less due to slippage)
                 effective_short = candle.close_price * (1 - slip)
                 shares = cash / candle.close_price  # position sizing uses market price
+                regime = _classify_regime(self.candles, i)
                 position = {
                     'side': 'short',
                     'quantity': shares,
                     'entry_price': effective_short,
-                    'entry_date': candle.begins_at
+                    'entry_date': candle.begins_at,
+                    'regime': regime,
                 }
                 # For short selling, we assume we receive cash from the sale
                 # but we track the liability
@@ -212,7 +218,8 @@ class Backtester:
                     exit_price=effective_cover,
                     quantity=position['quantity'],
                     pnl=pnl,
-                    pnl_pct=pnl_pct
+                    pnl_pct=pnl_pct,
+                    regime=position.get('regime', 'unknown'),
                 )
                 trades.append(trade)
 
@@ -333,6 +340,28 @@ class Backtester:
         # Alpha (excess return vs buy and hold)
         alpha = total_return - buy_hold_return
 
+        # Regime breakdown
+        regime_breakdown = None
+        if trades:
+            regime_data: dict[str, dict] = {}
+            for t in trades:
+                r = t.regime
+                if r not in regime_data:
+                    regime_data[r] = {'trades': 0, 'wins': 0, 'pnl': 0.0}
+                regime_data[r]['trades'] += 1
+                if t.pnl > 0:
+                    regime_data[r]['wins'] += 1
+                regime_data[r]['pnl'] += t.pnl
+
+            regime_breakdown = {}
+            for r, d in regime_data.items():
+                regime_breakdown[r] = {
+                    'trades': d['trades'],
+                    'wins': d['wins'],
+                    'win_rate': round((d['wins'] / d['trades']) * 100, 1) if d['trades'] > 0 else 0.0,
+                    'pnl': round(d['pnl'], 2),
+                }
+
         return BacktestResult(
             strategy_name=strategy_name,
             symbol=self.symbol,
@@ -352,4 +381,5 @@ class Backtester:
             trades=trades,
             equity_curve=equity_curve,
             slippage_pct=self.slippage_pct,
+            regime_breakdown=regime_breakdown,
         )

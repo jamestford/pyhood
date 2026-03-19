@@ -6,9 +6,10 @@ from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from pyhood.models import Candle
-from pyhood.backtest import Backtester, BacktestResult, Trade, benchmark_spy, compare_backtests, rank_backtests
+from pyhood.backtest import Backtester, BacktestResult, Trade, benchmark_spy, compare_backtests, rank_backtests, regime_report
 from pyhood.backtest.compare import sensitivity_report, sensitivity_test
 from pyhood.backtest.strategies import (
+    _classify_regime,
     _calculate_net_distribution,
     _detect_bull_flag,
     bollinger_breakout,
@@ -1251,3 +1252,190 @@ class TestSensitivityTest:
         from pyhood.backtest import sensitivity_test as st, sensitivity_report as sr
         assert callable(st)
         assert callable(sr)
+
+
+class TestClassifyRegime:
+    """Test the _classify_regime helper."""
+
+    def _make_candles(self, prices: list[float], symbol: str = "TEST") -> list[Candle]:
+        base_date = datetime(2023, 1, 1)
+        candles = []
+        for i, price in enumerate(prices):
+            date_str = (base_date + timedelta(days=i)).isoformat() + "Z"
+            candles.append(Candle(
+                symbol=symbol,
+                begins_at=date_str,
+                open_price=price * 0.995,
+                close_price=price,
+                high_price=price * 1.02,
+                low_price=price * 0.98,
+                volume=1000000,
+            ))
+        return candles
+
+    def test_unknown_insufficient_data(self):
+        """Returns 'unknown' when not enough data for SMA."""
+        prices = [100.0 + i * 0.1 for i in range(100)]
+        candles = self._make_candles(prices)
+        assert _classify_regime(candles, 50) == 'unknown'
+
+    def test_bull_regime(self):
+        """Price above rising SMA -> 'bull'."""
+        # Create 210 bars of steady uptrend so SMA is rising and price > SMA
+        prices = [100.0 + i * 0.5 for i in range(210)]
+        candles = self._make_candles(prices)
+        result = _classify_regime(candles, 209)
+        assert result == 'bull'
+
+    def test_bear_regime(self):
+        """Price below falling SMA -> 'bear'."""
+        # Create 210 bars of steady downtrend
+        prices = [200.0 - i * 0.5 for i in range(210)]
+        candles = self._make_candles(prices)
+        result = _classify_regime(candles, 209)
+        assert result == 'bear'
+
+    def test_recovery_regime(self):
+        """Price above SMA but SMA falling -> 'recovery'."""
+        # Start with downtrend (SMA will be falling), then spike price above SMA
+        prices = [200.0 - i * 0.3 for i in range(205)]
+        # Spike price well above the SMA at the end
+        for i in range(5):
+            prices.append(180.0)
+        candles = self._make_candles(prices)
+        result = _classify_regime(candles, len(prices) - 1)
+        assert result == 'recovery'
+
+    def test_correction_regime(self):
+        """Price below SMA but SMA rising -> 'correction'."""
+        # Strong uptrend for 208 bars so SMA is solidly rising,
+        # then a single bar dip below the SMA value.
+        prices = [50.0 + i * 0.5 for i in range(208)]
+        # The SMA at bar 207 is approx average of prices[8..207] = avg of (54..153.5) ≈ 103.75
+        # Drop price just below SMA but SMA will still be rising (only 2 low bars)
+        prices.append(60.0)
+        prices.append(60.0)
+        candles = self._make_candles(prices)
+        result = _classify_regime(candles, len(prices) - 1)
+        assert result == 'correction'
+
+    def test_custom_sma_period(self):
+        """Test with a shorter SMA period."""
+        prices = [100.0 + i * 0.5 for i in range(60)]
+        candles = self._make_candles(prices)
+        result = _classify_regime(candles, 59, sma_period=50)
+        assert result == 'bull'
+
+
+class TestTradeRegimeField:
+    """Test that Trade objects carry the regime field."""
+
+    def test_trade_default_regime(self):
+        """Trade should default regime to 'unknown'."""
+        trade = Trade(
+            entry_date="2023-01-01",
+            exit_date="2023-02-01",
+            side="long",
+            entry_price=100.0,
+            exit_price=110.0,
+            quantity=10.0,
+            pnl=100.0,
+            pnl_pct=10.0,
+        )
+        assert trade.regime == 'unknown'
+
+    def test_trade_with_regime(self):
+        """Trade should accept and store regime."""
+        trade = Trade(
+            entry_date="2023-01-01",
+            exit_date="2023-02-01",
+            side="long",
+            entry_price=100.0,
+            exit_price=110.0,
+            quantity=10.0,
+            pnl=100.0,
+            pnl_pct=10.0,
+            regime='bull',
+        )
+        assert trade.regime == 'bull'
+
+
+class TestBacktestResultRegimeBreakdown:
+    """Test that BacktestResult has regime_breakdown."""
+
+    def test_default_regime_breakdown_is_none(self):
+        """BacktestResult should default regime_breakdown to None."""
+        result = _make_result()
+        assert result.regime_breakdown is None
+
+    def test_regime_breakdown_with_value(self):
+        """BacktestResult should accept regime_breakdown dict."""
+        breakdown = {
+            'bull': {'trades': 5, 'wins': 4, 'win_rate': 80.0, 'pnl': 500.0},
+            'bear': {'trades': 3, 'wins': 1, 'win_rate': 33.3, 'pnl': -200.0},
+        }
+        result = _make_result(regime_breakdown=breakdown)
+        assert result.regime_breakdown is not None
+        assert result.regime_breakdown['bull']['trades'] == 5
+        assert result.regime_breakdown['bear']['pnl'] == -200.0
+
+
+class TestRegimeReport:
+    """Test regime_report formatting."""
+
+    def test_no_breakdown(self):
+        """Report handles missing regime_breakdown."""
+        result = _make_result()
+        report = regime_report(result)
+        assert "No regime breakdown" in report
+
+    def test_basic_report(self):
+        """Report formats regime data correctly."""
+        breakdown = {
+            'bull': {'trades': 10, 'wins': 8, 'win_rate': 80.0, 'pnl': 5000.0},
+            'bear': {'trades': 5, 'wins': 1, 'win_rate': 20.0, 'pnl': -1000.0},
+        }
+        result = _make_result(regime_breakdown=breakdown)
+        report = regime_report(result)
+        assert "Regime Report" in report
+        assert "bull" in report
+        assert "bear" in report
+        assert "5000.00" in report
+
+    def test_regime_dependent_flag(self):
+        """Report flags when 80%+ of P&L comes from one regime."""
+        breakdown = {
+            'bull': {'trades': 10, 'wins': 9, 'win_rate': 90.0, 'pnl': 9000.0},
+            'bear': {'trades': 5, 'wins': 2, 'win_rate': 40.0, 'pnl': 100.0},
+        }
+        result = _make_result(regime_breakdown=breakdown)
+        report = regime_report(result)
+        assert "REGIME-DEPENDENT" in report
+
+    def test_import_from_backtest_init(self):
+        from pyhood.backtest import regime_report as imported
+        assert callable(imported)
+
+
+class TestRegimeIntegration:
+    """Test that a full backtest populates regime data end-to-end."""
+
+    def test_regime_populated_on_run(self):
+        """Running a strategy should populate regime_breakdown in results."""
+        # Need 250+ candles for 200 SMA to have data
+        candles = create_synthetic_candles(days=300, trend=0.15)
+        backtester = Backtester(candles, initial_capital=10000.0)
+        strategy = ema_crossover(fast=9, slow=21)
+        result = backtester.run(strategy, "EMA Crossover Regime Test")
+
+        if result.total_trades > 0:
+            # regime_breakdown should be populated
+            assert result.regime_breakdown is not None
+            # Each trade should have a regime
+            for trade in result.trades:
+                assert trade.regime in ('bull', 'bear', 'recovery', 'correction', 'unknown')
+            # regime_breakdown values should match trades
+            total_trades_in_breakdown = sum(
+                d['trades'] for d in result.regime_breakdown.values()
+            )
+            assert total_trades_in_breakdown == result.total_trades

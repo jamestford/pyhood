@@ -4,6 +4,7 @@ from pyhood.backtest.compare import (
     benchmark_spy,
     compare_backtests,
     rank_backtests,
+    regime_report,
     sensitivity_report,
     sensitivity_test,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "benchmark_spy",
     "compare_backtests",
     "rank_backtests",
+    "regime_report",
     "sensitivity_report",
     "sensitivity_test",
     "bollinger_breakout",

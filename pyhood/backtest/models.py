@@ -16,6 +16,7 @@ class Trade:
     quantity: float
     pnl: float
     pnl_pct: float
+    regime: str = 'unknown'  # market regime at entry: bull/bear/recovery/correction/unknown
 
 
 @dataclass(frozen=True)
@@ -44,3 +45,4 @@ class BacktestResult:
     spy_alpha: float | None = None         # strategy total_return - spy_return
     verdict: str = ''                       # '✅ Beats both' / '⚠️ Better risk-adjusted' / '❌ Underperforms'
     slippage_pct: float = 0.0               # slippage applied per trade (% of price, e.g. 0.01 = 0.01%)
+    regime_breakdown: dict | None = None     # per-regime performance breakdown

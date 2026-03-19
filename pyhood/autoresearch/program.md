@@ -32,6 +32,9 @@ researcher = AutoResearcher(ticker='SPY', total_period='10y')
 - **Results must be stable** — if changing a parameter by ±10% kills performance, it's overfitting
 - **Train and Test Sharpe should be within 30% of each other** — big gap = overfitting
 - **Round number parameters only** — no 13.7, use 14
+- **Multi-regime profitability** — Strategy must be profitable in at least 2 out of 4 regimes (bull/bear/recovery/correction)
+- **Regime dependency check** — If 80%+ of total P&L comes from one regime, flag as regime-dependent. These strategies are fragile and will blow up in different market conditions.
+- **Check regime_breakdown** — Always inspect `result.regime_breakdown` before declaring a strategy "found". Use `regime_report(result)` for a formatted view.
 
 ## Available Strategies
 
@@ -191,3 +194,6 @@ Before declaring a strategy "found":
 5. ☐ Minimum 10 trades in each split
 6. ☐ Nearby parameters produce similar results (stability)
 7. ☐ Strategy makes economic sense (not just noise fitting)
+8. ☐ Profitable in ≥2 regimes (`regime_breakdown` check)
+9. ☐ Not regime-dependent (no single regime contributes 80%+ of P&L)
+10. ☐ `regime_report(result)` reviewed — no warning flags
