@@ -11,7 +11,6 @@ import inspect
 import itertools
 import json
 import logging
-import math
 from datetime import datetime, timezone
 
 from pyhood.backtest.engine import Backtester
@@ -312,7 +311,10 @@ class AutoResearcher:
 
         # Audit: experiment completed
         if self.audit:
-            test_sharpe = getattr(experiment.test_result, self.metric, None) if experiment.test_result else None
+            test_sharpe = (
+                getattr(experiment.test_result, self.metric, None)
+                if experiment.test_result else None
+            )
             self.audit.experiment_completed(
                 strategy_name, params,
                 train_sharpe=train_metric,
@@ -634,12 +636,10 @@ class AutoResearcher:
 
         results = []
         for exp in tested[:n]:
-            params = exp.params
             # We need to re-create the strategy — extract factory info from code
             # For robustness, just re-evaluate on validate set
             # The caller should use the same factory; here we store the result
             # by running evaluate with a simple approach
-            code = exp.strategy_code
             # Try to reconstruct the strategy from params + code
             strategy_fn = _reconstruct_strategy(exp)
             if strategy_fn is None:
@@ -808,9 +808,12 @@ class AutoResearcher:
                         lines.append(f'     Gap: {gap:.0%}{flag}')
                 if isinstance(val_m, float):
                     lines.append(f'     Validate {self.metric}: {val_m:.4f}')
-                lines.append(f'     Trades: train={e.train_result.total_trades}'
-                             + (f' test={e.test_result.total_trades}' if e.test_result else '')
-                             + (f' val={e.validate_result.total_trades}' if e.validate_result else ''))
+                trade_parts = f'     Trades: train={e.train_result.total_trades}'
+                if e.test_result:
+                    trade_parts += f' test={e.test_result.total_trades}'
+                if e.validate_result:
+                    trade_parts += f' val={e.validate_result.total_trades}'
+                lines.append(trade_parts)
                 # Cross-validation results
                 if e.cross_validation and e.cross_validation.get('results'):
                     cv = e.cross_validation
@@ -869,7 +872,7 @@ class AutoResearcher:
 
     def load(self, path: str = 'autoresearch_results.json') -> None:
         """Load a previous experiment log from JSON."""
-        with open(path, 'r') as f:
+        with open(path) as f:
             data = json.load(f)
         self.log = _dict_to_log(data)
         self._next_id = max(
@@ -1039,7 +1042,10 @@ def _dict_to_experiment(d: dict) -> ExperimentResult:
         params=d.get('params', {}),
         train_result=_dict_to_backtest(d['train_result']),
         test_result=_dict_to_backtest(d['test_result']) if d.get('test_result') else None,
-        validate_result=_dict_to_backtest(d['validate_result']) if d.get('validate_result') else None,
+        validate_result=(
+            _dict_to_backtest(d['validate_result'])
+            if d.get('validate_result') else None
+        ),
         kept=d.get('kept', False),
         reason=d.get('reason', ''),
         timestamp=d.get('timestamp', ''),

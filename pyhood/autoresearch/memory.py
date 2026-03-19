@@ -158,7 +158,10 @@ class ResearchMemory:
                 validate_sharpe, validate_return, validate_trades,
                 regime_breakdown_json, cross_validation_json,
                 kept, reason, overfit_flagged, overfit_gap
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )""",
             (
                 run_id,
                 datetime.now().isoformat(),
@@ -191,7 +194,9 @@ class ResearchMemory:
         self.conn.commit()
         return cursor.lastrowid
 
-    def store_experiments(self, experiments: list[ExperimentResult], run_id: int, ticker: str) -> list[int]:
+    def store_experiments(
+        self, experiments: list[ExperimentResult], run_id: int, ticker: str,
+    ) -> list[int]:
         """Store multiple experiment results."""
         return [self.store_experiment(exp, run_id, ticker) for exp in experiments]
 
@@ -233,7 +238,8 @@ class ResearchMemory:
         """Check if this exact experiment has already been run. For resume/skip."""
         params_json = json.dumps(params, sort_keys=True)
         row = self.conn.execute(
-            "SELECT COUNT(*) FROM experiments WHERE ticker = ? AND strategy_name = ? AND params_json = ?",
+            "SELECT COUNT(*) FROM experiments"
+            " WHERE ticker = ? AND strategy_name = ? AND params_json = ?",
             (ticker, strategy_name, params_json),
         ).fetchone()
         return row[0] > 0
@@ -349,7 +355,8 @@ class ResearchMemory:
     def _insight_already_exists(self, category: str, text: str) -> bool:
         """Check if a similar insight already exists and is valid."""
         row = self.conn.execute(
-            "SELECT COUNT(*) FROM insights WHERE category = ? AND insight_text = ? AND still_valid = 1",
+            "SELECT COUNT(*) FROM insights"
+            " WHERE category = ? AND insight_text = ? AND still_valid = 1",
             (category, text),
         ).fetchone()
         return row[0] > 0
@@ -361,7 +368,9 @@ class ResearchMemory:
             return None
 
         cursor = self.conn.execute(
-            """INSERT INTO insights (category, insight_text, confidence, evidence_count, source_experiment_ids)
+            """INSERT INTO insights (
+                category, insight_text, confidence,
+                evidence_count, source_experiment_ids)
             VALUES (?, ?, ?, ?, ?)""",
             (category, text, confidence, evidence_count, json.dumps(source_ids)),
         )
@@ -402,7 +411,9 @@ class ResearchMemory:
                 count = sum(len(ticker_data[t]) for t in failing_tickers)
                 confidence = 'high' if count >= 5 else 'medium'
                 text = f"{strategy} consistently fails across tickers: {', '.join(failing_tickers)}"
-                insight = self._store_insight('strategy_performance', text, confidence, count, all_exp_ids)
+                insight = self._store_insight(
+                    'strategy_performance', text, confidence, count, all_exp_ids,
+                )
                 if insight:
                     new_insights.append(insight)
 
@@ -418,8 +429,14 @@ class ResearchMemory:
                     has_validate = any(e['validate_sharpe'] is not None for e in exps)
                     has_cv = any(e['cross_validation_json'] is not None for e in exps)
                     confidence = 'high' if (has_validate and has_cv) else 'medium'
-                    text = f"{strategy} shows promise on {ticker} (best test Sharpe: {best_sharpe:.2f})"
-                    insight = self._store_insight('strategy_performance', text, confidence, len(exps), exp_ids)
+                    text = (
+                        f"{strategy} shows promise on {ticker}"
+                        f" (best test Sharpe: {best_sharpe:.2f})"
+                    )
+                    insight = self._store_insight(
+                        'strategy_performance', text, confidence,
+                        len(exps), exp_ids,
+                    )
                     if insight:
                         new_insights.append(insight)
 
@@ -431,9 +448,15 @@ class ResearchMemory:
 
         # Individual overfit detection (train/test gap > 50%)
         for exp in experiments:
-            if exp['overfit_flagged'] and exp['overfit_gap'] is not None and exp['overfit_gap'] > 0.5:
+            if (exp['overfit_flagged']
+                    and exp['overfit_gap'] is not None
+                    and exp['overfit_gap'] > 0.5):
                 params = exp['params_json']
-                text = f"{exp['strategy_name']} with params {params} is likely overfitted (gap: {exp['overfit_gap']:.0%})"
+                gap = exp['overfit_gap']
+                text = (
+                    f"{exp['strategy_name']} with params {params}"
+                    f" is likely overfitted (gap: {gap:.0%})"
+                )
                 insight = self._store_insight('overfitting', text, 'high', 1, [exp['id']])
                 if insight:
                     new_insights.append(insight)
@@ -454,8 +477,13 @@ class ResearchMemory:
                 if ratio > 0.6:
                     exp_ids = [e['id'] for e in exps]
                     confidence = 'high' if len(exps) >= 5 else 'medium'
-                    text = f"{strategy} family tends to overfit on {ticker} ({overfit_count}/{len(exps)} overfitted)"
-                    insight = self._store_insight('overfitting', text, confidence, len(exps), exp_ids)
+                    text = (
+                        f"{strategy} family tends to overfit on {ticker}"
+                        f" ({overfit_count}/{len(exps)} overfitted)"
+                    )
+                    insight = self._store_insight(
+                        'overfitting', text, confidence, len(exps), exp_ids,
+                    )
                     if insight:
                         new_insights.append(insight)
 
@@ -593,7 +621,10 @@ class ResearchMemory:
                         exp_ids.append(exp['id'])
 
             if trend_successes >= 2:
-                text = f"{ticker} responds well to trend-following strategies ({trend_successes} strategies with Sharpe > 0.7)"
+                text = (
+                    f"{ticker} responds well to trend-following strategies"
+                    f" ({trend_successes} strategies with Sharpe > 0.7)"
+                )
                 insight = self._store_insight('ticker', text, 'medium', trend_successes, exp_ids)
                 if insight:
                     new_insights.append(insight)
@@ -714,8 +745,10 @@ class ResearchMemory:
 
         params_json = json.dumps(params, sort_keys=True) if params else None
         cursor = self.conn.execute(
-            """INSERT INTO priorities (description, priority_level, strategy_name, ticker, params_json, source_insight_id)
-            VALUES (?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO priorities (
+                description, priority_level, strategy_name,
+                ticker, params_json, source_insight_id
+            ) VALUES (?, ?, ?, ?, ?, ?)""",
             (description, priority_level, strategy_name, ticker, params_json, source_insight_id),
         )
         self.conn.commit()
@@ -744,7 +777,9 @@ class ResearchMemory:
         ).fetchall()
         return [dict(row) for row in rows]
 
-    def update_priority(self, priority_id: int, status: str, result_experiment_id: int = None) -> None:
+    def update_priority(
+        self, priority_id: int, status: str, result_experiment_id: int = None,
+    ) -> None:
         """Update priority status."""
         completed_date = datetime.now().isoformat() if status == 'completed' else None
         self.conn.execute(
@@ -768,8 +803,13 @@ class ResearchMemory:
             return True, "Already run (dedupe)"
 
         # 2. Check high-confidence insights about strategy failure
-        base_name = strategy_name.split('(')[0].strip() if '(' in strategy_name else strategy_name
-        insights = self.get_insights(category='strategy_performance', confidence='high', valid_only=True)
+        base_name = (
+            strategy_name.split('(')[0].strip()
+            if '(' in strategy_name else strategy_name
+        )
+        insights = self.get_insights(
+            category='strategy_performance', confidence='high', valid_only=True,
+        )
         for insight in insights:
             if base_name in insight['insight_text'] and 'fails' in insight['insight_text']:
                 if ticker in insight['insight_text']:
@@ -826,7 +866,8 @@ class ResearchMemory:
                 f"Kept: {run['kept_count']}",
                 f"Errors: {run['error_count']}",
                 f"Best strategy: {run['best_strategy'] or 'N/A'}",
-                f"Best Sharpe: {run['best_sharpe']:.4f}" if run['best_sharpe'] else "Best Sharpe: N/A",
+                (f"Best Sharpe: {run['best_sharpe']:.4f}"
+                 if run['best_sharpe'] else "Best Sharpe: N/A"),
                 f"New insights: {run['new_insights_generated']}",
             ]
             return "\n".join(lines)
@@ -862,11 +903,21 @@ class ResearchMemory:
         """Return overall stats: total experiments, insights, runs, etc."""
         total_experiments = self.conn.execute("SELECT COUNT(*) FROM experiments").fetchone()[0]
         total_insights = self.conn.execute("SELECT COUNT(*) FROM insights").fetchone()[0]
-        active_insights = self.conn.execute("SELECT COUNT(*) FROM insights WHERE still_valid = 1").fetchone()[0]
-        total_runs = self.conn.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
-        pending_priorities = self.conn.execute("SELECT COUNT(*) FROM priorities WHERE status = 'pending'").fetchone()[0]
-        kept_experiments = self.conn.execute("SELECT COUNT(*) FROM experiments WHERE kept = 1").fetchone()[0]
-        overfit_flagged = self.conn.execute("SELECT COUNT(*) FROM experiments WHERE overfit_flagged = 1").fetchone()[0]
+        active_insights = self.conn.execute(
+            "SELECT COUNT(*) FROM insights WHERE still_valid = 1"
+        ).fetchone()[0]
+        total_runs = self.conn.execute(
+            "SELECT COUNT(*) FROM runs"
+        ).fetchone()[0]
+        pending_priorities = self.conn.execute(
+            "SELECT COUNT(*) FROM priorities WHERE status = 'pending'"
+        ).fetchone()[0]
+        kept_experiments = self.conn.execute(
+            "SELECT COUNT(*) FROM experiments WHERE kept = 1"
+        ).fetchone()[0]
+        overfit_flagged = self.conn.execute(
+            "SELECT COUNT(*) FROM experiments WHERE overfit_flagged = 1"
+        ).fetchone()[0]
 
         return {
             'total_experiments': total_experiments,

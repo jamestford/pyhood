@@ -1,7 +1,5 @@
 """Tests for crypto client module."""
 
-import json
-import time
 from datetime import datetime
 
 import pytest
@@ -31,7 +29,7 @@ from pyhood.exceptions import APIError, AuthError, RateLimitError
 
 class TestTokenBucket:
     """Test rate limiting token bucket implementation."""
-    
+
     def test_initial_state(self):
         """Test token bucket starts with full capacity."""
         bucket = TokenBucket(rate=100, capacity=300)
@@ -42,12 +40,12 @@ class TestTokenBucket:
     def test_rate_limiting(self):
         """Test rate limiting when tokens exhausted."""
         bucket = TokenBucket(rate=100, capacity=2)
-        
+
         # Consume all tokens
         assert bucket.consume(1) is True
         assert bucket.consume(1) is True
         assert bucket.consume(1) is False  # Should be rate limited
-        
+
         # Should suggest wait time
         wait_time = bucket.wait_time()
         assert wait_time > 0
@@ -55,11 +53,11 @@ class TestTokenBucket:
     def test_token_replenishment(self):
         """Test tokens replenish over time."""
         bucket = TokenBucket(rate=60, capacity=2)  # 1 token per second
-        
+
         # Exhaust tokens
         bucket.consume(2)
         assert bucket.consume(1) is False
-        
+
         # Mock time passing
         bucket.last_update -= 1.1  # 1.1 seconds ago
         assert bucket.consume(1) is True  # Should have 1 token replenished
@@ -91,9 +89,9 @@ class TestCryptoClient:
             },
             status=200
         )
-        
+
         account = self.client.get_account()
-        
+
         assert isinstance(account, CryptoAccount)
         assert account.account_number == "12345"
         assert account.buying_power == 1000.50
@@ -115,9 +113,9 @@ class TestCryptoClient:
             }],
             status=200
         )
-        
+
         account = self.client.get_account()
-        
+
         assert isinstance(account, CryptoAccount)
         assert account.account_number == "12345"
 
@@ -141,9 +139,9 @@ class TestCryptoClient:
             },
             status=200
         )
-        
+
         pairs = self.client.get_trading_pairs("BTC-USD")
-        
+
         assert len(pairs) == 1
         pair = pairs[0]
         assert isinstance(pair, TradingPair)
@@ -169,9 +167,9 @@ class TestCryptoClient:
             },
             status=200
         )
-        
+
         quotes = self.client.get_best_bid_ask("BTC-USD")
-        
+
         assert len(quotes) == 1
         quote = quotes[0]
         assert isinstance(quote, CryptoQuote)
@@ -196,9 +194,9 @@ class TestCryptoClient:
             },
             status=200
         )
-        
+
         price = self.client.get_estimated_price("BTC-USD", "buy", 0.001)
-        
+
         assert isinstance(price, EstimatedPrice)
         assert price.symbol == "BTC-USD"
         assert price.side == "buy"
@@ -222,9 +220,9 @@ class TestCryptoClient:
             },
             status=200
         )
-        
+
         holdings = self.client.get_holdings("12345", "BTC")
-        
+
         assert len(holdings) == 1
         holding = holdings[0]
         assert isinstance(holding, CryptoHolding)
@@ -256,7 +254,7 @@ class TestCryptoClient:
             },
             status=200
         )
-        
+
         order = self.client.place_order(
             account_number="12345",
             side="buy",
@@ -264,7 +262,7 @@ class TestCryptoClient:
             symbol="BTC-USD",
             order_config={"quantity": "0.001"}
         )
-        
+
         assert isinstance(order, CryptoOrder)
         assert order.order_id == "order-123"
         assert order.client_order_id == "client-123"
@@ -299,9 +297,9 @@ class TestCryptoClient:
             },
             status=200
         )
-        
+
         order = self.client.get_order("12345", "order-123")
-        
+
         assert isinstance(order, CryptoOrder)
         assert order.order_id == "order-123"
         assert order.status == "filled"
@@ -335,9 +333,9 @@ class TestCryptoClient:
             },
             status=200
         )
-        
+
         orders = self.client.get_orders("12345")
-        
+
         assert len(orders) == 1
         order = orders[0]
         assert isinstance(order, CryptoOrder)
@@ -353,7 +351,7 @@ class TestCryptoClient:
             json={"status": "cancelled"},
             status=200
         )
-        
+
         result = self.client.cancel_order("order-123")
         assert result["status"] == "cancelled"
 
@@ -379,7 +377,7 @@ class TestCryptoClient:
             },
             status=200
         )
-        
+
         # Second page
         responses.add(
             responses.GET,
@@ -399,9 +397,9 @@ class TestCryptoClient:
             },
             status=200
         )
-        
+
         pairs = self.client.get_trading_pairs()
-        
+
         assert len(pairs) == 2
         assert pairs[0].symbol == "BTC-USD"
         assert pairs[1].symbol == "ETH-USD"
@@ -415,7 +413,7 @@ class TestCryptoClient:
             json={"error": "Invalid authentication"},
             status=401
         )
-        
+
         with pytest.raises(AuthError, match="Authentication failed"):
             self.client.get_account()
 
@@ -428,7 +426,7 @@ class TestCryptoClient:
             json={"message": "Bad request"},
             status=400
         )
-        
+
         with pytest.raises(APIError, match="Bad request"):
             self.client.get_account()
 
@@ -448,7 +446,7 @@ class TestCryptoClient:
     def test_invalid_private_key(self):
         """Test client with invalid private key."""
         client = CryptoClient("test-key", "invalid-key")
-        
+
         with pytest.raises(AuthError, match="Failed to sign request"):
             client.make_request("GET", "/test")
 
@@ -457,12 +455,12 @@ class TestCryptoClient:
         # Create client with very restrictive rate limits for testing
         client = CryptoClient(self.api_key, self.private_key)
         client.rate_limiter = TokenBucket(rate=1, capacity=1)  # 1 req/min, 1 burst
-        
+
         # First request should work
         with responses.RequestsMock() as rsps:
             rsps.add(responses.GET, f"{CRYPTO_BASE}/test", json={})
             client.make_request("GET", "/test", retries=0)
-        
+
         # Second request should be rate limited (before HTTP is even attempted)
         with pytest.raises(RateLimitError):
             client.make_request("GET", "/test", retries=0)

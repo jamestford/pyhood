@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import json
-
-import pytest
-
 from pyhood.autoresearch.memory import ResearchMemory
 from pyhood.autoresearch.models import ExperimentResult
-from pyhood.backtest.models import BacktestResult, Trade
-
+from pyhood.backtest.models import BacktestResult
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -63,9 +58,18 @@ def _make_experiment(
     if params is None:
         params = {'fast': 5, 'slow': 20}
 
-    train = _make_backtest(sharpe=train_sharpe, name=strategy_name, regime_breakdown=regime_breakdown)
-    test = _make_backtest(sharpe=test_sharpe, name=strategy_name) if test_sharpe is not None else None
-    validate = _make_backtest(sharpe=validate_sharpe, name=strategy_name) if validate_sharpe is not None else None
+    train = _make_backtest(
+        sharpe=train_sharpe, name=strategy_name,
+        regime_breakdown=regime_breakdown,
+    )
+    test = (
+        _make_backtest(sharpe=test_sharpe, name=strategy_name)
+        if test_sharpe is not None else None
+    )
+    validate = (
+        _make_backtest(sharpe=validate_sharpe, name=strategy_name)
+        if validate_sharpe is not None else None
+    )
 
     return ExperimentResult(
         experiment_id=1,
@@ -191,7 +195,7 @@ class TestExperimentStorage:
         mem = ResearchMemory(':memory:')
         run_id = mem.start_run('SPY')
         exp = _make_experiment(test_sharpe=None, kept=False)
-        exp_id = mem.store_experiment(exp, run_id, 'SPY')
+        mem.store_experiment(exp, run_id, 'SPY')
 
         results = mem.get_experiments()
         assert len(results) == 1
@@ -346,7 +350,10 @@ class TestInsightGeneration:
             )
 
         insights = mem.generate_insights()
-        family_insights = [i for i in insights if 'family tends to overfit' in i.get('insight_text', '')]
+        family_insights = [
+            i for i in insights
+            if 'family tends to overfit' in i.get('insight_text', '')
+        ]
         if family_insights:
             assert family_insights[0]['confidence'] == 'high'
         mem.close()
@@ -387,11 +394,13 @@ class TestInsightManagement:
         mem = ResearchMemory(':memory:')
         # Manually insert insights
         mem.conn.execute(
-            "INSERT INTO insights (category, insight_text, confidence, evidence_count) VALUES (?, ?, ?, ?)",
+            "INSERT INTO insights (category, insight_text, confidence,"
+            " evidence_count) VALUES (?, ?, ?, ?)",
             ('overfitting', 'Test overfit', 'high', 3),
         )
         mem.conn.execute(
-            "INSERT INTO insights (category, insight_text, confidence, evidence_count) VALUES (?, ?, ?, ?)",
+            "INSERT INTO insights (category, insight_text, confidence,"
+            " evidence_count) VALUES (?, ?, ?, ?)",
             ('strategy_performance', 'Test perf', 'medium', 2),
         )
         mem.conn.commit()
@@ -413,7 +422,8 @@ class TestInsightManagement:
     def test_invalidate_insight(self):
         mem = ResearchMemory(':memory:')
         mem.conn.execute(
-            "INSERT INTO insights (category, insight_text, confidence, evidence_count) VALUES (?, ?, ?, ?)",
+            "INSERT INTO insights (category, insight_text, confidence,"
+            " evidence_count) VALUES (?, ?, ?, ?)",
             ('overfitting', 'Test insight', 'high', 1),
         )
         mem.conn.commit()
@@ -446,9 +456,13 @@ class TestPriorityGeneration:
         mem = ResearchMemory(':memory:')
         # Insert a "shows promise" insight
         mem.conn.execute(
-            "INSERT INTO insights (category, insight_text, confidence, evidence_count, still_valid) "
-            "VALUES (?, ?, ?, ?, ?)",
-            ('strategy_performance', 'EMA shows promise on SPY (best test Sharpe: 1.20)', 'medium', 3, 1),
+            "INSERT INTO insights (category, insight_text, confidence,"
+            " evidence_count, still_valid) VALUES (?, ?, ?, ?, ?)",
+            (
+                'strategy_performance',
+                'EMA shows promise on SPY (best test Sharpe: 1.20)',
+                'medium', 3, 1,
+            ),
         )
         mem.conn.commit()
 
@@ -461,8 +475,8 @@ class TestPriorityGeneration:
     def test_no_duplicate_priorities(self):
         mem = ResearchMemory(':memory:')
         mem.conn.execute(
-            "INSERT INTO insights (category, insight_text, confidence, evidence_count, still_valid) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO insights (category, insight_text, confidence,"
+            " evidence_count, still_valid) VALUES (?, ?, ?, ?, ?)",
             ('strategy_performance', 'EMA shows promise on SPY', 'medium', 3, 1),
         )
         mem.conn.commit()
@@ -543,9 +557,13 @@ class TestShouldSkip:
         mem = ResearchMemory(':memory:')
         # Insert a high-confidence failure insight
         mem.conn.execute(
-            "INSERT INTO insights (category, insight_text, confidence, evidence_count, still_valid) "
-            "VALUES (?, ?, ?, ?, ?)",
-            ('strategy_performance', 'BadStrat consistently fails across tickers: SPY, QQQ, DIA', 'high', 10, 1),
+            "INSERT INTO insights (category, insight_text, confidence,"
+            " evidence_count, still_valid) VALUES (?, ?, ?, ?, ?)",
+            (
+                'strategy_performance',
+                'BadStrat consistently fails across tickers: SPY, QQQ, DIA',
+                'high', 10, 1,
+            ),
         )
         mem.conn.commit()
 
@@ -667,7 +685,10 @@ class TestStats:
             run_id, 'SPY',
         )
         mem.store_experiment(
-            _make_experiment(strategy_name='B', params={'b': 1}, kept=False, train_sharpe=0.8, test_sharpe=0.7),
+            _make_experiment(
+                strategy_name='B', params={'b': 1}, kept=False,
+                train_sharpe=0.8, test_sharpe=0.7,
+            ),
             run_id, 'SPY',
         )
 
@@ -675,7 +696,9 @@ class TestStats:
         assert s['total_experiments'] == 2
         assert s['total_runs'] == 1
         assert s['kept_experiments'] == 1
-        assert s['overfit_flagged'] == 1  # first: train=2.0, test=0.5 → gap > 50%; second: train=0.8, test=0.7 → gap 12.5%
+        # first: train=2.0, test=0.5 → gap > 50%
+        # second: train=0.8, test=0.7 → gap 12.5%
+        assert s['overfit_flagged'] == 1
         mem.close()
 
 
@@ -692,7 +715,7 @@ class TestEdgeCases:
         exp = _make_experiment()
         # Manually set profit_factor to inf
         exp.train_result = _make_backtest(profit_factor=float('inf'))
-        exp_id = mem.store_experiment(exp, run_id, 'SPY')
+        mem.store_experiment(exp, run_id, 'SPY')
         results = mem.get_experiments()
         assert len(results) == 1
         assert results[0]['train_profit_factor'] == 999999.0
@@ -711,7 +734,7 @@ class TestEdgeCases:
         mem = ResearchMemory(':memory:')
         run_id = mem.start_run('SPY')
         exp = _make_experiment(strategy_name="EMA (fast=5, slow=20) — test's \"best\"")
-        exp_id = mem.store_experiment(exp, run_id, 'SPY')
+        mem.store_experiment(exp, run_id, 'SPY')
         results = mem.get_experiments()
         assert len(results) == 1
         mem.close()

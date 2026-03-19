@@ -2,13 +2,11 @@
 
 import time
 
+import pytest
 import responses
 
 from pyhood.exceptions import APIError, RateLimitError
 from pyhood.http import Session
-
-import pytest
-
 
 BASE = "https://api.robinhood.com"
 

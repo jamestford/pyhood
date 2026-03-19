@@ -1,11 +1,11 @@
 """Tests for stock screener — all mocked, no yfinance calls."""
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
-from pyhood.screener import StockScreener, SP500_TOP, NASDAQ100_TOP
 from pyhood.fundamentals import FundamentalData
-
+from pyhood.screener import SP500_TOP, StockScreener
 
 # Mock info dicts for different tickers
 MOCK_INFOS = {

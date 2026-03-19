@@ -133,7 +133,10 @@ class TestCryptoAuth:
             )
 
             # Reconstruct the message
-            message = f"{api_key}{timestamp}/api/v2/crypto/trading/orders/POST" + '{"symbol":"BTC-USD"}'
+            message = (
+                f"{api_key}{timestamp}/api/v2/crypto/trading/orders/POST"
+                + '{"symbol":"BTC-USD"}'
+            )
 
             # Verify with public key
             verify_key = nacl.signing.VerifyKey(base64.b64decode(public_key))

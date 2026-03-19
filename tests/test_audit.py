@@ -8,10 +8,7 @@ import tempfile
 import time
 from datetime import datetime, timezone
 
-import pytest
-
 from pyhood.autoresearch.audit import AuditTrail
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -29,7 +26,7 @@ def _make_audit(tmpdir: str | None = None) -> tuple[AuditTrail, str]:
 def _read_jsonl(path: str) -> list[dict]:
     """Read all JSON lines from a file."""
     events = []
-    with open(path, 'r') as f:
+    with open(path) as f:
         for line in f:
             line = line.strip()
             if line:
@@ -46,7 +43,7 @@ class TestAuditTrailInit:
     def test_creates_directory_on_init(self):
         tmpdir = tempfile.mkdtemp()
         audit_dir = os.path.join(tmpdir, 'nested', 'audit')
-        audit = AuditTrail(audit_dir=audit_dir)
+        AuditTrail(audit_dir=audit_dir)
         assert os.path.isdir(audit_dir)
 
     def test_file_path_none_before_start(self):
@@ -64,7 +61,7 @@ class TestAuditTrailInit:
         audit_dir = os.path.join(tmpdir, 'audit')
         os.makedirs(audit_dir)
         # Should not raise
-        audit = AuditTrail(audit_dir=audit_dir)
+        AuditTrail(audit_dir=audit_dir)
         assert os.path.isdir(audit_dir)
 
 
@@ -125,7 +122,7 @@ class TestLog:
         for i in range(10):
             audit.log(f'event_{i}', {'index': i})
 
-        with open(audit.file_path, 'r') as f:
+        with open(audit.file_path) as f:
             for line in f:
                 line = line.strip()
                 if line:
@@ -365,7 +362,7 @@ class TestReadEvents:
         audit, audit_dir = _make_audit()
         # Create an empty file
         empty_path = os.path.join(audit_dir, 'empty.jsonl')
-        with open(empty_path, 'w') as f:
+        with open(empty_path, 'w'):
             pass
         events = audit.read_events(file_path=empty_path)
         assert events == []
@@ -376,7 +373,9 @@ class TestReadEvents:
         with open(corrupt_path, 'w') as f:
             f.write('{"event": "good", "timestamp": "2026-01-01T00:00:00+00:00", "data": {}}\n')
             f.write('this is not json\n')
-            f.write('{"event": "also_good", "timestamp": "2026-01-01T00:00:01+00:00", "data": {}}\n')
+            f.write(
+                '{"event": "also_good", "timestamp": "2026-01-01T00:00:01+00:00", "data": {}}\n'
+            )
         events = audit.read_events(file_path=corrupt_path)
         assert len(events) == 2
         assert events[0]['event'] == 'good'
@@ -452,7 +451,9 @@ class TestSummary:
 
         s = audit.summary()
         assert s['run_id'] == 7
-        assert s['total_events'] == 11  # start + 3 started + 2 completed + 1 failed + 1 skipped + 1 insight + 1 priority + end
+        # start + 3 started + 2 completed + 1 failed + 1 skipped
+        # + 1 insight + 1 priority + end
+        assert s['total_events'] == 11
         assert s['experiments_started'] == 3
         assert s['experiments_completed'] == 2
         assert s['experiments_failed'] == 1

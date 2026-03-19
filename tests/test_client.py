@@ -9,7 +9,6 @@ from pyhood.exceptions import OrderError, SymbolNotFoundError
 from pyhood.http import Session
 from pyhood.models import OptionContract, OptionsChain, Order, Quote
 
-
 BASE = "https://api.robinhood.com"
 
 
@@ -318,7 +317,7 @@ class TestStockOrders:
             json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
             status=200,
         )
-        
+
         # Mock instrument endpoint
         responses.add(
             responses.GET,
@@ -326,7 +325,7 @@ class TestStockOrders:
             json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "AAPL"}]},
             status=200,
         )
-        
+
         # Mock order placement
         responses.add(
             responses.POST,
@@ -364,7 +363,7 @@ class TestStockOrders:
             json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
             status=200,
         )
-        
+
         # Mock instrument endpoint
         responses.add(
             responses.GET,
@@ -372,7 +371,7 @@ class TestStockOrders:
             json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "AAPL"}]},
             status=200,
         )
-        
+
         # Mock order placement
         responses.add(
             responses.POST,
@@ -411,7 +410,7 @@ class TestStockOrders:
             json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
             status=200,
         )
-        
+
         # Mock instrument endpoint
         responses.add(
             responses.GET,
@@ -419,7 +418,7 @@ class TestStockOrders:
             json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "TSLA"}]},
             status=200,
         )
-        
+
         # Mock order placement
         responses.add(
             responses.POST,
@@ -461,15 +460,17 @@ class TestOptionOrders:
             json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
             status=200,
         )
-        
+
         # Mock option instrument search
         responses.add(
             responses.GET,
             urls.OPTIONS_INSTRUMENTS,
-            json={"results": [{"url": f"{BASE}/options/instruments/opt123/", "chain_symbol": "AAPL"}]},
+            json={"results": [
+                {"url": f"{BASE}/options/instruments/opt123/", "chain_symbol": "AAPL"},
+            ]},
             status=200,
         )
-        
+
         # Mock option order placement
         responses.add(
             responses.POST,
@@ -507,15 +508,17 @@ class TestOptionOrders:
             json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
             status=200,
         )
-        
+
         # Mock option instrument search
         responses.add(
             responses.GET,
             urls.OPTIONS_INSTRUMENTS,
-            json={"results": [{"url": f"{BASE}/options/instruments/opt456/", "chain_symbol": "SPY"}]},
+            json={"results": [
+                {"url": f"{BASE}/options/instruments/opt456/", "chain_symbol": "SPY"},
+            ]},
             status=200,
         )
-        
+
         # Mock option order placement
         responses.add(
             responses.POST,
@@ -584,7 +587,7 @@ class TestOrderManagement:
         orders = client.get_stock_orders()
         assert len(orders) == 2
         assert all(isinstance(order, Order) for order in orders)
-        
+
         order1 = orders[0]
         assert order1.order_id == "order-1"
         assert order1.symbol == "AAPL"
@@ -592,7 +595,7 @@ class TestOrderManagement:
         assert order1.quantity == 10
         assert order1.average_price == 149.50
         assert order1.fees == 1.25
-        
+
         order2 = orders[1]
         assert order2.order_id == "order-2"
         assert order2.symbol == "TSLA"
@@ -646,7 +649,7 @@ class TestOrderManagement:
         assert result["id"] == "order-123"
         assert result["state"] == "cancelled"
 
-    @responses.activate 
+    @responses.activate
     def test_order_error_handling(self, client):
         """Test order error handling."""
         # Mock account endpoint
@@ -656,7 +659,7 @@ class TestOrderManagement:
             json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
             status=200,
         )
-        
+
         # Mock instrument endpoint
         responses.add(
             responses.GET,
@@ -664,7 +667,7 @@ class TestOrderManagement:
             json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "AAPL"}]},
             status=200,
         )
-        
+
         # Mock order placement with error
         responses.add(
             responses.POST,

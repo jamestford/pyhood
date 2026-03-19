@@ -148,7 +148,7 @@ def main():
             bh_cells.append(f"{ret:.1f}% / {sharpe:.2f}")
         else:
             bh_cells.append("N/A")
-    print(f"| **SPY Buy & Hold** | " + " | ".join(bh_cells) + " |")
+    print("| **SPY Buy & Hold** | " + " | ".join(bh_cells) + " |")
 
     # Save to JSON
     output_path = os.path.join(os.path.dirname(__file__), "catalog_results.json")

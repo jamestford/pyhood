@@ -238,7 +238,7 @@ class AuditTrail:
         if target is None or not os.path.exists(target):
             return []
         events = []
-        with open(target, 'r') as f:
+        with open(target) as f:
             for line in f:
                 line = line.strip()
                 if line:

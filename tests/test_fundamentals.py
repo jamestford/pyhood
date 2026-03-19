@@ -1,10 +1,8 @@
 """Tests for fundamental data module — all mocked, no yfinance calls."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from pyhood.fundamentals import FundamentalData, fundamental_filter
-
 
 # Sample yfinance-like info dict for mocking
 MOCK_INFO = {

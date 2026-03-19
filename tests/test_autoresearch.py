@@ -10,16 +10,14 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from pyhood.models import Candle
-from pyhood.backtest.models import BacktestResult
-from pyhood.autoresearch import AutoResearcher, ExperimentResult, ExperimentLog
+from pyhood.autoresearch import AutoResearcher, ExperimentLog, ExperimentResult
 from pyhood.autoresearch.runner import (
-    _log_to_dict, _dict_to_log,
     _default_cross_validate_tickers,
 )
 from pyhood.backtest.engine import Backtester
-from pyhood.backtest.strategies import ema_crossover, rsi_mean_reversion, macd_crossover
-
+from pyhood.backtest.models import BacktestResult
+from pyhood.backtest.strategies import ema_crossover
+from pyhood.models import Candle
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -385,7 +383,7 @@ class TestReport:
 class TestImports:
 
     def test_import_from_autoresearch(self):
-        from pyhood.autoresearch import AutoResearcher, ExperimentResult, ExperimentLog
+        from pyhood.autoresearch import AutoResearcher, ExperimentResult
         assert callable(AutoResearcher)
         assert ExperimentResult is not None
         assert ExperimentLog is not None

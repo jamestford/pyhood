@@ -25,7 +25,10 @@ class Backtester:
         bt = Backtester.from_yfinance("GME", start="2019-01-01", end="2021-06-01")
     """
 
-    def __init__(self, candles: list[Candle], initial_capital: float = 10000.0, slippage_pct: float = 0.0):
+    def __init__(
+        self, candles: list[Candle], initial_capital: float = 10000.0,
+        slippage_pct: float = 0.0,
+    ):
         """Initialize with historical candle data.
 
         Args:
@@ -358,7 +361,10 @@ class Backtester:
                 regime_breakdown[r] = {
                     'trades': d['trades'],
                     'wins': d['wins'],
-                    'win_rate': round((d['wins'] / d['trades']) * 100, 1) if d['trades'] > 0 else 0.0,
+                    'win_rate': (
+                        round((d['wins'] / d['trades']) * 100, 1)
+                        if d['trades'] > 0 else 0.0
+                    ),
                     'pnl': round(d['pnl'], 2),
                 }
 

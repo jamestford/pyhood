@@ -14,14 +14,13 @@ import itertools
 import json
 import logging
 import os
-import sys
 import threading
 import traceback
 from datetime import datetime
 
-from pyhood.autoresearch.memory import ResearchMemory
 from pyhood.autoresearch.audit import AuditTrail
-from pyhood.autoresearch.runner import AutoResearcher, _log_to_dict
+from pyhood.autoresearch.memory import ResearchMemory
+from pyhood.autoresearch.runner import AutoResearcher
 from pyhood.backtest.strategies import (
     bollinger_breakout,
     bull_flag_breakout,
@@ -35,6 +34,11 @@ from pyhood.backtest.strategies import (
     rsi_mean_reversion,
     volume_confirmed_breakout,
 )
+
+
+class _ExperimentTimeoutError(Exception):
+    pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +158,7 @@ def _grid_combos(grid: dict[str, list]) -> list[dict]:
     return [dict(zip(keys, combo)) for combo in itertools.product(*value_lists)]
 
 
-class _ExperimentTimeout(Exception):
+class _ExperimentTimeoutErrorError(Exception):
     """Raised when an experiment exceeds its timeout."""
 
 
@@ -305,7 +309,7 @@ class OvernightRunner:
     def _run_with_timeout(self, fn, timeout: int):
         """Run a function with a timeout using threading.
 
-        Returns the function's return value or raises _ExperimentTimeout.
+        Returns the function's return value or raises _ExperimentTimeoutError.
         """
         result = [None]
         exception = [None]
@@ -322,7 +326,7 @@ class OvernightRunner:
 
         if thread.is_alive():
             # Thread is still running — timeout
-            raise _ExperimentTimeout(
+            raise _ExperimentTimeoutError(
                 f'Experiment exceeded {timeout}s timeout'
             )
 
@@ -381,7 +385,14 @@ class OvernightRunner:
             status = '✅ KEPT' if exp.kept else '❌'
             train_sharpe = getattr(exp.train_result, 'sharpe_ratio', 0)
             test_sharpe = getattr(exp.test_result, 'sharpe_ratio', 0) if exp.test_result else 'N/A'
-            self._log(f'{progress} | {label} | train={train_sharpe:.4f} test={test_sharpe if isinstance(test_sharpe, str) else f"{test_sharpe:.4f}"} | {status}')
+            test_str = (
+                test_sharpe if isinstance(test_sharpe, str)
+                else f"{test_sharpe:.4f}"
+            )
+            self._log(
+                f'{progress} | {label} | train={train_sharpe:.4f}'
+                f' test={test_str} | {status}'
+            )
 
             self._mark_completed(label, params)
 
@@ -398,7 +409,7 @@ class OvernightRunner:
 
             return True
 
-        except _ExperimentTimeout as exc:
+        except _ExperimentTimeoutError as exc:
             self._timeout_count += 1
             self._log(f'{progress} | {label} | ⏰ TIMEOUT ({self.experiment_timeout}s)')
             self._log_error(label, params, str(exc))
@@ -442,16 +453,16 @@ class OvernightRunner:
         kept = [e for e in log.experiments if e.kept]
         lines = [
             f'# AutoResearch Summary — {self.ticker}',
-            f'',
+            '',
             f'**Generated:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
-            f'',
-            f'## Progress',
+            '',
+            '## Progress',
             f'- Total experiments: {log.total_experiments}',
             f'- Errors: {self._error_count}',
             f'- Timeouts: {self._timeout_count}',
             f'- Best train Sharpe: {log.best_train_sharpe:.4f}',
             f'- Best test Sharpe: {log.best_test_sharpe:.4f}',
-            f'',
+            '',
         ]
 
         if kept:
@@ -463,7 +474,8 @@ class OvernightRunner:
                 lines.append(f'### {e.strategy_name}')
                 lines.append(f'- Params: `{e.params}`')
                 lines.append(f'- Train Sharpe: {train_s:.4f}')
-                lines.append(f'- Test Sharpe: {test_s if isinstance(test_s, str) else f"{test_s:.4f}"}')
+                test_str = test_s if isinstance(test_s, str) else f"{test_s:.4f}"
+                lines.append(f'- Test Sharpe: {test_str}')
                 lines.append(f'- Reason: {e.reason}')
                 lines.append('')
         else:
@@ -571,7 +583,6 @@ class OvernightRunner:
             if self._audit:
                 self._audit.sweep_started(strategy_name, grid, n_combos)
 
-            sweep_kept = 0
             for params in combos:
                 self._run_single_experiment(strategy_name, factory, params)
 
@@ -591,7 +602,10 @@ class OvernightRunner:
         try:
             validated = self._researcher.validate_best(n=5)
             for exp in validated:
-                val_sharpe = getattr(exp.validate_result, 'sharpe_ratio', 'N/A') if exp.validate_result else 'N/A'
+                val_sharpe = (
+                    getattr(exp.validate_result, 'sharpe_ratio', 'N/A')
+                    if exp.validate_result else 'N/A'
+                )
                 self._log(f'  Validated: {exp.strategy_name} | validate_sharpe={val_sharpe}')
         except Exception as exc:
             self._log(f'Validation failed: {exc}')

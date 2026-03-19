@@ -8,8 +8,8 @@ import pytest
 import responses
 
 from pyhood import urls
-from pyhood.auth import TokenStore, generate_device_token, login, logout, refresh, get_session
-from pyhood.exceptions import AuthError, LoginTimeoutError, TokenExpiredError
+from pyhood.auth import TokenStore, generate_device_token, get_session, login, logout, refresh
+from pyhood.exceptions import AuthError, TokenExpiredError
 
 
 class TestGenerateDeviceToken:

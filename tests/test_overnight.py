@@ -8,17 +8,14 @@ import os
 import tempfile
 from datetime import datetime, timedelta
 
-import pytest
-
-from pyhood.models import Candle
 from pyhood.autoresearch.overnight import (
+    STRATEGY_SWEEPS,
     OvernightRunner,
     _count_combos,
     _grid_combos,
-    STRATEGY_SWEEPS,
 )
 from pyhood.backtest.strategies import ema_crossover
-
+from pyhood.models import Candle
 
 # ---------------------------------------------------------------------------
 # Helpers
