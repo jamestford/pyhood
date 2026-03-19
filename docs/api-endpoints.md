@@ -107,6 +107,18 @@ GET /marketdata/historicals/?symbols=AAPL&interval=day&span=year&bounds=regular
 | `span` | `day`, `week`, `month`, `3month`, `year`, `5year` |
 | `bounds` | `regular`, `extended`, `trading` |
 
+**Valid Combinations (verified):**
+
+| Interval | day | week | month | 3month | year | 5year |
+|----------|-----|------|-------|--------|------|-------|
+| `5minute` | 39 candles | 195 candles | ❌ | ❌ | ❌ | ❌ |
+| `10minute` | 39 candles | 195 candles | ❌ | ❌ | ❌ | ❌ |
+| `hour` | 6 candles | 30 candles | 120 candles | 357 candles | ❌ | ❌ |
+| `day` | ❌ | 5 candles | 20 candles | 60 candles | 251 candles | **1,255 candles** |
+| `week` | ❌ | ❌ | 4 candles | 13 candles | 52 candles | **261 candles** |
+
+Invalid combinations return HTTP 400. Maximum data: **5 years of daily candles (1,255 data points)**.
+
 **Returns (per candle):**
 
 | Field | Type | Description |
