@@ -32,19 +32,20 @@ All strategies benchmarked with default parameters, $10,000 initial capital, 10y
 | [Bollinger Breakout](bollinger-breakout.md) | 17.7% / 0.28 ❌ | 43.8% / 0.43 ❌ | 325.4% / 1.04 ✅ | 1858.6% / 1.06 ✅ | 5725.3% / 1.04 ✅ |
 | [Keltner Squeeze](keltner-squeeze.md) | -4.0% / -0.16 ❌ | -13.5% / -0.40 ❌ | 16.6% / 0.30 ❌ | 96.7% / 0.47 ❌ | 165.8% / 0.51 ❌ |
 
-### Benchmark
+### Benchmark (Buy & Hold)
 
 | Strategy | SPY | QQQ | AAPL | TSLA | BTC |
 |---|---|---|---|---|---|
 | **SPY Buy & Hold** | **279.3% / 0.84** | **279.3% / 0.84** | **279.3% / 0.84** | **279.3% / 0.84** | **279.3% / 0.84** |
+| **Ticker Buy & Hold** | **277.2% / 0.83** | **485.6% / 0.91** | **926.3% / 0.95** | **2343.0% / 0.84** | **16751.0% / 0.91** |
 
 ## Key Findings
 
-- **Trend following wins on momentum assets:** EMA, MACD, Bollinger, and Donchian all beat SPY when applied to AAPL, TSLA, and BTC — assets with strong directional moves.
-- **Nothing beats SPY on SPY:** No active strategy outperformed buy-and-hold on the S&P 500 index itself. EMA Crossover came closest with better risk-adjusted returns (⚠️).
-- **Mean reversion struggles everywhere:** RSI, RSI(2) Connors, and MA+ATR all underperformed across every ticker. These strategies prioritize win rate over total return.
-- **Keltner Squeeze needs work:** Worst performer overall — too few trades and poor timing. May need parameter tuning or a different implementation.
-- **Golden Cross is too slow:** Only 3-8 trades in 10 years. High win rate but misses most of the action.
+- **Almost nothing beats buy & hold of the same ticker.** AAPL returned 926%, TSLA 2343%, BTC 16,751% over 10yr. Even strategies that "beat SPY" mostly lost to just holding the ticker they traded.
+- **Trend following beats SPY but not the ticker itself:** EMA, MACD, Bollinger on AAPL/TSLA/BTC all beat SPY's 279% — but still underperformed each ticker's own buy & hold.
+- **MACD on TSLA (2952%) came closest** to beating TSLA buy & hold (2343%) — one of the rare ✅ where active trading actually added value.
+- **Mean reversion is a trap:** RSI, RSI(2) Connors, and MA+ATR all underperformed across every ticker. High win rates, low returns. Feels good, makes less money.
+- **The honest conclusion:** For most people, buying and holding beats active trading. These strategies are most useful for risk management (lower drawdowns) or as components of more complex systems — not as standalone approaches.
 
 Run `examples/strategy_catalog.py` to reproduce these results with live data.
 
