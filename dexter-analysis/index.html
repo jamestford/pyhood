@@ -1,0 +1,1622 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A modern, reliable Python client for the Robinhood API">
+      
+      
+      
+        <link rel="canonical" href="https://jamestford.github.io/pyhood/dexter-analysis/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Dexter Analysis — What Can pyhood Learn? - pyhood</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="lime">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dexter-analysis-what-can-pyhood-learn" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="pyhood" class="md-header__button md-logo" aria-label="pyhood" data-md-component="logo">
+      
+  <img src="../assets/logo-128.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            pyhood
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dexter Analysis — What Can pyhood Learn?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="lime"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jamestford/pyhood" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jamestford/pyhood
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="pyhood" class="md-nav__button md-logo" aria-label="pyhood" data-md-component="logo">
+      
+  <img src="../assets/logo-128.png" alt="logo">
+
+    </a>
+    pyhood
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jamestford/pyhood" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jamestford/pyhood
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quotes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stock Quotes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Options Chains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../account/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Account & Positions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crypto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crypto Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtesting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtesting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rate-limits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rate Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-endpoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Endpoints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyhoodClient
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/crypto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CryptoClient
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtester
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#section-1-what-dexter-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Section 1: What Dexter Does
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 1: What Dexter Does">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tech-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tech Stack
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-2-what-dexter-has-that-we-dont" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Section 2: What Dexter Has That We Don't
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 2: What Dexter Has That We Don&#39;t">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-fundamental-data-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Fundamental Data Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-stock-screener-with-natural-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Stock Screener with Natural Language
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-persistent-memory-with-semantic-search" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Persistent Memory with Semantic Search
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-evaluationbenchmarking-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Evaluation/Benchmarking Framework
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#25-scratchpad-audit-trail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5 Scratchpad / Audit Trail
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#26-skill-system-workflow-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.6 Skill System (Workflow Templates)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27-tool-call-deduplication-loop-prevention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.7 Tool Call Deduplication / Loop Prevention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28-news-sentiment-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8 News &amp; Sentiment Integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-3-recommendations-for-pyhood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Section 3: Recommendations for pyhood
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 3: Recommendations for pyhood">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#priority-1-fundamental-data-integration-high-impact-medium-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 1: Fundamental Data Integration (HIGH IMPACT / MEDIUM EFFORT)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-2-stock-universe-screening-high-impact-low-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 2: Stock Universe Screening (HIGH IMPACT / LOW EFFORT)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-3-research-memory-knowledge-base-medium-impact-medium-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 3: Research Memory / Knowledge Base (MEDIUM IMPACT / MEDIUM EFFORT)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-4-evaluation-framework-medium-impact-low-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 4: Evaluation Framework (MEDIUM IMPACT / LOW EFFORT)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-5-llm-driven-strategy-generation-high-impact-high-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 5: LLM-Driven Strategy Generation (HIGH IMPACT / HIGH EFFORT)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priority-6-event-driven-strategy-support-medium-impact-high-effort" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priority 6: Event-Driven Strategy Support (MEDIUM IMPACT / HIGH EFFORT)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not Recommended
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-4-what-we-have-that-dexter-doesnt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Section 4: What We Have That Dexter Doesn't
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 4: What We Have That Dexter Doesn&#39;t">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-actual-trading-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Actual Trading Engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-automated-strategy-discovery-autoresearch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Automated Strategy Discovery (AutoResearch)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-market-regime-classification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Market Regime Classification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-strategy-robustness-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Strategy Robustness Testing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-chart-pattern-recognition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Chart Pattern Recognition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-volume-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Volume Analysis
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#section-5-architecture-patterns-worth-adopting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Section 5: Architecture Patterns Worth Adopting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Section 5: Architecture Patterns Worth Adopting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-meta-tool-pattern-natural-language-sub-tool-routing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Meta-Tool Pattern (Natural Language → Sub-Tool Routing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-scratchpad-pattern-jsonl-audit-trail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Scratchpad Pattern (JSONL Audit Trail)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-tool-call-budget-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Tool Call Budget Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-memory-flush-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Memory Flush Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-skill-system-workflow-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Skill System (Workflow Templates)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-evaluation-driven-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 Evaluation-Driven Development
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bottom-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bottom Line
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="dexter-analysis-what-can-pyhood-learn">Dexter Analysis — What Can pyhood Learn?<a class="headerlink" href="#dexter-analysis-what-can-pyhood-learn" title="Permanent link">&para;</a></h1>
+<p><strong>Repo:</strong> https://github.com/virattt/dexter<br />
+<strong>Analyzed:</strong> 2026-03-19<br />
+<strong>Purpose:</strong> Identify tools, patterns, and features worth adopting for pyhood's backtesting engine and autoresearch system.</p>
+<hr />
+<h2 id="section-1-what-dexter-does">Section 1: What Dexter Does<a class="headerlink" href="#section-1-what-dexter-does" title="Permanent link">&para;</a></h2>
+<h3 id="architecture-overview">Architecture Overview<a class="headerlink" href="#architecture-overview" title="Permanent link">&para;</a></h3>
+<p>Dexter is an <strong>autonomous financial research agent</strong> — think "Claude Code for finance." It takes natural language questions about stocks, crypto, and companies, then:</p>
+<ol>
+<li><strong>Plans</strong> — decomposes complex queries into research steps</li>
+<li><strong>Executes</strong> — calls financial data APIs, web search, SEC filings, stock screeners</li>
+<li><strong>Self-validates</strong> — checks its own work with loop detection and iteration limits</li>
+<li><strong>Remembers</strong> — persistent memory with vector + keyword hybrid search (SQLite + embeddings)</li>
+</ol>
+<p>It is NOT a trading system. It does not backtest, execute trades, or manage portfolios. It's a <strong>research assistant</strong> that answers financial questions.</p>
+<h3 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Meta-tool routing</strong>: Single <code>get_financials</code> tool that accepts natural language and uses a secondary LLM call to route to the right sub-tool (income statements, balance sheets, key ratios, etc.). Same pattern for <code>get_market_data</code>.</li>
+<li><strong>Stock screener</strong>: Natural language → structured API filters via LLM structured output. "P/E below 15 and revenue growth above 20%" becomes exact API query.</li>
+<li><strong>SEC filing reader</strong>: Reads 10-K, 10-Q, 8-K filing content from an API.</li>
+<li><strong>Persistent memory</strong>: SQLite-backed memory with embedding search (OpenAI/Gemini/Ollama), chunking, hybrid vector+keyword retrieval. Memory survives sessions.</li>
+<li><strong>Scratchpad/debugging</strong>: Every tool call logged to JSONL files with timestamps, args, results, and LLM reasoning. Full audit trail.</li>
+<li><strong>Evaluation suite</strong>: LLM-as-judge evaluation against a CSV dataset of financial questions. LangSmith integration for tracking accuracy over time.</li>
+<li><strong>Skill system</strong>: YAML frontmatter-based skill files (like DCF valuation) that encode multi-step financial workflows.</li>
+<li><strong>DCF valuation skill</strong>: Complete discounted cash flow analysis with sector-specific WACC tables, sensitivity matrices, and sanity checks.</li>
+<li><strong>Context management</strong>: Anthropic-style context window management — keeps full tool results, clears oldest when approaching token limits, flushes important info to memory before clearing.</li>
+<li><strong>Multi-provider LLM</strong>: Supports OpenAI, Anthropic, Google, Ollama, OpenRouter, X.ai.</li>
+<li><strong>WhatsApp gateway</strong>: Chat with the agent via WhatsApp messages.</li>
+<li><strong>Tool call limits</strong>: Soft limits on repeated tool calls with similarity detection to prevent retry loops.</li>
+</ul>
+<h3 id="tech-stack">Tech Stack<a class="headerlink" href="#tech-stack" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Runtime:</strong> Bun (TypeScript)</li>
+<li><strong>LLM Framework:</strong> LangChain</li>
+<li><strong>Database:</strong> better-sqlite3 (for memory/embeddings)</li>
+<li><strong>Financial Data:</strong> financialdatasets.ai API</li>
+<li><strong>Search:</strong> Exa, Tavily, Perplexity (fallback chain)</li>
+<li><strong>Browser:</strong> Playwright</li>
+<li><strong>Evaluation:</strong> LangSmith</li>
+<li><strong>UI:</strong> pi-tui (terminal UI)</li>
+</ul>
+<hr />
+<h2 id="section-2-what-dexter-has-that-we-dont">Section 2: What Dexter Has That We Don't<a class="headerlink" href="#section-2-what-dexter-has-that-we-dont" title="Permanent link">&para;</a></h2>
+<h3 id="21-fundamental-data-pipeline">2.1 Fundamental Data Pipeline<a class="headerlink" href="#21-fundamental-data-pipeline" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Access to income statements, balance sheets, cash flow statements, key financial ratios, analyst estimates, earnings data, revenue segments, insider trades, SEC filings — all via structured APIs.</p>
+<p><strong>Why it matters:</strong> pyhood currently only uses price/volume data (candles) for strategy decisions. Fundamental data could enable strategies like: "only buy when P/E &lt; 15 AND insider buying is up" or "sell when earnings estimates drop."</p>
+<h3 id="22-stock-screener-with-natural-language">2.2 Stock Screener with Natural Language<a class="headerlink" href="#22-stock-screener-with-natural-language" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> LLM translates natural language screening criteria into structured API filters. Returns matching tickers.</p>
+<p><strong>Why it matters:</strong> Could automate the "which stocks should I even look at?" question. Instead of manually picking SPY/QQQ/AAPL, you could screen for "stocks with revenue growth &gt;20% and P/E &lt;20" and run autoresearch on the results.</p>
+<h3 id="23-persistent-memory-with-semantic-search">2.3 Persistent Memory with Semantic Search<a class="headerlink" href="#23-persistent-memory-with-semantic-search" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> SQLite database storing conversation context, research findings, user preferences. Hybrid vector (embedding) + keyword search. Survives across sessions.</p>
+<p><strong>Why it matters:</strong> pyhood's autoresearch currently loses context between runs. If the engine discovered that "RSI strategies fail on crypto" in a previous run, it has no way to remember that. Memory could make the research process cumulative.</p>
+<h3 id="24-evaluationbenchmarking-framework">2.4 Evaluation/Benchmarking Framework<a class="headerlink" href="#24-evaluationbenchmarking-framework" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> CSV dataset of financial questions with expected answers. LLM-as-judge scoring. LangSmith tracking. Can run on samples or full dataset.</p>
+<p><strong>Why it matters:</strong> pyhood has no equivalent for evaluating the quality of its autoresearch outputs. We could build an eval suite that tests: "Does the autoresearcher actually find strategies that work out-of-sample?"</p>
+<h3 id="25-scratchpad-audit-trail">2.5 Scratchpad / Audit Trail<a class="headerlink" href="#25-scratchpad-audit-trail" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Every tool call logged to JSONL with timestamps, arguments, raw results, and LLM reasoning. Creates a full audit trail per query.</p>
+<p><strong>Why it matters:</strong> pyhood's <code>OvernightRunner</code> logs to <code>run_log.txt</code> and <code>errors.log</code>, but doesn't capture the full reasoning chain. A JSONL scratchpad would help debug why the autoresearcher made certain decisions.</p>
+<h3 id="26-skill-system-workflow-templates">2.6 Skill System (Workflow Templates)<a class="headerlink" href="#26-skill-system-workflow-templates" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Markdown files with YAML frontmatter that encode multi-step financial workflows. The DCF skill, for example, has 8 steps with specific data gathering, calculation, and validation steps.</p>
+<p><strong>Why it matters:</strong> pyhood's <code>program.md</code> is essentially a manual skill. But it's not machine-parseable or composable. A formal skill system could encode workflows like "Overnight Research Program", "Single Strategy Deep Dive", "Market Regime Analysis" as pluggable templates.</p>
+<h3 id="27-tool-call-deduplication-loop-prevention">2.7 Tool Call Deduplication / Loop Prevention<a class="headerlink" href="#27-tool-call-deduplication-loop-prevention" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Tracks tool calls per query, detects similar queries using Jaccard similarity, warns the LLM when approaching limits, and suggests alternative approaches.</p>
+<p><strong>Why it matters:</strong> If pyhood ever adds an LLM-driven research layer (which it should), this prevents the agent from hammering the same API call in a loop.</p>
+<h3 id="28-news-sentiment-integration">2.8 News &amp; Sentiment Integration<a class="headerlink" href="#28-news-sentiment-integration" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Company news, insider trades, earnings surprises — all accessible as tools. Can combine price moves with news to explain "why did X go up?"</p>
+<p><strong>Why it matters:</strong> Could enable event-driven strategies. "Buy when insider buying spikes" or "avoid stocks with negative news sentiment before earnings."</p>
+<hr />
+<h2 id="section-3-recommendations-for-pyhood">Section 3: Recommendations for pyhood<a class="headerlink" href="#section-3-recommendations-for-pyhood" title="Permanent link">&para;</a></h2>
+<h3 id="priority-1-fundamental-data-integration-high-impact-medium-effort">Priority 1: Fundamental Data Integration (HIGH IMPACT / MEDIUM EFFORT)<a class="headerlink" href="#priority-1-fundamental-data-integration-high-impact-medium-effort" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Add a fundamental data layer that supplements price/volume data. Start with key ratios (P/E, P/B, debt/equity, revenue growth) and insider trading activity.</p>
+<p><strong>Why:</strong> Every strategy in pyhood is purely technical. Adding fundamental filters could dramatically improve signal quality. Example: "Only take EMA crossover signals when P/E &lt; 20 and insider buying is positive."</p>
+<p><strong>How:</strong>
+1. Add <code>financialdatasets.ai</code> or <code>yfinance</code> fundamentals as a data source
+2. Create a <code>FundamentalFilter</code> wrapper that takes a technical strategy and a fundamental condition
+3. Add fundamental screening to autoresearch: sweep not just technical parameters, but fundamental filters too</p>
+<p><strong>Effort:</strong> Medium (2-3 days for basic integration, 1 week for autoresearch integration)<br />
+<strong>Impact:</strong> High — opens entire new class of strategies</p>
+<h3 id="priority-2-stock-universe-screening-high-impact-low-effort">Priority 2: Stock Universe Screening (HIGH IMPACT / LOW EFFORT)<a class="headerlink" href="#priority-2-stock-universe-screening-high-impact-low-effort" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Before running autoresearch, automatically screen for candidate stocks based on fundamental criteria instead of hardcoding SPY/QQQ/AAPL.</p>
+<p><strong>Why:</strong> The current approach tests strategies on a fixed set of tickers. A screener could find better candidates: "What stocks have high volatility AND strong fundamentals?" — those are ideal for active trading.</p>
+<p><strong>How:</strong>
+1. Use <code>yfinance</code> or a screening API to filter stocks by criteria
+2. Feed the filtered tickers into AutoResearcher as the test universe
+3. Run overnight sweeps across both parameter space AND ticker space</p>
+<p><strong>Effort:</strong> Low (1-2 days)<br />
+<strong>Impact:</strong> High — could find dramatically better trading candidates</p>
+<h3 id="priority-3-research-memory-knowledge-base-medium-impact-medium-effort">Priority 3: Research Memory / Knowledge Base (MEDIUM IMPACT / MEDIUM EFFORT)<a class="headerlink" href="#priority-3-research-memory-knowledge-base-medium-impact-medium-effort" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Persistent storage of autoresearch findings, strategy performance across runs, and learned patterns. Use SQLite (like Dexter) with structured data.</p>
+<p><strong>Why:</strong> Currently each autoresearch run starts from scratch. Memory would enable:
+- "Last run found RSI(2) Connors works on SPY with these params — start there"
+- "EMA strategies fail on crypto — skip those"
+- "Regime X is starting — recall which strategies perform best"
+- Cumulative research that gets smarter over time</p>
+<p><strong>How:</strong>
+1. SQLite database storing: strategy results, regime observations, failed experiments
+2. Query interface: "What worked last time on QQQ?" → returns top strategies
+3. Auto-load previous best as starting point for new runs</p>
+<p><strong>Effort:</strong> Medium (3-5 days)<br />
+<strong>Impact:</strong> Medium — mostly time savings and smarter starting points</p>
+<h3 id="priority-4-evaluation-framework-medium-impact-low-effort">Priority 4: Evaluation Framework (MEDIUM IMPACT / LOW EFFORT)<a class="headerlink" href="#priority-4-evaluation-framework-medium-impact-low-effort" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Automated evaluation of autoresearch quality. Does the system actually find strategies that work? Track this over time.</p>
+<p><strong>How:</strong>
+1. After each overnight run, forward-test the top strategies on the most recent 3 months (out-of-sample)
+2. Track a "hit rate" — what % of strategies that pass train/test/validate actually profit in the next quarter
+3. Store results in the memory system above</p>
+<p><strong>Effort:</strong> Low (1-2 days)<br />
+<strong>Impact:</strong> Medium — crucial for knowing if the whole system actually works</p>
+<h3 id="priority-5-llm-driven-strategy-generation-high-impact-high-effort">Priority 5: LLM-Driven Strategy Generation (HIGH IMPACT / HIGH EFFORT)<a class="headerlink" href="#priority-5-llm-driven-strategy-generation-high-impact-high-effort" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Use an LLM (like Dexter's agent loop) to generate NEW strategy hypotheses, not just sweep parameters of existing ones.</p>
+<p><strong>Why:</strong> pyhood's autoresearch sweeps parameters of 11 known strategies. But the real alpha is in discovering NEW strategies. An LLM could:
+- Read financial research papers and extract strategy ideas
+- Combine existing indicators in novel ways
+- Propose strategies based on market regime analysis
+- Write Python strategy functions and test them</p>
+<p><strong>How:</strong>
+1. Build an agent loop (similar to Dexter's) that can write Python strategy code
+2. Use autoresearch to validate LLM-generated strategies
+3. Persist successful strategies and the reasoning behind them</p>
+<p><strong>Effort:</strong> High (1-2 weeks)<br />
+<strong>Impact:</strong> High — this is the endgame for automated alpha discovery</p>
+<h3 id="priority-6-event-driven-strategy-support-medium-impact-high-effort">Priority 6: Event-Driven Strategy Support (MEDIUM IMPACT / HIGH EFFORT)<a class="headerlink" href="#priority-6-event-driven-strategy-support-medium-impact-high-effort" title="Permanent link">&para;</a></h3>
+<p><strong>What:</strong> Extend the backtesting engine to handle non-price signals: earnings, insider trades, news sentiment, SEC filings.</p>
+<p><strong>Why:</strong> Many profitable strategies are event-driven, not purely technical. "Buy 3 days before earnings if RSI &lt; 30" or "Sell when CEO sells &gt;$1M in shares."</p>
+<p><strong>How:</strong>
+1. Add event data sources (earnings calendar, insider trades, news)
+2. Extend the <code>Candle</code> model or create a parallel event stream
+3. Let strategies access both price and event data
+4. Update autoresearch to sweep event-based parameters</p>
+<p><strong>Effort:</strong> High (1-2 weeks)<br />
+<strong>Impact:</strong> Medium — high potential but complex to implement correctly</p>
+<h3 id="not-recommended">Not Recommended<a class="headerlink" href="#not-recommended" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>WhatsApp/messaging gateway</strong> — Dexter has this but it's irrelevant for pyhood's mission</li>
+<li><strong>Browser automation</strong> — Overkill for data gathering when APIs exist</li>
+<li><strong>LangChain</strong> — pyhood is Python; if we add an LLM layer, use the AI SDK or raw API calls, not LangChain's abstractions</li>
+<li><strong>Terminal UI (TUI)</strong> — Nice for Dexter's interactive mode but pyhood runs headless overnight</li>
+</ul>
+<hr />
+<h2 id="section-4-what-we-have-that-dexter-doesnt">Section 4: What We Have That Dexter Doesn't<a class="headerlink" href="#section-4-what-we-have-that-dexter-doesnt" title="Permanent link">&para;</a></h2>
+<h3 id="41-actual-trading-engine">4.1 Actual Trading Engine<a class="headerlink" href="#41-actual-trading-engine" title="Permanent link">&para;</a></h3>
+<p>Dexter is research-only. pyhood has a complete backtesting engine with:
+- Long and short position support
+- Slippage modeling
+- Equity curve tracking
+- Sharpe ratio, max drawdown, win rate, profit factor, CAGR
+- Buy &amp; hold benchmark comparison
+- yfinance integration for 30+ years of data</p>
+<p>Dexter can't backtest anything. It can only answer questions.</p>
+<h3 id="42-automated-strategy-discovery-autoresearch">4.2 Automated Strategy Discovery (AutoResearch)<a class="headerlink" href="#42-automated-strategy-discovery-autoresearch" title="Permanent link">&para;</a></h3>
+<p>pyhood's autoresearch system is far ahead:
+- Train/test/validate data splitting with overfitting detection
+- Multi-parameter grid search with top-N forwarding
+- Cross-validation across related tickers
+- Regime-aware analysis (bull/bear/recovery/correction)
+- Overnight runner with crash resilience, resume, and timeouts
+- 11 built-in strategies with parameter grids
+- Comprehensive anti-overfitting checklist</p>
+<p>Dexter has nothing like this.</p>
+<h3 id="43-market-regime-classification">4.3 Market Regime Classification<a class="headerlink" href="#43-market-regime-classification" title="Permanent link">&para;</a></h3>
+<p>pyhood classifies regimes (bull/bear/recovery/correction) using 200-SMA and its slope, then tracks strategy performance by regime. This is critical for understanding WHEN a strategy works.</p>
+<p>Dexter has no concept of market regimes.</p>
+<h3 id="44-strategy-robustness-testing">4.4 Strategy Robustness Testing<a class="headerlink" href="#44-strategy-robustness-testing" title="Permanent link">&para;</a></h3>
+<p>pyhood checks parameter stability (nearby parameters should produce similar results), cross-validates on related tickers, detects regime dependency, and flags overfitting. This is serious quantitative rigor.</p>
+<p>Dexter evaluates answer quality, not strategy quality.</p>
+<h3 id="45-chart-pattern-recognition">4.5 Chart Pattern Recognition<a class="headerlink" href="#45-chart-pattern-recognition" title="Permanent link">&para;</a></h3>
+<p>Bull flag detection with configurable parameters — actual pattern recognition in Python.</p>
+<h3 id="46-volume-analysis">4.6 Volume Analysis<a class="headerlink" href="#46-volume-analysis" title="Permanent link">&para;</a></h3>
+<p>Net Distribution indicator (volume direction analysis), volume-confirmed breakouts. Dexter can fetch volume data but can't analyze it.</p>
+<hr />
+<h2 id="section-5-architecture-patterns-worth-adopting">Section 5: Architecture Patterns Worth Adopting<a class="headerlink" href="#section-5-architecture-patterns-worth-adopting" title="Permanent link">&para;</a></h2>
+<h3 id="51-meta-tool-pattern-natural-language-sub-tool-routing">5.1 Meta-Tool Pattern (Natural Language → Sub-Tool Routing)<a class="headerlink" href="#51-meta-tool-pattern-natural-language-sub-tool-routing" title="Permanent link">&para;</a></h3>
+<p>Dexter's <code>get_financials</code> and <code>get_market_data</code> are brilliant: a single tool that accepts natural language and uses an inner LLM call to route to the right sub-tool. This means the outer agent only needs to decide "I need financial data" — not which specific API endpoint to call.</p>
+<p><strong>Adopt for pyhood:</strong> If we add an LLM-driven research layer, use this pattern. One tool: "analyze_strategy" that accepts natural language and routes to: backtest, parameter sweep, cross-validate, regime analysis, etc.</p>
+<h3 id="52-scratchpad-pattern-jsonl-audit-trail">5.2 Scratchpad Pattern (JSONL Audit Trail)<a class="headerlink" href="#52-scratchpad-pattern-jsonl-audit-trail" title="Permanent link">&para;</a></h3>
+<p>Every action logged to append-only JSONL files. Cheap, crash-safe, debuggable. Each research session gets its own file with a timestamp hash.</p>
+<p><strong>Adopt for pyhood:</strong> Add JSONL logging to autoresearch. Each experiment logs: hypothesis, parameters, results, reasoning. This becomes the training data for the LLM-driven strategy generator.</p>
+<h3 id="53-tool-call-budget-pattern">5.3 Tool Call Budget Pattern<a class="headerlink" href="#53-tool-call-budget-pattern" title="Permanent link">&para;</a></h3>
+<p>Dexter tracks tool usage per query and warns when approaching limits. Uses Jaccard similarity to detect "you're asking the same thing again."</p>
+<p><strong>Adopt for pyhood:</strong> Apply to autoresearch — if the system has tried 50 variations of EMA crossover and none beat the benchmark, it should automatically move on to the next strategy family.</p>
+<h3 id="54-memory-flush-pattern">5.4 Memory Flush Pattern<a class="headerlink" href="#54-memory-flush-pattern" title="Permanent link">&para;</a></h3>
+<p>When context gets large, Dexter asks the LLM to summarize what's worth remembering, stores it in persistent memory, then clears the context. This keeps the agent running indefinitely without losing critical insights.</p>
+<p><strong>Adopt for pyhood:</strong> After each autoresearch run, summarize findings into a persistent knowledge base. "Regime-dependent strategies found for SPY: [list]. Failed approaches: [list]. Next research directions: [list]."</p>
+<h3 id="55-skill-system-workflow-templates">5.5 Skill System (Workflow Templates)<a class="headerlink" href="#55-skill-system-workflow-templates" title="Permanent link">&para;</a></h3>
+<p>YAML frontmatter + markdown instructions. Machine-parseable, composable, discoverable at startup.</p>
+<p><strong>Adopt for pyhood:</strong> Convert <code>program.md</code> into a formal skill format. Add more skills: "Quick Backtest", "Deep Parameter Sweep", "Regime Analysis", "Cross-Ticker Robustness Check". Each with clear inputs/outputs and step-by-step workflow.</p>
+<h3 id="56-evaluation-driven-development">5.6 Evaluation-Driven Development<a class="headerlink" href="#56-evaluation-driven-development" title="Permanent link">&para;</a></h3>
+<p>Dexter has an eval suite that measures whether the agent actually answers financial questions correctly. Every code change can be validated against the eval set.</p>
+<p><strong>Adopt for pyhood:</strong> Build a "strategy discovery eval" — a set of known-good strategies (verified manually) that the autoresearcher should find. Track discovery rate over time. This tells you if your system improvements actually help.</p>
+<hr />
+<h2 id="bottom-line">Bottom Line<a class="headerlink" href="#bottom-line" title="Permanent link">&para;</a></h2>
+<p><strong>Dexter and pyhood are complementary, not competitive.</strong> Dexter is a financial research chatbot. pyhood is a quantitative trading system. The biggest opportunity is combining them:</p>
+<ol>
+<li><strong>Use Dexter-style fundamental data</strong> to filter pyhood's trading signals</li>
+<li><strong>Use Dexter-style LLM agents</strong> to generate new strategy hypotheses for pyhood to backtest</li>
+<li><strong>Use Dexter-style memory</strong> to make pyhood's autoresearch cumulative across runs</li>
+<li><strong>Use Dexter-style screening</strong> to find better tickers to trade</li>
+</ol>
+<p>The highest-ROI change: <strong>add fundamental data filtering to the backtesting engine</strong>. It's the single biggest gap in pyhood's strategy space, and Dexter shows exactly which data sources and APIs make it practical.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/jamestford/pyhood" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "content.code.copy", "content.code.annotate", "search.highlight", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
