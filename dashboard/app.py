@@ -336,108 +336,192 @@ def page_comparison():
 # PAGE 3: Autoresearch Results
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _compute_score(row):
+    """Composite ranking score for a kept strategy."""
+    ts = row.get("test_sharpe", 0) or 0
+    tpf = row.get("test_profit_factor", 0) or 0
+    twr = row.get("test_win_rate", 0) or 0
+    og = row.get("overfit_gap", 0) or 0
+    return (ts * 0.35) + (tpf * 0.25) + (twr / 100 * 0.20) + ((100 - abs(og)) / 100 * 0.20)
+
+
 def page_autoresearch():
-    st.header("🔬 Autoresearch Results")
+    st.header("🔬 Strategy Leaderboard")
 
     db_path = ROOT / "autoresearch_results" / "autoresearch_memory.db"
     if not db_path.exists():
-        st.error(f"DB not found: {db_path}")
+        st.error(f"DB not found: `{db_path}`")
         return
 
     conn = sqlite3.connect(str(db_path))
-    df = pd.read_sql_query("SELECT * FROM experiments ORDER BY id", conn)
-    conn.close()
+    try:
+        df = pd.read_sql_query("SELECT * FROM experiments ORDER BY id", conn)
+    finally:
+        conn.close()
 
     if df.empty:
-        st.info("No experiments found.")
+        st.info("No experiments found yet. Run autoresearch to populate results.")
         return
 
-    # Sidebar filters
-    with st.sidebar:
-        st.subheader("Filters")
-        tickers = ["All"] + sorted(df["ticker"].unique().tolist())
-        sel_ticker = st.selectbox("Ticker", tickers, key="ar_ticker")
-        show_only_kept = st.checkbox("Show only kept", value=True)
-        if not show_only_kept:
-            max_rows = st.slider("Max rows", 50, 500, 100, key="ar_max_rows")
+    # Only kept strategies
+    kept = df[df["kept"] == 1].copy()
+    if kept.empty:
+        st.warning(f"No strategies passed filters yet ({len(df)} total experiments run).")
+        return
 
-    filtered = df.copy()
+    # Fill NaN numerics with 0 for score calc
+    numeric_cols = ["test_sharpe", "test_profit_factor", "test_win_rate",
+                    "overfit_gap", "test_return", "test_max_drawdown", "test_trades",
+                    "train_sharpe", "train_profit_factor", "train_win_rate",
+                    "train_return", "train_max_drawdown", "train_trades"]
+    for c in numeric_cols:
+        if c in kept.columns:
+            kept[c] = pd.to_numeric(kept[c], errors="coerce").fillna(0)
+
+    # Compute composite score
+    kept["score"] = kept.apply(_compute_score, axis=1)
+
+    # ── Sidebar filters ──
+    with st.sidebar:
+        st.subheader("Leaderboard Filters")
+        tickers = ["All"] + sorted(kept["ticker"].unique().tolist())
+        sel_ticker = st.selectbox("Ticker", tickers, key="ar_ticker")
+
+        min_trades = st.slider("Min Test Trades", 0, 100, 10, key="ar_min_trades")
+
+        sort_options = {
+            "Score": "score",
+            "Test Sharpe": "test_sharpe",
+            "Test Return": "test_return",
+            "Win Rate": "test_win_rate",
+            "Overfit Gap": "overfit_gap",
+        }
+        sort_label = st.selectbox("Sort By", list(sort_options.keys()), key="ar_sort")
+        sort_col = sort_options[sort_label]
+
+    # Apply filters
+    filtered = kept.copy()
     if sel_ticker != "All":
         filtered = filtered[filtered["ticker"] == sel_ticker]
-    if show_only_kept:
-        filtered = filtered[filtered["kept"] == 1]
+    if "test_trades" in filtered.columns:
+        filtered = filtered[filtered["test_trades"] >= min_trades]
 
-    # Summary
-    st.markdown(
-        f"**{len(filtered)}** shown | "
-        f"✅ **{int(df['kept'].sum())}** kept"
-        f" / **{len(df)}** total experiments"
+    if filtered.empty:
+        st.warning("No strategies match current filters. Try lowering min trades or changing ticker.")
+        return
+
+    # Sort
+    ascending = True if sort_col == "overfit_gap" else False
+    filtered = filtered.sort_values(sort_col, ascending=ascending).reset_index(drop=True)
+    filtered.insert(0, "rank", range(1, len(filtered) + 1))
+
+    # ── Top Strategy Callout ──
+    top = filtered.iloc[0]
+    st.success(
+        f"🏆 **#{1} — {top['strategy_name']}** ({top['ticker']})  •  "
+        f"Score: **{top['score']:.2f}**"
+    )
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Test Sharpe", f"{top['test_sharpe']:.2f}")
+    c2.metric("Test Return", f"{top['test_return']:.1f}%")
+    c3.metric("Win Rate", f"{top['test_win_rate']:.1f}%")
+    c4.metric("Max Drawdown", f"{top['test_max_drawdown']:.1f}%")
+    c5.metric("Overfit Gap", f"{top['overfit_gap']:.1f}%")
+
+    # ── Summary Stats ──
+    avg_sharpe = filtered["test_sharpe"].mean()
+    best_row = filtered.loc[filtered["test_sharpe"].idxmax()]
+    ticker_list = ", ".join(sorted(filtered["ticker"].unique().tolist()))
+    st.caption(
+        f"**{len(filtered)}** strategies passed  |  "
+        f"Avg Test Sharpe: **{avg_sharpe:.2f}**  |  "
+        f"Best Sharpe: **{best_row['strategy_name']}** ({best_row['test_sharpe']:.2f})  |  "
+        f"Tickers: {ticker_list}"
     )
 
-    # Table
-    display_cols = ["id", "ticker", "strategy_name", "kept", "train_sharpe", "test_sharpe",
-                    "overfit_gap", "train_return", "test_return", "train_max_drawdown",
-                    "test_max_drawdown", "train_win_rate", "test_win_rate", "reason"]
-    avail_cols = [c for c in display_cols if c in filtered.columns]
+    # ── Leaderboard Table ──
+    st.subheader("Leaderboard")
+    board = filtered[["rank", "strategy_name", "ticker", "score",
+                       "test_sharpe", "test_return", "test_win_rate",
+                       "overfit_gap", "test_trades"]].copy()
+    board.columns = ["Rank", "Strategy", "Ticker", "Score",
+                     "Test Sharpe", "Test Return %", "Win Rate %",
+                     "Overfit Gap %", "Test Trades"]
 
-    # Limit rows when showing all to prevent crashes
-    if not show_only_kept:
-        display = filtered[avail_cols].head(max_rows).copy()
-        if len(filtered) > max_rows:
-            st.caption(
-                f"Showing {max_rows} of {len(filtered)}. "
-                "Increase slider or filter to see more."
-            )
-    else:
-        display = filtered[avail_cols].copy()
+    # Round for display
+    for col in ["Score", "Test Sharpe"]:
+        board[col] = board[col].round(2)
+    for col in ["Test Return %", "Win Rate %", "Overfit Gap %"]:
+        board[col] = board[col].round(1)
+    board["Test Trades"] = board["Test Trades"].astype(int)
 
-    st.dataframe(display, use_container_width=True, hide_index=True)
+    st.dataframe(board, use_container_width=True, hide_index=True)
 
-    # Detail expander
+    # ── Strategy Detail ──
     st.subheader("Strategy Detail")
-    sel_id = st.selectbox("Select experiment ID", filtered["id"].tolist())
-    row = filtered[filtered["id"] == sel_id].iloc[0]
+    detail_options = [
+        f"#{r['rank']} — {r['Strategy']} ({r['Ticker']})"
+        for _, r in board.iterrows()
+    ]
+    if not detail_options:
+        return
+
+    sel_detail = st.selectbox("Select a strategy", detail_options, key="ar_detail")
+    sel_rank = int(sel_detail.split("#")[1].split(" ")[0])
+    row = filtered[filtered["rank"] == sel_rank].iloc[0]
 
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("**Train Metrics**")
-        st.write(f"- Sharpe: {row.get('train_sharpe', 'N/A')}")
-        st.write(f"- Return: {row.get('train_return', 'N/A')}")
-        st.write(f"- Max DD: {row.get('train_max_drawdown', 'N/A')}")
-        st.write(f"- Win Rate: {row.get('train_win_rate', 'N/A')}")
-        st.write(f"- PF: {row.get('train_profit_factor', 'N/A')}")
-        st.write(f"- Trades: {row.get('train_trades', 'N/A')}")
+        st.metric("Sharpe", f"{row.get('train_sharpe', 0):.2f}")
+        st.metric("Return", f"{row.get('train_return', 0):.1f}%")
+        st.metric("Max Drawdown", f"{row.get('train_max_drawdown', 0):.1f}%")
+        st.metric("Win Rate", f"{row.get('train_win_rate', 0):.1f}%")
+        st.metric("Profit Factor", f"{row.get('train_profit_factor', 0):.2f}")
+        st.metric("Trades", f"{int(row.get('train_trades', 0))}")
     with col2:
         st.markdown("**Test Metrics**")
-        st.write(f"- Sharpe: {row.get('test_sharpe', 'N/A')}")
-        st.write(f"- Return: {row.get('test_return', 'N/A')}")
-        st.write(f"- Max DD: {row.get('test_max_drawdown', 'N/A')}")
-        st.write(f"- Win Rate: {row.get('test_win_rate', 'N/A')}")
-        st.write(f"- PF: {row.get('test_profit_factor', 'N/A')}")
-        st.write(f"- Trades: {row.get('test_trades', 'N/A')}")
+        st.metric("Sharpe", f"{row.get('test_sharpe', 0):.2f}")
+        st.metric("Return", f"{row.get('test_return', 0):.1f}%")
+        st.metric("Max Drawdown", f"{row.get('test_max_drawdown', 0):.1f}%")
+        st.metric("Win Rate", f"{row.get('test_win_rate', 0):.1f}%")
+        st.metric("Profit Factor", f"{row.get('test_profit_factor', 0):.2f}")
+        st.metric("Trades", f"{int(row.get('test_trades', 0))}")
 
-    # Overfit indicator
-    train_s = row.get("train_sharpe")
-    test_s = row.get("test_sharpe")
-    if train_s and test_s and not pd.isna(train_s) and not pd.isna(test_s) and train_s != 0:
-        gap = (train_s - test_s) / abs(train_s) * 100
-        color = "red" if gap > 50 else "orange" if gap > 25 else "green"
-        st.markdown(f"**Overfit Gap:** <span style='color:{color};font-size:1.2em'>{gap:.1f}%</span> (train {train_s:.2f} → test {test_s:.2f})", unsafe_allow_html=True)
+    # Overfit gap indicator
+    gap_val = abs(row.get("overfit_gap", 0))
+    if gap_val < 25:
+        gap_color, gap_label = "green", "Low"
+    elif gap_val < 50:
+        gap_color, gap_label = "orange", "Moderate"
+    else:
+        gap_color, gap_label = "red", "High"
+    st.markdown(
+        f"**Overfit Gap:** <span style='color:{gap_color};font-size:1.2em'>"
+        f"{row.get('overfit_gap', 0):.1f}% ({gap_label})</span>",
+        unsafe_allow_html=True,
+    )
 
-    # Params
+    # Parameters
     try:
-        params = json.loads(row.get("params_json", "{}"))
-        st.json(params)
+        params_raw = row.get("params_json", "{}")
+        if params_raw and str(params_raw) != "nan":
+            params_data = json.loads(params_raw)
+            if params_data:
+                st.markdown("**Parameters**")
+                st.json(params_data)
     except Exception:
         pass
 
     # Regime breakdown
     try:
-        regime = json.loads(row.get("regime_breakdown_json", "{}"))
-        if regime:
-            st.subheader("Regime Breakdown")
-            regime_df = pd.DataFrame(regime).T
-            st.dataframe(regime_df, use_container_width=True)
+        regime_raw = row.get("regime_breakdown_json", "{}")
+        if regime_raw and str(regime_raw) != "nan":
+            regime_data = json.loads(regime_raw)
+            if regime_data:
+                st.markdown("**Regime Breakdown**")
+                regime_df = pd.DataFrame(regime_data).T
+                st.dataframe(regime_df, use_container_width=True)
     except Exception:
         pass
 
