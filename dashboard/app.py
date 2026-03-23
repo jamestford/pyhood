@@ -345,8 +345,34 @@ def _compute_score(row):
     return (ts * 0.35) + (tpf * 0.25) + (twr / 100 * 0.20) + ((100 - abs(og)) / 100 * 0.20)
 
 
+@st.cache_data(ttl=3600, show_spinner="Fetching buy & hold benchmarks...")
+def _buy_and_hold_returns(tickers: tuple[str, ...]) -> dict[str, float]:
+    """Calculate buy & hold return for the TEST period (second half of 10y daily data)."""
+    bh = {}
+    for ticker in tickers:
+        try:
+            data = fetch_equity(ticker, interval="1d", years=10)
+            if data is None or len(data) < 10:
+                bh[ticker] = float("nan")
+                continue
+            mid = len(data) // 2
+            test_data = data.iloc[mid:]
+            first_close = test_data["close"].iloc[0]
+            last_close = test_data["close"].iloc[-1]
+            bh[ticker] = ((last_close - first_close) / first_close) * 100
+        except Exception:
+            bh[ticker] = float("nan")
+    return bh
+
+
 def page_autoresearch():
     st.header("🔬 Strategy Leaderboard")
+
+    # ── Backtest context header ──
+    st.info(
+        "📋 **Backtest Configuration:** 10 years daily data (yfinance) "
+        "| 50/50 train/test split | Slippage: 0.01% | Commission: $1/trade"
+    )
 
     db_path = ROOT / "autoresearch_results" / "autoresearch_memory.db"
     if not db_path.exists():
@@ -380,6 +406,12 @@ def page_autoresearch():
 
     # Compute composite score
     kept["score"] = kept.apply(_compute_score, axis=1)
+
+    # ── Buy & Hold benchmark per ticker ──
+    unique_tickers = tuple(sorted(kept["ticker"].unique().tolist()))
+    bh_map = _buy_and_hold_returns(unique_tickers)
+    kept["buy_hold_pct"] = kept["ticker"].map(bh_map)
+    kept["alpha_pct"] = kept["test_return"] - kept["buy_hold_pct"]
 
     # ── Sidebar filters ──
     with st.sidebar:
@@ -417,23 +449,33 @@ def page_autoresearch():
 
     # ── Top Strategy Callout ──
     top = filtered.iloc[0]
+    top_bh = top["buy_hold_pct"]
+    top_alpha = top["alpha_pct"]
+    bh_str = f"{top_bh:.1f}%" if pd.notna(top_bh) else "N/A"
+    alpha_str = f"{top_alpha:+.1f}%" if pd.notna(top_alpha) else "N/A"
     st.success(
         f"🏆 **#{1} — {top['strategy_name']}** ({top['ticker']})  •  "
-        f"Score: **{top['score']:.2f}**"
+        f"Score: **{top['score']:.2f}**  •  "
+        f"Strategy: **{top['test_return']:.1f}%** vs Buy & Hold: **{bh_str}**  •  "
+        f"Alpha: **{alpha_str}**"
     )
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("Test Sharpe", f"{top['test_sharpe']:.2f}")
     c2.metric("Test Return", f"{top['test_return']:.1f}%")
-    c3.metric("Win Rate", f"{top['test_win_rate']:.1f}%")
-    c4.metric("Max Drawdown", f"{top['test_max_drawdown']:.1f}%")
-    c5.metric("Overfit Gap", f"{top['overfit_gap']:.1f}%")
+    c3.metric("Buy & Hold", bh_str)
+    c4.metric("Alpha", alpha_str)
+    c5.metric("Win Rate", f"{top['test_win_rate']:.1f}%")
+    c6.metric("Max Drawdown", f"{top['test_max_drawdown']:.1f}%")
 
     # ── Summary Stats ──
     avg_sharpe = filtered["test_sharpe"].mean()
+    avg_alpha = filtered["alpha_pct"].mean()
+    avg_alpha_str = f"{avg_alpha:+.1f}%" if pd.notna(avg_alpha) else "N/A"
     best_row = filtered.loc[filtered["test_sharpe"].idxmax()]
     ticker_list = ", ".join(sorted(filtered["ticker"].unique().tolist()))
     st.caption(
         f"**{len(filtered)}** strategies passed  |  "
+        f"Avg Alpha: **{avg_alpha_str}** vs buy & hold  |  "
         f"Avg Test Sharpe: **{avg_sharpe:.2f}**  |  "
         f"Best Sharpe: **{best_row['strategy_name']}** ({best_row['test_sharpe']:.2f})  |  "
         f"Tickers: {ticker_list}"
@@ -442,20 +484,27 @@ def page_autoresearch():
     # ── Leaderboard Table ──
     st.subheader("Leaderboard")
     board = filtered[["rank", "strategy_name", "ticker", "score",
-                       "test_sharpe", "test_return", "test_win_rate",
-                       "overfit_gap", "test_trades"]].copy()
+                       "test_sharpe", "test_return", "buy_hold_pct", "alpha_pct",
+                       "test_win_rate", "overfit_gap", "test_trades"]].copy()
     board.columns = ["Rank", "Strategy", "Ticker", "Score",
-                     "Test Sharpe", "Test Return %", "Win Rate %",
-                     "Overfit Gap %", "Test Trades"]
+                     "Test Sharpe", "Test Return %", "Buy & Hold %", "Alpha %",
+                     "Win Rate %", "Overfit Gap %", "Test Trades"]
 
     # Round for display
     for col in ["Score", "Test Sharpe"]:
         board[col] = board[col].round(2)
-    for col in ["Test Return %", "Win Rate %", "Overfit Gap %"]:
+    for col in ["Test Return %", "Buy & Hold %", "Alpha %", "Win Rate %", "Overfit Gap %"]:
         board[col] = board[col].round(1)
     board["Test Trades"] = board["Test Trades"].astype(int)
 
-    st.dataframe(board, use_container_width=True, hide_index=True)
+    # Style alpha column
+    def _style_alpha(val):
+        if pd.isna(val):
+            return "color: gray"
+        return "color: #00cc96" if val >= 0 else "color: #ef553b"
+
+    styled = board.style.applymap(_style_alpha, subset=["Alpha %"])
+    st.dataframe(styled, use_container_width=True, hide_index=True)
 
     # ── Strategy Detail ──
     st.subheader("Strategy Detail")
@@ -483,6 +532,10 @@ def page_autoresearch():
         st.markdown("**Test Metrics**")
         st.metric("Sharpe", f"{row.get('test_sharpe', 0):.2f}")
         st.metric("Return", f"{row.get('test_return', 0):.1f}%")
+        detail_bh = row.get("buy_hold_pct", float("nan"))
+        detail_alpha = row.get("alpha_pct", float("nan"))
+        st.metric("Buy & Hold", f"{detail_bh:.1f}%" if pd.notna(detail_bh) else "N/A")
+        st.metric("Alpha vs B&H", f"{detail_alpha:+.1f}%" if pd.notna(detail_alpha) else "N/A")
         st.metric("Max Drawdown", f"{row.get('test_max_drawdown', 0):.1f}%")
         st.metric("Win Rate", f"{row.get('test_win_rate', 0):.1f}%")
         st.metric("Profit Factor", f"{row.get('test_profit_factor', 0):.2f}")
