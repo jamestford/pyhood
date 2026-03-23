@@ -224,14 +224,12 @@ class ResearchMemory:
         if kept_only:
             conditions.append("kept = 1")
 
-        where = ""
+        query = "SELECT * FROM experiments"
         if conditions:
-            where = "WHERE " + " AND ".join(conditions)
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY id DESC LIMIT ?"
 
-        rows = self.conn.execute(
-            f"SELECT * FROM experiments {where} ORDER BY id DESC LIMIT ?",
-            params + [limit],
-        ).fetchall()
+        rows = self.conn.execute(query, params + [limit]).fetchall()
         return [dict(row) for row in rows]
 
     def experiment_exists(self, ticker: str, strategy_name: str, params: dict) -> bool:
@@ -646,14 +644,12 @@ class ResearchMemory:
         if valid_only:
             conditions.append("still_valid = 1")
 
-        where = ""
+        query = "SELECT * FROM insights"
         if conditions:
-            where = "WHERE " + " AND ".join(conditions)
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY id DESC"
 
-        rows = self.conn.execute(
-            f"SELECT * FROM insights {where} ORDER BY id DESC",
-            params,
-        ).fetchall()
+        rows = self.conn.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
     def invalidate_insight(self, insight_id: int, reason: str) -> None:
@@ -769,12 +765,13 @@ class ResearchMemory:
             conditions.append("priority_level = ?")
             params.append(priority_level)
 
-        where = "WHERE " + " AND ".join(conditions)
-        rows = self.conn.execute(
-            f"SELECT * FROM priorities {where} ORDER BY "
-            "CASE priority_level WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END",
-            params,
-        ).fetchall()
+        query = "SELECT * FROM priorities WHERE " + " AND ".join(conditions)
+        query += (
+            " ORDER BY CASE priority_level"
+            " WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END"
+        )
+
+        rows = self.conn.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
     def update_priority(

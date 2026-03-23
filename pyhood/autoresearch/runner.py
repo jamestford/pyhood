@@ -990,12 +990,39 @@ def _reconstruct_strategy(exp: ExperimentResult):
     ns = {name: getattr(strat_mod, name) for name in dir(strat_mod)
           if callable(getattr(strat_mod, name)) and not name.startswith('_')}
 
-    try:
-        fn = eval(code, {"__builtins__": {}}, ns)  # noqa: S307
+    # Safe lookup: resolve strategy name from code string instead of eval
+    code_stripped = code.strip()
+    fn = ns.get(code_stripped)
+    if fn is None:
+        # Handle "func_name(...)" format — extract just the name
+        func_name = code_stripped.split("(")[0].strip()
+        fn = ns.get(func_name)
+        if fn is not None and "(" in code_stripped:
+            # Has arguments — try to parse and call the factory
+            import ast
+            try:
+                tree = ast.parse(code_stripped, mode="eval")
+                if isinstance(tree.body, ast.Call) and tree.body.keywords:
+                    kwargs = {
+                        kw.arg: ast.literal_eval(kw.value)
+                        for kw in tree.body.keywords
+                        if kw.arg is not None
+                    }
+                    result = fn(**kwargs)
+                    if callable(result):
+                        return result
+            except Exception:
+                pass
+    if fn is not None and callable(fn):
+        try:
+            result = fn(**exp.params) if exp.params else fn()
+            if callable(result):
+                return result
+        except Exception:
+            pass
+        # If fn itself is callable (not a factory), return directly
         if callable(fn):
             return fn
-    except Exception:
-        pass
 
     # Last resort: try matching factory name in code string
     for factory_name, factory_fn in ns.items():
