@@ -87,6 +87,50 @@ order = client.buy_option(
 
 IRA accounts are limited to Level 2 options: long calls, long puts, covered calls, and cash-secured puts. Spreads and multi-leg strategies are not available. See [Account docs](account.md#ira--retirement-accounts) for details.
 
+## Viewing Option Positions
+
+Use `get_option_positions()` to get fully resolved option positions with live market data, P&L, and Greeks:
+
+```python
+positions = client.get_option_positions()
+
+for p in positions:
+    print(
+        f"{p.symbol} ${p.strike} {p.option_type} exp {p.expiration} | "
+        f"qty: {p.quantity} | "
+        f"cost: ${p.cost_basis:.0f} | "
+        f"value: ${p.current_value:.0f} | "
+        f"P&L: ${p.unrealized_pl:.2f} ({p.unrealized_pl_pct:+.1f}%) | "
+        f"delta: {p.delta:.3f} | IV: {p.iv:.1%}"
+    )
+```
+
+For IRA accounts, pass `account_number`:
+
+```python
+positions = client.get_option_positions(account_number="YOUR_IRA_ACCOUNT")
+```
+
+### OptionPosition Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `symbol` | `str` | Underlying ticker |
+| `option_type` | `str` | `"call"` or `"put"` |
+| `strike` | `float` | Strike price |
+| `expiration` | `str` | Expiration date (YYYY-MM-DD) |
+| `quantity` | `int` | Number of contracts |
+| `average_open_price` | `float` | Average entry price per share |
+| `cost_basis` | `float` | Total cost basis |
+| `current_mark` | `float` | Current mid-market price per share |
+| `current_value` | `float` | Current total value (mark × qty × 100) |
+| `unrealized_pl` | `float` | Unrealized P&L in dollars |
+| `unrealized_pl_pct` | `float` | Unrealized P&L as percentage |
+| `strategy` | `str` | Strategy type (e.g. `"long_call"`) |
+| `delta` | `float` | Position delta |
+| `iv` | `float` | Implied volatility (decimal) |
+| `theta` | `float` | Theta (daily decay) |
+
 ## Example: Find High Vol/OI Calls
 
 ```python

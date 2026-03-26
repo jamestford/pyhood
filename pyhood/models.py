@@ -108,6 +108,29 @@ class Candle:
 
 
 @dataclass(frozen=True)
+class OptionPosition:
+    """Open option position with resolved details."""
+    symbol: str
+    option_type: str  # 'call' or 'put'
+    strike: float
+    expiration: str
+    quantity: int
+    average_open_price: float  # per-share (not per-contract)
+    cost_basis: float  # total cost
+    current_mark: float  # per-share
+    current_value: float  # mark * quantity * 100
+    unrealized_pl: float
+    unrealized_pl_pct: float
+    strategy: str  # e.g. 'long_call'
+    option_id: str = ""
+    account_number: str = ""
+    # Greeks (from market data)
+    delta: float = 0.0
+    iv: float = 0.0
+    theta: float = 0.0
+
+
+@dataclass(frozen=True)
 class Earnings:
     """Upcoming earnings info."""
     symbol: str

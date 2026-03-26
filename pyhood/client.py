@@ -18,6 +18,7 @@ from pyhood.models import (
     Candle,
     Earnings,
     OptionContract,
+    OptionPosition,
     OptionsChain,
     Order,
     Position,
@@ -489,6 +490,94 @@ class PyhoodClient:
                 equity=round(equity, 2),
                 unrealized_pl=round(unrealized_pl, 2),
                 unrealized_pl_pct=round(unrealized_pl_pct, 2),
+            ))
+
+        return positions
+
+    def get_option_positions(
+        self, account_number: str | None = None, nonzero: bool = True,
+    ) -> list[OptionPosition]:
+        """Get current option positions with fully resolved details.
+
+        Uses aggregate_positions endpoint which returns symbol, strike, expiry
+        in the legs data. Also fetches current market data for P&L and greeks.
+
+        Args:
+            account_number: Filter to specific account (e.g. '915060792' for IRA).
+            nonzero: Only return positions with quantity > 0.
+        """
+        params: dict[str, str] = {}
+        if nonzero:
+            params["nonzero"] = "true"
+        if account_number:
+            params["account_numbers"] = account_number  # NOTE: plural for options endpoint
+
+        raw_positions = list(self._session.get_paginated(
+            "https://api.robinhood.com/options/aggregate_positions/",
+            params=params,
+        ))
+
+        positions: list[OptionPosition] = []
+        for pos in raw_positions:
+            qty = int(float(pos.get("quantity", 0)))
+            if qty == 0 and nonzero:
+                continue
+
+            symbol = pos.get("symbol", "")
+            strategy = pos.get("strategy", "")
+            avg_open = float(pos.get("average_open_price", 0)) / 100  # API returns per-contract, convert to per-share
+
+            # Extract details from legs
+            legs = pos.get("legs", [])
+            if not legs:
+                continue
+
+            leg = legs[0]  # Primary leg
+            strike = float(leg.get("strike_price", 0))
+            expiration = leg.get("expiration_date", "")
+            option_type = leg.get("option_type", "")
+            option_id = leg.get("option_id", "")
+            cost_basis = float(leg.get("clearing_cost_basis_in_strategy", 0))
+
+            # Fetch current market data
+            current_mark = 0.0
+            delta = 0.0
+            iv = 0.0
+            theta = 0.0
+            if option_id:
+                try:
+                    md = self._session.get(
+                        f"https://api.robinhood.com/marketdata/options/{option_id}/"
+                    )
+                    current_mark = float(md.get("mark_price", 0))
+                    delta = float(md.get("delta", 0) or 0)
+                    iv = float(md.get("implied_volatility", 0) or 0)
+                    theta = float(md.get("theta", 0) or 0)
+                except Exception:
+                    pass
+
+            current_value = current_mark * qty * 100
+            unrealized_pl = current_value - cost_basis
+            unrealized_pl_pct = (unrealized_pl / cost_basis * 100) if cost_basis > 0 else 0.0
+
+            positions.append(OptionPosition(
+                symbol=symbol,
+                option_type=option_type,
+                strike=strike,
+                expiration=expiration,
+                quantity=qty,
+                average_open_price=avg_open,
+                cost_basis=cost_basis,
+                current_mark=current_mark,
+                current_value=round(current_value, 2),
+                unrealized_pl=round(unrealized_pl, 2),
+                unrealized_pl_pct=round(unrealized_pl_pct, 2),
+                strategy=strategy,
+                option_id=option_id,
+                account_number=account_number or "",
+                delta=delta,
+                iv=iv,
+                theta=theta,
             ))
 
         return positions
