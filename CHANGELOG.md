@@ -5,6 +5,32 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-03-29
+
+### Added
+- **Research & Discovery** — Analyst ratings, news, market movers, and trending stocks
+  - `get_ratings(symbol)` returns buy/hold/sell analyst consensus with computed percentages
+  - `get_news(symbol)` returns news articles with source, summary, and related instruments
+  - `get_movers(direction)` returns S&P 500 top movers (up or down)
+  - `get_tags(tag)` returns symbols for discovery tags (100-most-popular, top-movers, etf, etc.)
+  - `get_popularity(symbol)` returns how many Robinhood users hold a stock
+  - `get_splits(symbol)` returns stock split history
+  - Typed models: `Rating`, `NewsArticle`, `Mover`, `StockSplit`
+- **Portfolio Historicals** — Track portfolio value over time
+  - `get_portfolio_historicals(account_number, interval, span, bounds)` returns equity/market value candles
+  - Typed model: `PortfolioCandle`
+- **Option Historicals** — Historical pricing for option contracts
+  - `get_option_historicals(option_id, interval, span)` returns OHLCV candles
+  - Reuses existing `Candle` model
+- **Documents & Statements** — Account documents, trade confirmations, tax docs
+  - `get_documents(doc_type)` with optional type filtering
+  - Typed model: `Document`
+- **Day Trades / Margin / Deposit Schedules**
+  - `get_day_trades(account_id)` returns recent day trade history
+  - `get_margin_calls()` returns active margin calls
+  - `get_deposit_schedules()` returns recurring ACH deposit schedules
+- 15 new tests (212 total)
+
 ## [0.5.0] - 2026-03-29
 
 ### Added

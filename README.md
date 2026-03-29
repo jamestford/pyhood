@@ -32,7 +32,9 @@ Built for automated trading — with auth that doesn't break, proper error handl
 - 🏦 **IRA/Retirement accounts** — Trade stocks and options in Traditional and Roth IRAs. The only Python Robinhood library with retirement account support.
 - 💰 **Banking & dividends** — Query ACH transfers, linked bank accounts, and dividend history.
 - 📋 **Watchlists** — Create, manage, and modify your Robinhood watchlists programmatically.
-- 🧪 **Tested and maintained** — 197 tests, CI across Python 3.10-3.13, linted with ruff. If it breaks, we know immediately.
+- 🔍 **Research & discovery** — Analyst ratings, news feed, S&P 500 movers, trending stocks, instrument popularity, and stock splits.
+- 📑 **Portfolio & documents** — Portfolio historicals, option historicals, account statements, and trade confirmations.
+- 🧪 **Tested and maintained** — 212 tests, CI across Python 3.10-3.13, linted with ruff. If it breaks, we know immediately.
 
 ## Quick Start
 
@@ -260,6 +262,48 @@ hours = client.get_market_hours("XNYS", "2026-03-30")
 print(f"Open: {hours.is_open}, {hours.opens_at} — {hours.closes_at}")
 ```
 
+## Research & Discovery
+
+```python
+# Analyst ratings
+rating = client.get_ratings("AAPL")
+print(f"Buy: {rating.num_buy}, Hold: {rating.num_hold}, Sell: {rating.num_sell}")
+
+# News articles
+articles = client.get_news("AAPL")
+for a in articles:
+    print(f"{a.source}: {a.title}")
+
+# S&P 500 movers
+movers = client.get_movers("up")
+
+# Trending stocks (100 most popular on Robinhood)
+popular = client.get_tags("100-most-popular")
+
+# How many RH users hold a stock
+count = client.get_popularity("AAPL")
+
+# Stock split history
+splits = client.get_splits("AAPL")
+```
+
+## Portfolio & Option Historicals
+
+```python
+# Portfolio value over time
+history = client.get_portfolio_historicals(
+    account_number="123456", interval="day", span="year",
+)
+for candle in history:
+    print(f"{candle.begins_at}: ${candle.adjusted_close_equity:.2f}")
+
+# Historical option pricing
+candles = client.get_option_historicals("option-id-here", interval="day", span="month")
+
+# Account documents (statements, trade confirms, tax docs)
+docs = client.get_documents(doc_type="account_statement")
+```
+
 ## Development Status
 - ✅ Stocks/options market data (unofficial API) — functional (equity + index options)
 - ✅ Futures trading (contracts, quotes, orders, P&L) — functional
@@ -271,6 +315,10 @@ print(f"Open: {hours.is_open}, {hours.opens_at} — {hours.closes_at}")
 - ✅ Dividends (query history) — functional
 - ✅ Markets/Trading Hours (exchange schedules) — functional
 - ✅ User profile & notification settings — functional
+- ✅ Research & discovery (ratings, news, movers, tags, popularity) — functional
+- ✅ Portfolio historicals & option historicals — functional
+- ✅ Documents & statements — functional
+- ✅ Day trades, margin calls, deposit schedules — functional
 
 ## Acknowledgments
 

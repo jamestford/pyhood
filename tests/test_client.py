@@ -11,13 +11,19 @@ from pyhood.models import (
     ACHTransfer,
     BankAccount,
     Dividend,
+    Document,
     Market,
     MarketHours,
+    Mover,
+    NewsArticle,
     NotificationSettings,
     OptionContract,
     OptionsChain,
     Order,
+    PortfolioCandle,
     Quote,
+    Rating,
+    StockSplit,
     UserProfile,
     Watchlist,
 )
@@ -1437,3 +1443,387 @@ class TestGetDividends:
         # Non-matching symbol returns empty
         dividends = client.get_dividends_by_symbol("TSLA")
         assert dividends == []
+
+
+class TestRatings:
+    @responses.activate
+    def test_get_ratings(self, client):
+        responses.add(
+            responses.GET,
+            urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{urls.RATINGS}abc123/",
+            json={
+                "summary": {
+                    "num_buy_ratings": 25,
+                    "num_hold_ratings": 8,
+                    "num_sell_ratings": 2,
+                },
+                "instrument_id": "abc123",
+            },
+            status=200,
+        )
+
+        rating = client.get_ratings("AAPL")
+        assert isinstance(rating, Rating)
+        assert rating.symbol == "AAPL"
+        assert rating.num_buy == 25
+        assert rating.num_hold == 8
+        assert rating.num_sell == 2
+        assert rating.total == 35
+        assert rating.buy_pct == pytest.approx(71.43, abs=0.01)
+
+
+class TestNews:
+    @responses.activate
+    def test_get_news(self, client):
+        responses.add(
+            responses.GET,
+            urls.NEWS,
+            json={
+                "results": [
+                    {
+                        "title": "Apple Reports Record Quarter",
+                        "source": "Reuters",
+                        "url": "https://reuters.com/article/1",
+                        "published_at": "2026-03-29T10:00:00Z",
+                        "summary": "Apple beat expectations...",
+                        "related_instruments": [{"symbol": "AAPL"}],
+                    },
+                    {
+                        "title": "Tech Stocks Rally",
+                        "source": "Bloomberg",
+                        "url": "https://bloomberg.com/article/2",
+                        "published_at": "2026-03-29T09:00:00Z",
+                        "summary": "Tech sector gains...",
+                        "related_instruments": [
+                            {"symbol": "AAPL"},
+                            {"symbol": "MSFT"},
+                        ],
+                    },
+                ],
+            },
+            status=200,
+        )
+
+        articles = client.get_news("AAPL")
+        assert len(articles) == 2
+        assert isinstance(articles[0], NewsArticle)
+        assert articles[0].title == "Apple Reports Record Quarter"
+        assert articles[0].source == "Reuters"
+        assert articles[1].related_instruments == ["AAPL", "MSFT"]
+
+    @responses.activate
+    def test_get_news_empty(self, client):
+        responses.add(
+            responses.GET,
+            urls.NEWS,
+            json={"results": []},
+            status=200,
+        )
+        assert client.get_news("XYZ") == []
+
+
+class TestMovers:
+    @responses.activate
+    def test_get_movers(self, client):
+        responses.add(
+            responses.GET,
+            urls.MOVERS_SP500,
+            json={
+                "results": [
+                    {
+                        "instrument_url": f"{BASE}/instruments/abc123/",
+                        "price_movement": {
+                            "market_hours_last_movement_pct": "3.45",
+                        },
+                    },
+                ],
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{BASE}/instruments/abc123/",
+            json={"symbol": "NVDA"},
+            status=200,
+        )
+
+        movers = client.get_movers("up")
+        assert len(movers) == 1
+        assert isinstance(movers[0], Mover)
+        assert movers[0].symbol == "NVDA"
+        assert movers[0].price_change_pct == 3.45
+
+
+class TestTags:
+    @responses.activate
+    def test_get_tags(self, client):
+        responses.add(
+            responses.GET,
+            f"{urls.TAGS}100-most-popular/",
+            json={
+                "instruments": [
+                    f"{BASE}/instruments/aaa/",
+                    f"{BASE}/instruments/bbb/",
+                ],
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{BASE}/instruments/aaa/",
+            json={"symbol": "AAPL"},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{BASE}/instruments/bbb/",
+            json={"symbol": "MSFT"},
+            status=200,
+        )
+
+        symbols = client.get_tags("100-most-popular")
+        assert symbols == ["AAPL", "MSFT"]
+
+
+class TestPopularity:
+    @responses.activate
+    def test_get_popularity(self, client):
+        responses.add(
+            responses.GET,
+            urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc123/"}]},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{BASE}/instruments/abc123/popularity/",
+            json={"num_open_positions": 150432},
+            status=200,
+        )
+
+        count = client.get_popularity("AAPL")
+        assert count == 150432
+
+
+class TestSplits:
+    @responses.activate
+    def test_get_splits(self, client):
+        responses.add(
+            responses.GET,
+            urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc123/"}]},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{BASE}/instruments/abc123/splits/",
+            json={
+                "results": [
+                    {
+                        "instrument": f"{BASE}/instruments/abc123/",
+                        "execution_date": "2020-08-31",
+                        "multiplier": "4.00",
+                        "divisor": "1.00",
+                    },
+                ],
+            },
+            status=200,
+        )
+
+        splits = client.get_splits("AAPL")
+        assert len(splits) == 1
+        assert isinstance(splits[0], StockSplit)
+        assert splits[0].execution_date == "2020-08-31"
+        assert splits[0].multiplier == 4.0
+
+    @responses.activate
+    def test_get_splits_empty(self, client):
+        responses.add(
+            responses.GET,
+            urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc123/"}]},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{BASE}/instruments/abc123/splits/",
+            json={"results": []},
+            status=200,
+        )
+        assert client.get_splits("BRK.A") == []
+
+
+class TestPortfolioHistoricals:
+    @responses.activate
+    def test_get_portfolio_historicals(self, client):
+        responses.add(
+            responses.GET,
+            f"{BASE}/portfolios/historicals/123456/",
+            json={
+                "equity_historicals": [
+                    {
+                        "begins_at": "2026-03-28T00:00:00Z",
+                        "adjusted_open_equity": "15000.00",
+                        "adjusted_close_equity": "15200.00",
+                        "open_equity": "15000.00",
+                        "close_equity": "15200.00",
+                        "open_market_value": "14000.00",
+                        "close_market_value": "14200.00",
+                    },
+                ],
+            },
+            status=200,
+        )
+
+        candles = client.get_portfolio_historicals(
+            account_number="123456",
+        )
+        assert len(candles) == 1
+        assert isinstance(candles[0], PortfolioCandle)
+        assert candles[0].adjusted_close_equity == 15200.00
+        assert candles[0].close_market_value == 14200.00
+
+
+class TestOptionHistoricals:
+    @responses.activate
+    def test_get_option_historicals(self, client):
+        responses.add(
+            responses.GET,
+            f"{urls.OPTIONS_HISTORICALS}opt-123/",
+            json={
+                "data_points": [
+                    {
+                        "begins_at": "2026-03-28T00:00:00Z",
+                        "open_price": "5.00",
+                        "close_price": "5.25",
+                        "high_price": "5.50",
+                        "low_price": "4.90",
+                        "volume": "1200",
+                    },
+                ],
+            },
+            status=200,
+        )
+
+        candles = client.get_option_historicals("opt-123")
+        assert len(candles) == 1
+        assert candles[0].close_price == 5.25
+        assert candles[0].volume == 1200
+
+
+class TestDocuments:
+    @responses.activate
+    def test_get_documents(self, client):
+        responses.add(
+            responses.GET,
+            urls.DOCUMENTS,
+            json={
+                "results": [
+                    {
+                        "id": "doc-001",
+                        "type": "account_statement",
+                        "date": "2026-03-01",
+                        "url": f"{BASE}/documents/doc-001/",
+                        "download_url": f"{BASE}/documents/doc-001/download/",
+                    },
+                    {
+                        "id": "doc-002",
+                        "type": "trade_confirm",
+                        "date": "2026-03-15",
+                        "url": f"{BASE}/documents/doc-002/",
+                        "download_url": f"{BASE}/documents/doc-002/download/",
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+
+        docs = client.get_documents()
+        assert len(docs) == 2
+        assert isinstance(docs[0], Document)
+        assert docs[0].type == "account_statement"
+        assert docs[1].type == "trade_confirm"
+
+    @responses.activate
+    def test_get_documents_filtered(self, client):
+        responses.add(
+            responses.GET,
+            urls.DOCUMENTS,
+            json={
+                "results": [
+                    {
+                        "id": "doc-001",
+                        "type": "account_statement",
+                        "date": "2026-03-01",
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+
+        docs = client.get_documents(doc_type="account_statement")
+        assert len(docs) == 1
+
+
+class TestDayTrades:
+    @responses.activate
+    def test_get_day_trades(self, client):
+        responses.add(
+            responses.GET,
+            f"{BASE}/accounts/acct-123/recent_day_trades/",
+            json={
+                "equity_day_trades": [
+                    {"symbol": "AAPL", "day": "2026-03-28"},
+                    {"symbol": "TSLA", "day": "2026-03-28"},
+                ],
+            },
+            status=200,
+        )
+
+        trades = client.get_day_trades(account_id="acct-123")
+        assert len(trades) == 2
+        assert trades[0]["symbol"] == "AAPL"
+
+
+class TestMarginCalls:
+    @responses.activate
+    def test_get_margin_calls_empty(self, client):
+        responses.add(
+            responses.GET,
+            urls.MARGIN_CALLS,
+            json={"results": [], "next": None},
+            status=200,
+        )
+        assert client.get_margin_calls() == []
+
+
+class TestDepositSchedules:
+    @responses.activate
+    def test_get_deposit_schedules(self, client):
+        responses.add(
+            responses.GET,
+            urls.ACH_DEPOSIT_SCHEDULES,
+            json={
+                "results": [
+                    {
+                        "id": "sched-001",
+                        "amount": "100.00",
+                        "frequency": "weekly",
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+
+        schedules = client.get_deposit_schedules()
+        assert len(schedules) == 1
+        assert schedules[0]["frequency"] == "weekly"

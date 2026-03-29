@@ -243,6 +243,78 @@ class Dividend:
     id: str = ""
 
 
+# ── Research / Discovery ─────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Rating:
+    """Analyst rating summary for a stock."""
+    symbol: str
+    num_buy: int = 0
+    num_hold: int = 0
+    num_sell: int = 0
+    published_at: str = ""
+
+    @property
+    def total(self) -> int:
+        return self.num_buy + self.num_hold + self.num_sell
+
+    @property
+    def buy_pct(self) -> float:
+        return self.num_buy / self.total * 100 if self.total > 0 else 0.0
+
+
+@dataclass(frozen=True)
+class NewsArticle:
+    """News article for a stock."""
+    title: str
+    source: str
+    url: str
+    published_at: str = ""
+    summary: str = ""
+    related_instruments: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Mover:
+    """S&P 500 mover."""
+    symbol: str
+    price_change: float = 0.0
+    price_change_pct: float = 0.0
+    instrument_url: str = ""
+
+
+@dataclass(frozen=True)
+class PortfolioCandle:
+    """Portfolio value at a point in time."""
+    begins_at: str
+    adjusted_open_equity: float
+    adjusted_close_equity: float
+    open_equity: float
+    close_equity: float
+    open_market_value: float
+    close_market_value: float
+
+
+@dataclass(frozen=True)
+class Document:
+    """Account document (statement, confirmation, tax doc)."""
+    id: str
+    type: str
+    date: str
+    url: str = ""
+    download_url: str = ""
+
+
+@dataclass(frozen=True)
+class StockSplit:
+    """Stock split record."""
+    instrument: str
+    execution_date: str
+    multiplier: float
+    divisor: float
+
+
 # ── Futures ──────────────────────────────────────────────────────────
 
 

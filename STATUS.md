@@ -41,6 +41,18 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - Watchlist management (list, add, remove)
 - Markets and trading hours lookup
 - User profile and notification settings
+- Documents and statements (trade confirms, tax docs)
+- Day trade history, margin calls, deposit schedules
+
+### Research & Discovery
+- Analyst ratings (buy/hold/sell consensus)
+- Stock news feed
+- S&P 500 top movers
+- Trending/popular stocks via tags
+- Instrument popularity (user count)
+- Stock split history
+- Portfolio historicals (equity over time)
+- Option historicals (contract pricing over time)
 
 ### Crypto Features
 - **Official Crypto API:** ED25519 key-based authentication
@@ -49,7 +61,7 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - **Keys stored separately:** Crypto keys in pyhood config
 
 ## Testing & Quality
-- **Test Coverage:** ~79% (197 tests passing)
+- **Test Coverage:** ~79% (212 tests passing)
 - **CI Pipeline:** GitHub Actions on Python 3.10-3.13
 - **Linting:** ruff for code style
 - **HTTP Mocking:** responses library for reliable tests

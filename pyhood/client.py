@@ -19,6 +19,7 @@ from pyhood.models import (
     BankAccount,
     Candle,
     Dividend,
+    Document,
     Earnings,
     FuturesContract,
     FuturesOrder,
@@ -26,13 +27,18 @@ from pyhood.models import (
     FuturesQuote,
     Market,
     MarketHours,
+    Mover,
+    NewsArticle,
     NotificationSettings,
     OptionContract,
     OptionPosition,
     OptionsChain,
     Order,
+    PortfolioCandle,
     Position,
     Quote,
+    Rating,
+    StockSplit,
     UserProfile,
     Watchlist,
 )
@@ -491,6 +497,250 @@ class PyhoodClient:
                     eps_actual=_safe_float(entry.get("eps", {}).get("actual")),
                 )
         return None
+
+    # ── Research / Discovery ─────────────────────────────────────────
+
+    def get_ratings(self, symbol: str) -> Rating:
+        """Get analyst buy/hold/sell ratings for a symbol."""
+        instrument = self._get_instrument_url(symbol)
+        instrument_id = instrument.rstrip("/").split("/")[-1]
+        data = self._session.get(f"{urls.RATINGS}{instrument_id}/")
+        summary = data.get("summary", {})
+        return Rating(
+            symbol=symbol.upper(),
+            num_buy=int(summary.get("num_buy_ratings", 0)),
+            num_hold=int(summary.get("num_hold_ratings", 0)),
+            num_sell=int(summary.get("num_sell_ratings", 0)),
+            published_at=data.get("instrument_id", ""),
+        )
+
+    def get_news(self, symbol: str) -> list[NewsArticle]:
+        """Get news articles for a symbol."""
+        data = self._session.get(urls.NEWS, params={"symbol": symbol.upper()})
+        results = data.get("results", []) if isinstance(data, dict) else []
+        return [
+            NewsArticle(
+                title=item.get("title", ""),
+                source=item.get("source", ""),
+                url=item.get("url", ""),
+                published_at=item.get("published_at", ""),
+                summary=item.get("summary", ""),
+                related_instruments=[
+                    inst.get("symbol", "")
+                    for inst in item.get("related_instruments", [])
+                    if inst.get("symbol")
+                ],
+            )
+            for item in results
+        ]
+
+    def get_movers(self, direction: str = "up") -> list[Mover]:
+        """Get S&P 500 top movers.
+
+        Args:
+            direction: 'up' or 'down'.
+        """
+        data = self._session.get(urls.MOVERS_SP500, params={"direction": direction})
+        results = data.get("results", []) if isinstance(data, dict) else []
+        movers: list[Mover] = []
+        for item in results:
+            instrument_url = item.get("instrument_url", "")
+            symbol = ""
+            if instrument_url:
+                try:
+                    inst = self._session.get(instrument_url)
+                    symbol = inst.get("symbol", "")
+                except Exception:
+                    pass
+            movement = item.get("price_movement", {})
+            pct = float(movement.get("market_hours_last_movement_pct", 0) or 0)
+            movers.append(Mover(
+                symbol=symbol,
+                price_change=pct,
+                price_change_pct=pct,
+                instrument_url=instrument_url,
+            ))
+        return movers
+
+    def get_tags(self, tag: str) -> list[str]:
+        """Get stock symbols for a discovery tag.
+
+        Args:
+            tag: Tag name (e.g. '100-most-popular', 'top-movers', 'etf',
+                 '10-most-popular', 'technology', 'healthcare').
+        """
+        data = self._session.get(f"{urls.TAGS}{tag}/")
+        instruments = data.get("instruments", []) if isinstance(data, dict) else []
+        symbols: list[str] = []
+        for instrument_url in instruments:
+            try:
+                inst = self._session.get(instrument_url)
+                symbol = inst.get("symbol", "")
+                if symbol:
+                    symbols.append(symbol)
+            except Exception:
+                pass
+        return symbols
+
+    def get_popularity(self, symbol: str) -> int:
+        """Get how many Robinhood users hold a stock.
+
+        Args:
+            symbol: Stock ticker.
+
+        Returns:
+            Number of open positions (popularity count).
+        """
+        instrument = self._get_instrument_url(symbol)
+        instrument_id = instrument.rstrip("/").split("/")[-1]
+        url = urls.POPULARITY.format(instrument_id=instrument_id)
+        data = self._session.get(url)
+        return int(data.get("num_open_positions", 0))
+
+    def get_splits(self, symbol: str) -> list[StockSplit]:
+        """Get stock split history for a symbol."""
+        instrument = self._get_instrument_url(symbol)
+        instrument_id = instrument.rstrip("/").split("/")[-1]
+        url = urls.SPLITS.format(instrument_id=instrument_id)
+        data = self._session.get(url)
+        results = data.get("results", []) if isinstance(data, dict) else []
+        return [
+            StockSplit(
+                instrument=item.get("instrument", ""),
+                execution_date=item.get("execution_date", ""),
+                multiplier=float(item.get("multiplier", 0)),
+                divisor=float(item.get("divisor", 0)),
+            )
+            for item in results
+        ]
+
+    # ── Portfolio Historicals ─────────────────────────────────────────
+
+    def get_portfolio_historicals(
+        self,
+        account_number: str | None = None,
+        interval: str = "day",
+        span: str = "year",
+        bounds: str = "regular",
+    ) -> list[PortfolioCandle]:
+        """Get historical portfolio value over time.
+
+        Args:
+            account_number: Account number. If None, uses first account.
+            interval: 'day', 'week', '5minute', '10minute', 'hour'.
+            span: 'day', 'week', 'month', '3month', 'year', '5year', 'all'.
+            bounds: 'regular', 'extended', 'trading'.
+        """
+        if not account_number:
+            accounts = self._session.get_paginated(urls.ACCOUNTS)
+            if not accounts:
+                return []
+            account_number = accounts[0].get("account_number", "")
+
+        url = urls.PORTFOLIO_HISTORICALS.format(account_number=account_number)
+        data = self._session.get(url, params={
+            "interval": interval,
+            "span": span,
+            "bounds": bounds,
+        })
+        results = data.get("equity_historicals", []) if isinstance(data, dict) else []
+        return [
+            PortfolioCandle(
+                begins_at=item.get("begins_at", ""),
+                adjusted_open_equity=float(item.get("adjusted_open_equity", 0)),
+                adjusted_close_equity=float(item.get("adjusted_close_equity", 0)),
+                open_equity=float(item.get("open_equity", 0)),
+                close_equity=float(item.get("close_equity", 0)),
+                open_market_value=float(item.get("open_market_value", 0)),
+                close_market_value=float(item.get("close_market_value", 0)),
+            )
+            for item in results
+        ]
+
+    # ── Option Historicals ────────────────────────────────────────────
+
+    def get_option_historicals(
+        self,
+        option_id: str,
+        interval: str = "day",
+        span: str = "year",
+    ) -> list[Candle]:
+        """Get historical pricing data for an option contract.
+
+        Args:
+            option_id: Option instrument ID.
+            interval: 'day', 'week', 'hour', '5minute', '10minute'.
+            span: 'day', 'week', 'month', '3month', 'year'.
+        """
+        data = self._session.get(
+            f"{urls.OPTIONS_HISTORICALS}{option_id}/",
+            params={"interval": interval, "span": span},
+        )
+        results = data.get("data_points", []) if isinstance(data, dict) else []
+        return [
+            Candle(
+                symbol=option_id,
+                begins_at=item.get("begins_at", ""),
+                open_price=float(item.get("open_price", 0)),
+                close_price=float(item.get("close_price", 0)),
+                high_price=float(item.get("high_price", 0)),
+                low_price=float(item.get("low_price", 0)),
+                volume=int(item.get("volume", 0)),
+            )
+            for item in results
+        ]
+
+    # ── Documents ─────────────────────────────────────────────────────
+
+    def get_documents(self, doc_type: str | None = None) -> list[Document]:
+        """Get account documents (statements, confirmations, tax docs).
+
+        Args:
+            doc_type: Filter by type (e.g. 'account_statement', 'trade_confirm').
+                If None, returns all documents.
+        """
+        params: dict[str, str] = {}
+        if doc_type:
+            params["type"] = doc_type
+        data = self._session.get_paginated(urls.DOCUMENTS, params=params)
+        return [
+            Document(
+                id=item.get("id", ""),
+                type=item.get("type", ""),
+                date=item.get("date", item.get("created_at", "")),
+                url=item.get("url", ""),
+                download_url=item.get("download_url", ""),
+            )
+            for item in data
+        ]
+
+    # ── Day Trades / Margin ──────────────────────────────────────────
+
+    def get_day_trades(self, account_id: str | None = None) -> list[dict]:
+        """Get recent day trade history.
+
+        Args:
+            account_id: Account ID. If None, uses first account.
+        """
+        if not account_id:
+            accounts = self._session.get_paginated(urls.ACCOUNTS)
+            if not accounts:
+                return []
+            account_id = accounts[0].get("url", "").rstrip("/").split("/")[-1]
+
+        url = urls.DAY_TRADES.format(account_id=account_id)
+        data = self._session.get(url)
+        return data.get("equity_day_trades", []) if isinstance(data, dict) else []
+
+    def get_margin_calls(self) -> list[dict]:
+        """Get active margin calls."""
+        data = self._session.get_paginated(urls.MARGIN_CALLS)
+        return data
+
+    def get_deposit_schedules(self) -> list[dict]:
+        """Get all scheduled recurring deposits."""
+        data = self._session.get_paginated(urls.ACH_DEPOSIT_SCHEDULES)
+        return data
 
     # ── Settings / Notifications ──────────────────────────────────────
 

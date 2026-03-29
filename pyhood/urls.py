@@ -63,6 +63,23 @@ NOTIFICATION_DEVICES = f"{BASE}/notifications/devices/"
 # Dividends
 DIVIDENDS = f"{BASE}/dividends/"
 
+# Documents
+DOCUMENTS = f"{BASE}/documents/"
+
+# Portfolio Historicals
+PORTFOLIO_HISTORICALS = f"{BASE}/portfolios/historicals/{{account_number}}/"
+
+# Options Historicals
+OPTIONS_HISTORICALS = f"{BASE}/marketdata/options/historicals/"
+
+# Popularity / Splits
+POPULARITY = f"{BASE}/instruments/{{instrument_id}}/popularity/"
+SPLITS = f"{BASE}/instruments/{{instrument_id}}/splits/"
+
+# Day Trades / Margin
+DAY_TRADES = f"{BASE}/accounts/{{account_id}}/recent_day_trades/"
+MARGIN_CALLS = f"{BASE}/margin/calls/"
+
 # Futures
 FUTURES_CONTRACTS = f"{BASE}/arsenal/v1/futures/contracts/"
 FUTURES_QUOTES = f"{BASE}/marketdata/futures/quotes/v1/"
