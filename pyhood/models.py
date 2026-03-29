@@ -140,6 +140,109 @@ class Earnings:
     eps_actual: float | None = None
 
 
+# ── Settings / Notifications ─────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class NotificationSettings:
+    """User notification preferences (raw key-value pairs from API)."""
+    settings: dict = field(default_factory=dict)
+
+    def is_enabled(self, key: str) -> bool:
+        """Check if a specific notification type is enabled."""
+        return self.settings.get(key, False)
+
+
+@dataclass(frozen=True)
+class UserProfile:
+    """Basic user profile information."""
+    username: str
+    email: str
+    first_name: str = ""
+    last_name: str = ""
+    id: str = ""
+    created_at: str = ""
+
+
+# ── Banking / ACH ────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class BankAccount:
+    """Linked bank account (ACH relationship)."""
+    id: str
+    bank_name: str
+    account_type: str  # 'checking' or 'savings'
+    account_nickname: str = ""
+    state: str = ""  # 'approved', 'pending', etc.
+    url: str = ""
+
+
+@dataclass(frozen=True)
+class ACHTransfer:
+    """ACH transfer record (deposit or withdrawal)."""
+    id: str
+    amount: float
+    direction: str  # 'deposit' or 'withdraw'
+    state: str  # 'pending', 'completed', 'cancelled'
+    created_at: str = ""
+    expected_landing_date: str = ""
+    ach_relationship: str = ""
+
+
+# ── Watchlists ───────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Watchlist:
+    """User watchlist."""
+    name: str
+    symbols: list[str] = field(default_factory=list)
+    url: str = ""
+
+
+# ── Markets ──────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Market:
+    """Stock exchange / market info."""
+    mic: str  # Market Identifier Code (e.g. 'XNYS', 'XNAS')
+    name: str
+    city: str
+    country: str
+    acronym: str = ""
+    timezone: str = ""
+    url: str = ""
+
+
+@dataclass(frozen=True)
+class MarketHours:
+    """Trading hours for a market on a specific date."""
+    date: str
+    is_open: bool
+    opens_at: str = ""
+    closes_at: str = ""
+    extended_opens_at: str = ""
+    extended_closes_at: str = ""
+
+
+# ── Dividends ────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class Dividend:
+    """Dividend payment record."""
+    symbol: str
+    amount: float
+    rate: float
+    payable_date: str
+    record_date: str
+    state: str  # 'paid', 'pending', 'voided'
+    instrument_url: str = ""
+    id: str = ""
+
+
 # ── Futures ──────────────────────────────────────────────────────────
 
 

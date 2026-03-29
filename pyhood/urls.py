@@ -47,10 +47,18 @@ MARKET_HOURS = f"{BASE}/markets/{{market}}/hours/{{date}}/"
 MOVERS_SP500 = f"{BASE}/midlands/movers/sp500/"
 TAGS = f"{BASE}/midlands/tags/tag/"
 WATCHLISTS = f"{BASE}/midlands/lists/default/"
+WATCHLISTS_V2 = f"{BASE}/midlands/lists/"
 
-# Profile
+# Banking / ACH
+ACH_RELATIONSHIPS = f"{BASE}/ach/relationships/"
+ACH_TRANSFERS = f"{BASE}/ach/transfers/"
+ACH_DEPOSIT_SCHEDULES = f"{BASE}/ach/deposit_schedules/"
+
+# Profile & Settings
 USER = f"{BASE}/user/"
 INVESTMENT_PROFILE = f"{BASE}/user/investment_profile/"
+NOTIFICATION_SETTINGS = f"{BASE}/settings/notifications/"
+NOTIFICATION_DEVICES = f"{BASE}/notifications/devices/"
 
 # Dividends
 DIVIDENDS = f"{BASE}/dividends/"

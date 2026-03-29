@@ -15,18 +15,26 @@ from pyhood.auth import get_session
 from pyhood.exceptions import OrderError, SymbolNotFound
 from pyhood.http import Session
 from pyhood.models import (
+    ACHTransfer,
+    BankAccount,
     Candle,
+    Dividend,
     Earnings,
     FuturesContract,
     FuturesOrder,
     FuturesPnL,
     FuturesQuote,
+    Market,
+    MarketHours,
+    NotificationSettings,
     OptionContract,
     OptionPosition,
     OptionsChain,
     Order,
     Position,
     Quote,
+    UserProfile,
+    Watchlist,
 )
 
 logger = logging.getLogger("pyhood")
@@ -483,6 +491,234 @@ class PyhoodClient:
                     eps_actual=_safe_float(entry.get("eps", {}).get("actual")),
                 )
         return None
+
+    # ── Settings / Notifications ──────────────────────────────────────
+
+    def get_user_profile(self) -> UserProfile:
+        """Get the authenticated user's profile."""
+        data = self._session.get(urls.USER)
+        return UserProfile(
+            username=data.get("username", ""),
+            email=data.get("email", ""),
+            first_name=data.get("first_name", ""),
+            last_name=data.get("last_name", ""),
+            id=data.get("id", ""),
+            created_at=data.get("created_at", ""),
+        )
+
+    def get_notification_settings(self) -> NotificationSettings:
+        """Get current notification preferences."""
+        data = self._session.get(urls.NOTIFICATION_SETTINGS)
+        return NotificationSettings(settings=data)
+
+    def update_notification_settings(self, **kwargs: bool) -> NotificationSettings:
+        """Update notification preferences.
+
+        Pass notification keys as keyword arguments, e.g.:
+            client.update_notification_settings(market_open=False, dividends=True)
+        """
+        data = self._session.post(urls.NOTIFICATION_SETTINGS, data=kwargs)
+        return NotificationSettings(settings=data)
+
+    # ── Banking / ACH ─────────────────────────────────────────────────
+
+    def get_bank_accounts(self) -> list[BankAccount]:
+        """Get all linked bank accounts."""
+        data = self._session.get_paginated(urls.ACH_RELATIONSHIPS)
+        return [
+            BankAccount(
+                id=item.get("id", ""),
+                bank_name=item.get("bank_account_holder_name", item.get("bank_name", "")),
+                account_type=item.get("bank_account_type", ""),
+                account_nickname=item.get("bank_account_nickname", ""),
+                state=item.get("state", ""),
+                url=item.get("url", ""),
+            )
+            for item in data
+        ]
+
+    def get_transfers(self) -> list[ACHTransfer]:
+        """Get all ACH transfers (deposits and withdrawals)."""
+        data = self._session.get_paginated(urls.ACH_TRANSFERS)
+        return [
+            ACHTransfer(
+                id=item.get("id", ""),
+                amount=float(item.get("amount", 0)),
+                direction=item.get("direction", ""),
+                state=item.get("state", ""),
+                created_at=item.get("created_at", ""),
+                expected_landing_date=item.get("expected_landing_date", ""),
+                ach_relationship=item.get("ach_relationship", ""),
+            )
+            for item in data
+        ]
+
+    def initiate_transfer(
+        self, amount: float, direction: str, ach_relationship_url: str,
+    ) -> ACHTransfer:
+        """Initiate an ACH transfer (deposit or withdrawal).
+
+        Args:
+            amount: Dollar amount to transfer.
+            direction: 'deposit' or 'withdraw'.
+            ach_relationship_url: URL of the linked bank account.
+        """
+        data = self._session.post(urls.ACH_TRANSFERS, data={
+            "amount": f"{amount:.2f}",
+            "direction": direction,
+            "ach_relationship": ach_relationship_url,
+        })
+        return ACHTransfer(
+            id=data.get("id", ""),
+            amount=float(data.get("amount", 0)),
+            direction=data.get("direction", ""),
+            state=data.get("state", ""),
+            created_at=data.get("created_at", ""),
+            expected_landing_date=data.get("expected_landing_date", ""),
+            ach_relationship=data.get("ach_relationship", ""),
+        )
+
+    def cancel_transfer(self, transfer_id: str) -> dict:
+        """Cancel a pending ACH transfer."""
+        return self._session.post(f"{urls.ACH_TRANSFERS}{transfer_id}/cancel/")
+
+    # ── Watchlists ────────────────────────────────────────────────────
+
+    def get_watchlists(self) -> list[Watchlist]:
+        """Get all user watchlists with their symbols."""
+        data = self._session.get_paginated(urls.WATCHLISTS_V2)
+        watchlists: list[Watchlist] = []
+        for item in data:
+            symbols = [
+                entry.get("symbol", "")
+                for entry in item.get("items", [])
+                if entry.get("symbol")
+            ]
+            watchlists.append(Watchlist(
+                name=item.get("display_name", item.get("name", "")),
+                symbols=symbols,
+                url=item.get("url", ""),
+            ))
+        return watchlists
+
+    def get_watchlist(self, name: str = "Default") -> Watchlist:
+        """Get a single watchlist by name.
+
+        Args:
+            name: Watchlist name (default: 'Default', Robinhood's main watchlist).
+        """
+        watchlists = self.get_watchlists()
+        for wl in watchlists:
+            if wl.name.lower() == name.lower():
+                return wl
+        raise SymbolNotFound(f"Watchlist not found: {name}")
+
+    def add_to_watchlist(self, symbols: list[str], name: str = "Default") -> list[dict]:
+        """Add symbols to a watchlist (max 32 at a time).
+
+        Args:
+            symbols: List of stock symbols to add.
+            name: Watchlist name (default: 'Default').
+        """
+        watchlist = self.get_watchlist(name)
+        list_id = watchlist.url.rstrip("/").split("/")[-1] if watchlist.url else name
+        url = f"{urls.WATCHLISTS_V2}{list_id}/items/"
+        results = []
+        for symbol in symbols:
+            resp = self._session.post(url, data={"symbol": symbol.upper()})
+            results.append(resp)
+        return results
+
+    def remove_from_watchlist(self, symbols: list[str], name: str = "Default") -> None:
+        """Remove symbols from a watchlist.
+
+        Args:
+            symbols: List of stock symbols to remove.
+            name: Watchlist name (default: 'Default').
+        """
+        watchlist = self.get_watchlist(name)
+        list_id = watchlist.url.rstrip("/").split("/")[-1] if watchlist.url else name
+        upper_symbols = {s.upper() for s in symbols}
+        # Get list items to find their IDs for deletion
+        items = self._session.get_paginated(f"{urls.WATCHLISTS_V2}{list_id}/items/")
+        for item in items:
+            if item.get("symbol", "").upper() in upper_symbols:
+                item_id = item.get("id", "")
+                if item_id:
+                    self._session.delete(
+                        f"{urls.WATCHLISTS_V2}{list_id}/items/{item_id}/"
+                    )
+
+    # ── Markets ───────────────────────────────────────────────────────
+
+    def get_markets(self) -> list[Market]:
+        """Get all available stock exchanges/markets."""
+        data = self._session.get_paginated(urls.MARKETS)
+        return [
+            Market(
+                mic=item.get("mic", ""),
+                name=item.get("name", ""),
+                city=item.get("city", ""),
+                country=item.get("country", ""),
+                acronym=item.get("acronym", ""),
+                timezone=item.get("timezone", ""),
+                url=item.get("url", ""),
+            )
+            for item in data
+        ]
+
+    def get_market_hours(self, market: str, date: str) -> MarketHours:
+        """Get trading hours for a market on a specific date.
+
+        Args:
+            market: Market MIC code (e.g. 'XNYS' for NYSE, 'XNAS' for Nasdaq).
+            date: Date string in YYYY-MM-DD format.
+        """
+        url = urls.MARKET_HOURS.format(market=market, date=date)
+        data = self._session.get(url)
+        return MarketHours(
+            date=data.get("date", date),
+            is_open=data.get("is_open", False),
+            opens_at=data.get("opens_at", "") or "",
+            closes_at=data.get("closes_at", "") or "",
+            extended_opens_at=data.get("extended_opens_at", "") or "",
+            extended_closes_at=data.get("extended_closes_at", "") or "",
+        )
+
+    # ── Dividends ──────────────────────────────────────────────────────
+
+    def get_dividends(self) -> list[Dividend]:
+        """Get all dividend payments."""
+        data = self._session.get_paginated(urls.DIVIDENDS)
+        dividends: list[Dividend] = []
+        # Cache instrument URL -> symbol lookups to avoid repeated requests
+        symbol_cache: dict[str, str] = {}
+        for item in data:
+            instrument_url = item.get("instrument", "")
+            symbol = symbol_cache.get(instrument_url, "")
+            if not symbol and instrument_url:
+                try:
+                    inst = self._session.get(instrument_url)
+                    symbol = inst.get("symbol", "")
+                    symbol_cache[instrument_url] = symbol
+                except Exception:
+                    pass
+
+            dividends.append(Dividend(
+                symbol=symbol,
+                amount=float(item.get("amount", 0)),
+                rate=float(item.get("rate", 0)),
+                payable_date=item.get("payable_date", ""),
+                record_date=item.get("record_date", ""),
+                state=item.get("state", ""),
+                instrument_url=instrument_url,
+                id=item.get("id", ""),
+            ))
+        return dividends
+
+    def get_dividends_by_symbol(self, symbol: str) -> list[Dividend]:
+        """Get dividend payments for a specific symbol."""
+        return [d for d in self.get_dividends() if d.symbol.upper() == symbol.upper()]
 
     # ── Account ─────────────────────────────────────────────────────────
 

@@ -4,10 +4,23 @@ import pytest
 import responses
 
 from pyhood import urls
-from pyhood.client import INDEX_CHAIN_SYMBOLS, PyhoodClient
+from pyhood.client import PyhoodClient
 from pyhood.exceptions import OrderError, SymbolNotFoundError
 from pyhood.http import Session
-from pyhood.models import OptionContract, OptionsChain, Order, Quote
+from pyhood.models import (
+    ACHTransfer,
+    BankAccount,
+    Dividend,
+    Market,
+    MarketHours,
+    NotificationSettings,
+    OptionContract,
+    OptionsChain,
+    Order,
+    Quote,
+    UserProfile,
+    Watchlist,
+)
 
 BASE = "https://api.robinhood.com"
 
@@ -912,3 +925,515 @@ class TestStockHistoricals:
         )
         candles = client.get_stock_historicals("AAPL")
         assert candles == []
+
+
+class TestSettings:
+    @responses.activate
+    def test_get_user_profile(self, client):
+        responses.add(
+            responses.GET,
+            urls.USER,
+            json={
+                "id": "user-001",
+                "username": "jford",
+                "email": "james@example.com",
+                "first_name": "James",
+                "last_name": "Ford",
+                "created_at": "2020-01-15T10:00:00Z",
+            },
+            status=200,
+        )
+
+        profile = client.get_user_profile()
+        assert isinstance(profile, UserProfile)
+        assert profile.username == "jford"
+        assert profile.email == "james@example.com"
+        assert profile.first_name == "James"
+        assert profile.last_name == "Ford"
+
+    @responses.activate
+    def test_get_notification_settings(self, client):
+        responses.add(
+            responses.GET,
+            urls.NOTIFICATION_SETTINGS,
+            json={
+                "market_open": True,
+                "dividends": True,
+                "transfers": False,
+                "price_movements": True,
+            },
+            status=200,
+        )
+
+        settings = client.get_notification_settings()
+        assert isinstance(settings, NotificationSettings)
+        assert settings.is_enabled("market_open") is True
+        assert settings.is_enabled("transfers") is False
+        assert settings.is_enabled("nonexistent") is False
+
+    @responses.activate
+    def test_update_notification_settings(self, client):
+        responses.add(
+            responses.POST,
+            urls.NOTIFICATION_SETTINGS,
+            json={
+                "market_open": False,
+                "dividends": True,
+                "transfers": False,
+                "price_movements": True,
+            },
+            status=200,
+        )
+
+        settings = client.update_notification_settings(market_open=False)
+        assert isinstance(settings, NotificationSettings)
+        assert settings.is_enabled("market_open") is False
+
+
+class TestBanking:
+    @responses.activate
+    def test_get_bank_accounts(self, client):
+        responses.add(
+            responses.GET,
+            urls.ACH_RELATIONSHIPS,
+            json={
+                "results": [
+                    {
+                        "id": "bank-001",
+                        "bank_account_holder_name": "Chase",
+                        "bank_account_type": "checking",
+                        "bank_account_nickname": "My Checking",
+                        "state": "approved",
+                        "url": f"{BASE}/ach/relationships/bank-001/",
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+
+        accounts = client.get_bank_accounts()
+        assert len(accounts) == 1
+        assert isinstance(accounts[0], BankAccount)
+        assert accounts[0].id == "bank-001"
+        assert accounts[0].bank_name == "Chase"
+        assert accounts[0].account_type == "checking"
+        assert accounts[0].state == "approved"
+
+    @responses.activate
+    def test_get_transfers(self, client):
+        responses.add(
+            responses.GET,
+            urls.ACH_TRANSFERS,
+            json={
+                "results": [
+                    {
+                        "id": "xfer-001",
+                        "amount": "500.00",
+                        "direction": "deposit",
+                        "state": "completed",
+                        "created_at": "2026-03-01T10:00:00Z",
+                        "expected_landing_date": "2026-03-03",
+                        "ach_relationship": f"{BASE}/ach/relationships/bank-001/",
+                    },
+                    {
+                        "id": "xfer-002",
+                        "amount": "200.00",
+                        "direction": "withdraw",
+                        "state": "pending",
+                        "created_at": "2026-03-28T10:00:00Z",
+                        "expected_landing_date": "2026-03-31",
+                        "ach_relationship": f"{BASE}/ach/relationships/bank-001/",
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+
+        transfers = client.get_transfers()
+        assert len(transfers) == 2
+        assert isinstance(transfers[0], ACHTransfer)
+        assert transfers[0].amount == 500.00
+        assert transfers[0].direction == "deposit"
+        assert transfers[0].state == "completed"
+        assert transfers[1].direction == "withdraw"
+        assert transfers[1].state == "pending"
+
+    @responses.activate
+    def test_initiate_transfer(self, client):
+        responses.add(
+            responses.POST,
+            urls.ACH_TRANSFERS,
+            json={
+                "id": "xfer-003",
+                "amount": "1000.00",
+                "direction": "deposit",
+                "state": "pending",
+                "created_at": "2026-03-29T10:00:00Z",
+                "expected_landing_date": "2026-04-01",
+                "ach_relationship": f"{BASE}/ach/relationships/bank-001/",
+            },
+            status=201,
+        )
+
+        transfer = client.initiate_transfer(
+            amount=1000.00,
+            direction="deposit",
+            ach_relationship_url=f"{BASE}/ach/relationships/bank-001/",
+        )
+        assert isinstance(transfer, ACHTransfer)
+        assert transfer.amount == 1000.00
+        assert transfer.direction == "deposit"
+        assert transfer.state == "pending"
+
+    @responses.activate
+    def test_cancel_transfer(self, client):
+        responses.add(
+            responses.POST,
+            f"{urls.ACH_TRANSFERS}xfer-003/cancel/",
+            json={"id": "xfer-003", "state": "cancelled"},
+            status=200,
+        )
+
+        result = client.cancel_transfer("xfer-003")
+        assert result["state"] == "cancelled"
+
+
+class TestWatchlists:
+    @responses.activate
+    def test_get_watchlists(self, client):
+        responses.add(
+            responses.GET,
+            urls.WATCHLISTS_V2,
+            json={
+                "results": [
+                    {
+                        "display_name": "Default",
+                        "url": f"{BASE}/midlands/lists/abc123/",
+                        "items": [
+                            {"symbol": "AAPL"},
+                            {"symbol": "MSFT"},
+                        ],
+                    },
+                    {
+                        "display_name": "Tech Stocks",
+                        "url": f"{BASE}/midlands/lists/def456/",
+                        "items": [
+                            {"symbol": "NVDA"},
+                        ],
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+
+        watchlists = client.get_watchlists()
+        assert len(watchlists) == 2
+        assert isinstance(watchlists[0], Watchlist)
+        assert watchlists[0].name == "Default"
+        assert watchlists[0].symbols == ["AAPL", "MSFT"]
+        assert watchlists[1].name == "Tech Stocks"
+        assert watchlists[1].symbols == ["NVDA"]
+
+    @responses.activate
+    def test_get_watchlist_by_name(self, client):
+        responses.add(
+            responses.GET,
+            urls.WATCHLISTS_V2,
+            json={
+                "results": [
+                    {
+                        "display_name": "Default",
+                        "url": f"{BASE}/midlands/lists/abc123/",
+                        "items": [{"symbol": "AAPL"}],
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+
+        wl = client.get_watchlist("Default")
+        assert wl.name == "Default"
+        assert wl.symbols == ["AAPL"]
+
+    @responses.activate
+    def test_get_watchlist_not_found(self, client):
+        responses.add(
+            responses.GET,
+            urls.WATCHLISTS_V2,
+            json={"results": [], "next": None},
+            status=200,
+        )
+
+        with pytest.raises(SymbolNotFoundError):
+            client.get_watchlist("Nonexistent")
+
+    @responses.activate
+    def test_add_to_watchlist(self, client):
+        responses.add(
+            responses.GET,
+            urls.WATCHLISTS_V2,
+            json={
+                "results": [
+                    {
+                        "display_name": "Default",
+                        "url": f"{BASE}/midlands/lists/abc123/",
+                        "items": [{"symbol": "AAPL"}],
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.POST,
+            f"{BASE}/midlands/lists/abc123/items/",
+            json={"symbol": "TSLA"},
+            status=201,
+        )
+
+        results = client.add_to_watchlist(["TSLA"])
+        assert len(results) == 1
+
+    @responses.activate
+    def test_remove_from_watchlist(self, client):
+        responses.add(
+            responses.GET,
+            urls.WATCHLISTS_V2,
+            json={
+                "results": [
+                    {
+                        "display_name": "Default",
+                        "url": f"{BASE}/midlands/lists/abc123/",
+                        "items": [{"symbol": "AAPL"}],
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{BASE}/midlands/lists/abc123/items/",
+            json={
+                "results": [
+                    {"id": "item-001", "symbol": "AAPL"},
+                    {"id": "item-002", "symbol": "MSFT"},
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.DELETE,
+            f"{BASE}/midlands/lists/abc123/items/item-001/",
+            body="",
+            status=200,
+        )
+
+        client.remove_from_watchlist(["AAPL"])
+        # Verify the DELETE was called
+        assert any(
+            call.request.method == "DELETE" for call in responses.calls
+        )
+
+
+class TestGetMarkets:
+    @responses.activate
+    def test_get_markets(self, client):
+        responses.add(
+            responses.GET,
+            urls.MARKETS,
+            json={
+                "results": [
+                    {
+                        "mic": "XNYS",
+                        "name": "New York Stock Exchange",
+                        "city": "New York",
+                        "country": "US",
+                        "acronym": "NYSE",
+                        "timezone": "US/Eastern",
+                        "url": f"{BASE}/markets/XNYS/",
+                    },
+                    {
+                        "mic": "XNAS",
+                        "name": "NASDAQ",
+                        "city": "New York",
+                        "country": "US",
+                        "acronym": "NASDAQ",
+                        "timezone": "US/Eastern",
+                        "url": f"{BASE}/markets/XNAS/",
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+
+        markets = client.get_markets()
+        assert len(markets) == 2
+        assert isinstance(markets[0], Market)
+        assert markets[0].mic == "XNYS"
+        assert markets[0].name == "New York Stock Exchange"
+        assert markets[0].city == "New York"
+        assert markets[1].mic == "XNAS"
+        assert markets[1].acronym == "NASDAQ"
+
+    @responses.activate
+    def test_get_market_hours_open_day(self, client):
+        responses.add(
+            responses.GET,
+            f"{BASE}/markets/XNYS/hours/2026-03-30/",
+            json={
+                "date": "2026-03-30",
+                "is_open": True,
+                "opens_at": "2026-03-30T13:30:00Z",
+                "closes_at": "2026-03-30T20:00:00Z",
+                "extended_opens_at": "2026-03-30T13:00:00Z",
+                "extended_closes_at": "2026-03-30T22:00:00Z",
+            },
+            status=200,
+        )
+
+        hours = client.get_market_hours("XNYS", "2026-03-30")
+        assert isinstance(hours, MarketHours)
+        assert hours.date == "2026-03-30"
+        assert hours.is_open is True
+        assert hours.opens_at == "2026-03-30T13:30:00Z"
+        assert hours.closes_at == "2026-03-30T20:00:00Z"
+        assert hours.extended_opens_at == "2026-03-30T13:00:00Z"
+
+    @responses.activate
+    def test_get_market_hours_closed_day(self, client):
+        responses.add(
+            responses.GET,
+            f"{BASE}/markets/XNYS/hours/2026-03-29/",
+            json={
+                "date": "2026-03-29",
+                "is_open": False,
+                "opens_at": None,
+                "closes_at": None,
+                "extended_opens_at": None,
+                "extended_closes_at": None,
+            },
+            status=200,
+        )
+
+        hours = client.get_market_hours("XNYS", "2026-03-29")
+        assert hours.is_open is False
+        assert hours.opens_at == ""
+        assert hours.closes_at == ""
+
+
+class TestGetDividends:
+    @responses.activate
+    def test_get_dividends(self, client):
+        responses.add(
+            responses.GET,
+            urls.DIVIDENDS,
+            json={
+                "results": [
+                    {
+                        "id": "div-001",
+                        "amount": "1.25",
+                        "rate": "0.25",
+                        "payable_date": "2026-03-15",
+                        "record_date": "2026-03-01",
+                        "state": "paid",
+                        "instrument": f"{BASE}/instruments/abc123/",
+                    },
+                    {
+                        "id": "div-002",
+                        "amount": "0.88",
+                        "rate": "0.22",
+                        "payable_date": "2026-06-15",
+                        "record_date": "2026-06-01",
+                        "state": "pending",
+                        "instrument": f"{BASE}/instruments/def456/",
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{BASE}/instruments/abc123/",
+            json={"symbol": "AAPL"},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{BASE}/instruments/def456/",
+            json={"symbol": "MSFT"},
+            status=200,
+        )
+
+        dividends = client.get_dividends()
+        assert len(dividends) == 2
+        assert isinstance(dividends[0], Dividend)
+        assert dividends[0].symbol == "AAPL"
+        assert dividends[0].amount == 1.25
+        assert dividends[0].rate == 0.25
+        assert dividends[0].state == "paid"
+        assert dividends[0].payable_date == "2026-03-15"
+        assert dividends[1].symbol == "MSFT"
+        assert dividends[1].state == "pending"
+
+    @responses.activate
+    def test_get_dividends_empty(self, client):
+        responses.add(
+            responses.GET,
+            urls.DIVIDENDS,
+            json={"results": [], "next": None},
+            status=200,
+        )
+        assert client.get_dividends() == []
+
+    @responses.activate
+    def test_get_dividends_by_symbol(self, client):
+        responses.add(
+            responses.GET,
+            urls.DIVIDENDS,
+            json={
+                "results": [
+                    {
+                        "id": "div-001",
+                        "amount": "1.25",
+                        "rate": "0.25",
+                        "payable_date": "2026-03-15",
+                        "record_date": "2026-03-01",
+                        "state": "paid",
+                        "instrument": f"{BASE}/instruments/abc123/",
+                    },
+                    {
+                        "id": "div-002",
+                        "amount": "0.88",
+                        "rate": "0.22",
+                        "payable_date": "2026-06-15",
+                        "record_date": "2026-06-01",
+                        "state": "paid",
+                        "instrument": f"{BASE}/instruments/abc123/",
+                    },
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{BASE}/instruments/abc123/",
+            json={"symbol": "AAPL"},
+            status=200,
+        )
+
+        dividends = client.get_dividends_by_symbol("AAPL")
+        assert len(dividends) == 2
+        assert all(d.symbol == "AAPL" for d in dividends)
+
+        # Non-matching symbol returns empty
+        dividends = client.get_dividends_by_symbol("TSLA")
+        assert dividends == []

@@ -5,6 +5,34 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-29
+
+### Added
+- **Banking / ACH Support** — Query and manage bank accounts and transfers
+  - `get_bank_accounts()` lists all linked bank accounts with status
+  - `get_transfers()` returns full ACH transfer history (deposits & withdrawals)
+  - `initiate_transfer()` starts a new deposit or withdrawal
+  - `cancel_transfer()` cancels a pending transfer
+  - Typed models: `BankAccount`, `ACHTransfer`
+- **Watchlist Support** — Manage Robinhood watchlists programmatically
+  - `get_watchlists()` returns all watchlists with their symbols
+  - `get_watchlist(name)` fetches a single watchlist by name
+  - `add_to_watchlist()` and `remove_from_watchlist()` for modifying lists
+  - Typed model: `Watchlist`
+- **Dividend History** — Query past and pending dividend payments
+  - `get_dividends()` returns all dividend records with symbol resolution
+  - `get_dividends_by_symbol()` filters to a specific ticker
+  - Typed model: `Dividend`
+- **Markets / Trading Hours** — Exchange info and schedules
+  - `get_markets()` lists all available exchanges (NYSE, NASDAQ, etc.)
+  - `get_market_hours(market, date)` returns open/close times for a specific date
+  - Typed models: `Market`, `MarketHours`
+- **User Profile & Notification Settings**
+  - `get_user_profile()` returns username, email, name
+  - `get_notification_settings()` and `update_notification_settings()` for managing preferences
+  - Typed models: `UserProfile`, `NotificationSettings`
+- 18 new tests covering all new features (197 total)
+
 ## [0.4.2] - 2026-03-28
 
 ### Added

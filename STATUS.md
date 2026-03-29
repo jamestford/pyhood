@@ -31,6 +31,16 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - Options orders
 - Buying power and positions
 - Account information
+- Futures trading (contracts, quotes, orders, P&L)
+
+### Banking & Account Features
+- ACH bank account listing and management
+- ACH transfer history (deposits/withdrawals)
+- Initiate and cancel transfers
+- Dividend history with symbol filtering
+- Watchlist management (list, add, remove)
+- Markets and trading hours lookup
+- User profile and notification settings
 
 ### Crypto Features
 - **Official Crypto API:** ED25519 key-based authentication
@@ -39,7 +49,7 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - **Keys stored separately:** Crypto keys in pyhood config
 
 ## Testing & Quality
-- **Test Coverage:** ~79% (58 tests passing)
+- **Test Coverage:** ~79% (197 tests passing)
 - **CI Pipeline:** GitHub Actions on Python 3.10-3.13
 - **Linting:** ruff for code style
 - **HTTP Mocking:** responses library for reliable tests

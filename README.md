@@ -30,7 +30,9 @@ Built for automated trading — with auth that doesn't break, proper error handl
 - 📊 **Options-first** — Deep options chain support with Greeks, volume/OI analysis, and earnings integration. Supports both equity and index options (SPX, NDX, VIX, RUT).
 - 📈 **Futures trading** — Contract details, real-time quotes, order history, and P&L calculation for Robinhood futures.
 - 🏦 **IRA/Retirement accounts** — Trade stocks and options in Traditional and Roth IRAs. The only Python Robinhood library with retirement account support.
-- 🧪 **Tested and maintained** — 170+ tests, CI across Python 3.10-3.13, linted with ruff. If it breaks, we know immediately.
+- 💰 **Banking & dividends** — Query ACH transfers, linked bank accounts, and dividend history.
+- 📋 **Watchlists** — Create, manage, and modify your Robinhood watchlists programmatically.
+- 🧪 **Tested and maintained** — 197 tests, CI across Python 3.10-3.13, linted with ruff. If it breaks, we know immediately.
 
 ## Quick Start
 
@@ -211,12 +213,64 @@ print(f"Realized P&L: ${pnl:.2f}")
 
 See the [Futures documentation](https://jamestford.github.io/pyhood/futures/) for full details.
 
+## Banking & Dividends
+
+```python
+# Check linked bank accounts
+accounts = client.get_bank_accounts()
+
+# View transfer history
+transfers = client.get_transfers()
+
+# Initiate a deposit
+transfer = client.initiate_transfer(
+    amount=500.00,
+    direction="deposit",
+    ach_relationship_url=accounts[0].url,
+)
+
+# Dividend history
+dividends = client.get_dividends()
+aapl_divs = client.get_dividends_by_symbol("AAPL")
+```
+
+## Watchlists
+
+```python
+# Get all watchlists
+watchlists = client.get_watchlists()
+
+# Get a specific watchlist
+default = client.get_watchlist("Default")
+print(default.symbols)  # ['AAPL', 'MSFT', ...]
+
+# Add / remove symbols
+client.add_to_watchlist(["NVDA", "TSLA"])
+client.remove_from_watchlist(["TSLA"])
+```
+
+## Markets & Trading Hours
+
+```python
+# List available exchanges
+markets = client.get_markets()
+
+# Check if NYSE is open on a specific date
+hours = client.get_market_hours("XNYS", "2026-03-30")
+print(f"Open: {hours.is_open}, {hours.opens_at} — {hours.closes_at}")
+```
+
 ## Development Status
 - ✅ Stocks/options market data (unofficial API) — functional (equity + index options)
 - ✅ Futures trading (contracts, quotes, orders, P&L) — functional
 - ✅ Crypto trading (official API) — functional
 - ✅ Authentication with automatic token refresh — functional
 - ✅ Full order management for stocks/options — functional
+- ✅ Banking (ACH transfers, deposits/withdrawals) — functional
+- ✅ Watchlists (create/manage) — functional
+- ✅ Dividends (query history) — functional
+- ✅ Markets/Trading Hours (exchange schedules) — functional
+- ✅ User profile & notification settings — functional
 
 ## Acknowledgments
 
