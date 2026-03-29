@@ -52,7 +52,7 @@ jobs:
         run: |
           pip install pip-audit
           pip install requests python-dotenv cryptography pynacl
-          pip-audit --strict --desc --exclude pygments
+          pip-audit --strict --desc --ignore-vuln CVE-2026-4539  # pygments vuln — pip-audit dep, not pyhood
 
   codeql:
     name: CodeQL (Static Analysis)
