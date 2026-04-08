@@ -5,6 +5,13 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **SNDK earnings edge case** — `get_earnings()` now handles `eps: null` payloads without raising an exception
+- **Equity options expiration fallback** — `get_options_expirations()` now falls back to an equity instrument's `tradable_chain_id` when the standard chain lookup returns no expiration dates
+- This fixes real-world symbol-specific failures like SNDK in downstream scanners
+
 ## [0.6.0] - 2026-03-29
 
 ### Added
