@@ -208,3 +208,56 @@ class TestCsvExport:
         out = client.export_stock_orders(tmp_path / "empty.csv")
 
         assert out.read_text().strip().startswith("order_id,symbol,side")
+
+
+class TestTrailingStopServerLimits:
+    """Server-side limits confirmed against the live API on 2026-08-09."""
+
+    def test_trailing_stop_limit_rejected_client_side(self, client):
+        """Robinhood: 'Trailing stop limit orders not supported.'"""
+        with pytest.raises(OrderError, match="trailing stop limit"):
+            client.buy_stock("AAPL", 1, price=100.0, trail_percent=10.0)
+
+    @responses.activate
+    def test_app_version_gate_gets_explanatory_error(self, client):
+        """The raw 'app version' message is wrapped with what it actually means."""
+        _mock_account()
+        responses.add(
+            responses.GET, f"{urls.QUOTES}AAPL/",
+            json={"symbol": "AAPL", "last_trade_price": "100.00",
+                  "previous_close": "100.00"},
+            status=200,
+        )
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        responses.add(
+            responses.POST, urls.ORDERS,
+            json={"non_field_errors": [
+                "Your app version is missing important stock trading updates. "
+                "You can still place orders on the web."
+            ]},
+            status=400,
+        )
+
+        with pytest.raises(OrderError, match="gates trailing stops"):
+            client.buy_stock("AAPL", 1, trail_percent=50.0)
+
+    @responses.activate
+    def test_field_errors_are_not_swallowed(self, client):
+        """A rejection with only field errors must raise, not return a blank Order."""
+        _mock_account()
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        responses.add(
+            responses.POST, urls.ORDERS,
+            json={"quantity": ["Enter a valid number."]}, status=400,
+        )
+
+        with pytest.raises(OrderError, match="rejected"):
+            client.buy_stock("AAPL", 1, price=50.0)

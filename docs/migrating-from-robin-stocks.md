@@ -98,12 +98,25 @@ Trailing stops and fractional orders:
 
 | robin_stocks | pyhood |
 | --- | --- |
-| `order_buy_trailing_stop(symbol, qty, trailAmount)` | `client.buy_stock(symbol, qty, trail_amount=amt)` |
-| `order_sell_trailing_stop(symbol, qty, trailAmount)` | `client.sell_stock(symbol, qty, trail_amount=amt)` |
-| `order_trailing_stop(..., trailType='percentage')` | `client.buy_stock(..., trail_percent=pct)` |
+| `order_buy_trailing_stop(symbol, qty, trailAmount)` | `client.buy_stock(symbol, qty, trail_amount=amt)` — see note |
+| `order_sell_trailing_stop(symbol, qty, trailAmount)` | `client.sell_stock(symbol, qty, trail_amount=amt)` — see note |
+| `order_trailing_stop(..., trailType='percentage')` | `client.buy_stock(..., trail_percent=pct)` — see note |
 | `order_buy_fractional_by_price(symbol, dollars)` | `client.buy_stock_by_price(symbol, dollars)` |
 | `order_sell_fractional_by_price(symbol, dollars)` | `client.sell_stock_by_price(symbol, dollars)` |
 | `order_buy_fractional_by_quantity(symbol, qty)` | `client.buy_stock(symbol, qty)` — fractional quantities are accepted |
+
+**Trailing stops are blocked by Robinhood, not by pyhood.** Tested against the live API on 2026-08-09, the server rejects them from any third-party client:
+
+```
+Your app version is missing important stock trading updates.
+You can still place orders on the web.
+```
+
+Robinhood gates trailing stops to its own current app versions. The accepted version is not published, and sending any other value returns `412 Precondition Failed`, so there is no header a third-party library can send. robin_stocks sends the same `X-Robinhood-API-Version: 1.431.4` and fails identically.
+
+pyhood raises an `OrderError` explaining this rather than silently failing. The methods stay in place: if Robinhood widens the accepted versions, they will start working with no code change.
+
+Separately, Robinhood returns *"Trailing stop limit orders not supported"* — a trailing stop is always a market order, so passing both `price` and a trail is rejected up front.
 
 Order history takes `start_date=` to avoid paging through years of orders:
 

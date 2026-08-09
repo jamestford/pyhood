@@ -1462,6 +1462,14 @@ class PyhoodClient:
         if trail_amount is not None and trail_percent is not None:
             raise OrderError("Pass trail_amount or trail_percent, not both")
 
+        if (trail_amount is not None or trail_percent is not None) and price is not None:
+            # Confirmed against the live API: "Trailing stop limit orders not
+            # supported." A trailing stop is always a market order.
+            raise OrderError(
+                "Robinhood does not support trailing stop limit orders — "
+                "omit price to place a trailing stop market order"
+            )
+
         trailing_peg = None
         if trail_amount is not None or trail_percent is not None:
             # A trailing stop is a stop order whose stop price follows the
@@ -1546,6 +1554,21 @@ class PyhoodClient:
         if "detail" in data or "error" in data:
             error_msg = data.get("detail") or data.get("error") or "Unknown order error"
             raise OrderError(f"Order rejected: {error_msg}")
+
+        # Field-level validation errors carry neither 'detail' nor 'error' —
+        # they come back as {field: [messages]}. Without this, a rejected order
+        # returns an Order with a blank id and the caller believes it worked.
+        if "id" not in data:
+            errors = " ".join(data.get("non_field_errors", [])) if isinstance(data, dict) else ""
+            if "app version" in errors:
+                raise OrderError(
+                    "Robinhood rejected this order because it gates trailing stops "
+                    "to its own current app versions. The accepted version is not "
+                    "published and arbitrary values return 412, so no third-party "
+                    "client can place trailing stops at present. Server said: "
+                    f"{errors}"
+                )
+            raise OrderError(f"Order rejected: {data}")
 
         # Parse successful response
         created_at = None
@@ -1726,6 +1749,11 @@ class PyhoodClient:
         if "detail" in data or "error" in data:
             error_msg = data.get("detail") or data.get("error") or "Unknown option order error"
             raise OrderError(f"Option order rejected: {error_msg}")
+
+        # Field-level validation errors carry neither key; without this an
+        # order with a blank id is returned as if it succeeded.
+        if "id" not in data:
+            raise OrderError(f"Option order rejected: {data}")
 
         # Parse successful response
         created_at = None

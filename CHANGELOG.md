@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Rejected orders were reported as successful** — `order_stock()` and `order_option()` only treated a response as an error when it carried a `detail` or `error` key, but Robinhood returns field-level validation errors (`{"field": ["message"]}`) that have neither. Any such rejection returned an `Order` with a blank id and no exception, so callers believed the order was placed. Both now raise when the response has no `id`.
+- Trailing stop rejections now raise a specific `OrderError` explaining that Robinhood gates the feature to its own app versions, rather than surfacing the raw server text.
+- Passing both a `price` and a trail is rejected up front — Robinhood does not support trailing stop limit orders.
+
 ### Added
 - **Interest, fees and transfers** — `get_interest_payments()`, `get_margin_interest()`, `get_subscription_fees()`, `get_unified_transfers()`. All verified against live data except margin interest, where the endpoint is confirmed but the account has no charges to observe.
-- **Trailing stop orders** — `buy_stock(..., trail_amount=)` / `trail_percent=`, and the same on `sell_stock()` and `order_stock()`. Posted as JSON, since the nested `trailing_peg` cannot survive form encoding.
+- **Trailing stop orders** — `buy_stock(..., trail_amount=)` / `trail_percent=`, and the same on `sell_stock()` and `order_stock()`. Posted as JSON, since the nested `trailing_peg` cannot survive form encoding. **Robinhood currently rejects these from third-party clients** — see Fixed below.
 - **Fractional orders by dollar amount** — `buy_stock_by_price()` and `sell_stock_by_price()`.
 - **Multi-leg option spreads** — `order_option_spread()` for debit and credit spreads, with per-leg ratios.
 - **`cancel_all_option_orders()`** — mirrors the existing stock version.
