@@ -5,6 +5,24 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`python -m pyhood setup`** — guided credential setup, replacing the copy-paste snippets in the README
+  - `setup login` establishes a session. The stored session is tried first, so a valid or refreshable one needs no password at all; only when that fails does it prompt, handling MFA and device approval.
+  - `setup crypto` generates an Ed25519 key pair, shows only the public half for registration, reads the API key Robinhood issues, writes both owner-only, and then makes one signed read-only call to confirm the pair is accepted. That last step is the point: writing a file proves nothing, and without it a mistyped or placeholder key is not discovered until a real request fails with an authentication error that reads like a service outage.
+  - `setup` with no target reports what is configured — which source credentials resolve from, file permissions, and whether the private key is a real Ed25519 key. No network calls, and lengths and validity only, never values.
+  - Secrets are read with `getpass` and there are deliberately no `--password` or `--api-key` options, since arguments are visible to other processes via `ps` and are recorded by the shell. The crypto private key goes from generation directly to disk and is never displayed.
+  - Existing crypto credentials are not replaced without `--force` — overwriting would orphan a key that still works.
+  - Available programmatically as `pyhood.onboarding.crypto_status()`, `session_status()` and `print_status()`.
+
+### Changed
+- The README's key-generation snippet printed the private key to the terminal, where it lands in scrollback. It now points at `python -m pyhood setup crypto`, with the manual file format kept as a fallback.
+- Quick Start no longer opens with a hardcoded password — it uses the stored session.
+
+### Fixed
+- The README's portfolio example still called `get_portfolio_historicals()`, which raises `APIError` as of 0.11.0. It now shows `get_portfolio_performance()`.
+
 ## [0.11.0] - 2026-08-09
 
 A repair release. Every fix below was found by running pyhood against the live Robinhood API. Each broken feature shipped with passing tests that mocked a response shape the API never returns, so CI stayed green while the feature was unusable.

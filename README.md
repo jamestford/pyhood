@@ -24,18 +24,26 @@ pyhood is a modern, typed, maintained Python client for Robinhood. It supports s
 pip install pyhood
 ```
 
+Then set up credentials. The setup commands prompt for secrets interactively — nothing sensitive is passed as an argument, since command-line arguments are visible to other processes and recorded in shell history.
+
+```bash
+python -m pyhood setup login    # session tokens for stocks, options, futures
+python -m pyhood setup crypto   # key pair for the Crypto Trading API
+python -m pyhood setup          # report what is configured
+```
+
+Both write to `~/.pyhood/`, readable only by you. See [Setup](#setup) for what each one does.
+
 ## Quick Start
+
+Once `python -m pyhood setup login` has stored a session, no credentials appear in your code at all:
 
 ```python
 import pyhood
 from pyhood.client import PyhoodClient
 
-# First login may require device approval in the Robinhood mobile app.
-session = pyhood.login(
-    username="you@email.com",
-    password="your_password",
-    timeout=90,
-)
+# Reuses the stored session, refreshing it if the access token has expired.
+session = pyhood.login()
 
 client = PyhoodClient(session)
 
@@ -46,13 +54,10 @@ positions = client.get_positions()
 buying_power = client.get_buying_power()
 ```
 
-After the first approved login, pyhood can refresh the session without credentials:
+`login()` with no arguments tries the cached session, then the refresh token. To force a refresh explicitly:
 
 ```python
-import pyhood
-
 session = pyhood.refresh()
-client = PyhoodClient(session)
 ```
 
 ## Why pyhood exists
@@ -102,16 +107,47 @@ Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and the acti
 
 Migrating from `robin_stocks`? See the [migration guide](docs/migrating-from-robin-stocks.md) for a function-by-function map.
 
+## Setup
+
+pyhood uses two unrelated kinds of credential, and `python -m pyhood setup` configures either one.
+
+| Command | Credential | Stored at |
+|---|---|---|
+| `python -m pyhood setup login` | Session tokens for the main API — stocks, options, futures | `~/.pyhood/session.json` |
+| `python -m pyhood setup crypto` | Ed25519 key pair for the Crypto Trading API | `~/.pyhood/crypto.env` |
+| `python -m pyhood setup` | — | reports what is configured |
+
+Both files are created `0600` inside a `0700` directory, with the mode applied at creation so the contents are never briefly readable by others.
+
+**`setup login`** tries the stored session first — a valid or refreshable one needs no password at all. Only when that fails does it prompt for your username and password, handling MFA and device approval. The password is read without echoing and is never stored; only the resulting tokens are written.
+
+**`setup crypto`** generates an Ed25519 key pair on your machine, prints only the public half for you to register with Robinhood, then reads the API key Robinhood issues and writes both to disk. The private key goes straight from generation to file — it is never displayed. Afterwards it makes one signed read-only call to confirm Robinhood actually accepts the pair, which is the step that catches a mistyped or placeholder key immediately rather than at your first order.
+
+**`setup`** with no target reports what is configured — where credentials came from, file permissions, and whether the private key is a real Ed25519 key. It shows lengths and validity, never values, and makes no network calls.
+
+```
+$ python -m pyhood setup
+Session (main API — stocks, options, futures)
+    /Users/you/.pyhood/session.json (refreshable, saved 1.2h ago)
+
+Crypto API (official Crypto Trading API)
+    source: file
+    /Users/you/.pyhood/crypto.env
+    api key: 43 chars
+    private key: valid Ed25519, 32 bytes
+```
+
+Secrets are only ever read interactively. There are deliberately no `--password` or `--api-key` options: arguments are visible to every process on the machine via `ps` and are recorded by your shell.
+
 ## Authentication
 
 Robinhood requires device approval on first login. After that, pyhood keeps the session alive automatically.
 
 ### First Login
 
-1. Open the Robinhood mobile app.
-2. Call `pyhood.login()`.
-3. Approve the device prompt in the app.
-4. pyhood saves the session to `~/.pyhood/session.json`.
+Run `python -m pyhood setup login` and approve the device prompt in the Robinhood mobile app when it appears. The session is saved to `~/.pyhood/session.json`.
+
+To log in from code instead:
 
 ```python
 import pyhood
@@ -122,6 +158,8 @@ session = pyhood.login(
     timeout=90,
 )
 ```
+
+Prefer the setup command where you can — a password written into a script tends to end up committed.
 
 ### Staying Authenticated
 
@@ -226,13 +264,15 @@ order = crypto.place_order(
 )
 ```
 
-**Getting API keys.** Robinhood does not issue you a key pair — you generate one and register only the public half:
+**Getting API keys.** Robinhood does not issue you a key pair — you generate one and register only the public half. The setup command walks through it:
 
 ```bash
-python -c "from pyhood.crypto.auth import generate_keypair; priv, pub = generate_keypair(); print('PRIVATE:', priv); print('PUBLIC :', pub)"
+python -m pyhood setup crypto
 ```
 
-Paste the **public** key at [robinhood.com/account/crypto](https://robinhood.com/account/crypto) → API Trading → Add key. Robinhood then issues an **API key**. Save both:
+It generates the key pair, shows you the **public** key to paste at [robinhood.com/account/crypto](https://robinhood.com/account/crypto) → API Trading → Add key, reads the **API key** Robinhood issues back, writes both to `~/.pyhood/crypto.env` at mode `0600`, and then makes one signed read-only call to confirm the pair works. The private key is never displayed.
+
+If you would rather do it by hand, the file is a plain env file:
 
 ```
 # ~/.pyhood/crypto.env  (chmod 600)
@@ -240,7 +280,7 @@ RH_CRYPTO_API_KEY=the-key-robinhood-issued
 RH_CRYPTO_PRIVATE_KEY=the-private-key-you-generated
 ```
 
-The private key is the credential — anyone holding it can trade your crypto. Environment variables take precedence over this file, so a stale export will shadow it; `credentials_source()` reports which is in use.
+The private key is the credential — anyone holding it can trade your crypto, and unlike a session token it cannot be refreshed, only revoked. Environment variables take precedence over this file, so a stale export will silently shadow it; `python -m pyhood setup` reports which source is in use.
 
 Only pairs with `api_tradable` set can be ordered through the API — a pair can be tradable in the app but not here. See the [crypto documentation](https://jamestford.github.io/pyhood/crypto/) for details.
 
@@ -259,14 +299,12 @@ See the [futures documentation](https://jamestford.github.io/pyhood/futures/) fo
 ### Portfolio and Documents
 
 ```python
-history = client.get_portfolio_historicals(
-    account_number="123456",
-    interval="day",
-    span="year",
-)
+performance = client.get_portfolio_performance()
 
 docs = client.get_documents(doc_type="account_statement")
 ```
+
+`get_portfolio_historicals()` raises `APIError` — Robinhood retired that endpoint. `get_portfolio_performance()` returns the chart view model that replaced it, unmapped, since its y values are returns rather than equity.
 
 ## Feature Status
 
@@ -283,7 +321,8 @@ docs = client.get_documents(doc_type="account_statement")
 | Watchlists | Functional |
 | Markets and trading hours | Functional |
 | Research, news, ratings, movers, and popularity | Functional |
-| Portfolio and option historicals | Functional |
+| Option historicals and portfolio performance | Functional |
+| Guided credential setup (`python -m pyhood setup`) | Functional |
 | Documents and statements | Functional |
 | Day trades, margin calls, and deposit schedules | Functional |
 
