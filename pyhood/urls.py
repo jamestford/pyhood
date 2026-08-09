@@ -16,6 +16,7 @@ LOGOUT = f"{OAUTH}/revoke_token/"
 # Account
 ACCOUNTS = f"{BASE}/accounts/"
 POSITIONS = f"{BASE}/positions/"
+BONFIRE = "https://bonfire.robinhood.com"
 PORTFOLIOS = f"{BASE}/portfolios/"
 
 # Stocks — Market Data
@@ -70,6 +71,8 @@ DIVIDENDS = f"{BASE}/dividends/"
 DOCUMENTS = f"{BASE}/documents/"
 
 # Portfolio Historicals
+# Retired by Robinhood — returns 404. Kept for reference; see
+# portfolio_performance_url() for the replacement.
 PORTFOLIO_HISTORICALS = f"{BASE}/portfolios/historicals/{{account_number}}/"
 
 # Options Historicals
@@ -112,6 +115,16 @@ SUBSCRIPTION_FEES = f"{BASE}/subscription/subscription_fees/"
 UNIFIED_TRANSFERS = "https://bonfire.robinhood.com/paymenthub/unified_transfers/"
 
 
+def portfolio_performance_url(account_number: str) -> str:
+    """URL for the portfolio performance chart view model."""
+    return f"{BONFIRE}/portfolio/performance/{account_number}"
+
+
+def portfolio_positions_url(account_number: str) -> str:
+    """URL for the portfolio positions view model."""
+    return f"{BONFIRE}/portfolio/{account_number}/positions_v2"
+
+
 def futures_positions_url(account_id: str) -> str:
     """URL for open futures positions on a specific account."""
     return f"{FUTURES_ACCOUNTS}{account_id}/positions/"
@@ -121,7 +134,6 @@ def futures_positions_url(account_id: str) -> str:
 # Undocumented bonfire view models backing Robinhood's retail IPO
 # allocation program.
 
-BONFIRE = "https://bonfire.robinhood.com"
 IPO_ACCESS_LIST = f"{BONFIRE}/lists/ipo_access/view_model/"
 IPO_ACCESS_VIEWMODELS = f"{BONFIRE}/equity_trading/ipo_access/viewmodels"
 

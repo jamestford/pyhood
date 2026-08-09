@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **`get_portfolio_historicals()`** now raises `APIError` — Robinhood retired `/portfolios/historicals/`, which returns 404 for every parameter combination. It had a passing test that mocked the dead endpoint. robin_stocks calls the same URL.
+
+### Added
+- **`get_portfolio_performance()`** — the bonfire chart view model that replaced it. Returned unmapped: its y values are returns rather than equity, so mapping it onto `PortfolioCandle` would mean inventing figures the endpoint does not provide.
+
 ### Fixed
 - **Position P&L was wrong, reporting gains on losing positions** — `get_positions()` read `average_buy_price`, which Robinhood returns as `0` for settled positions. Cost basis therefore came out as zero and `unrealized_pl` degenerated to equity. It now falls back to `clearing_average_cost` and prefers the broker's own `clearing_cost_basis`, matching what the app displays. Caught by comparing pyhood's output against the Robinhood web UI for the same position.
 - `get_positions()` no longer fetches each instrument to resolve a symbol — the positions payload already carries it, saving a request per position.

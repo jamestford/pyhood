@@ -672,39 +672,52 @@ class PyhoodClient:
         span: str = "year",
         bounds: str = "regular",
     ) -> list[PortfolioCandle]:
-        """Get historical portfolio value over time.
+        """Deprecated — Robinhood retired this endpoint.
+
+        Raises:
+            APIError: Always. `/portfolios/historicals/` returns 404 for every
+                parameter combination as of 2026-08-09.
+
+        Use `get_portfolio_performance()` instead. It is not a drop-in: the
+        replacement returns a chart view model whose y values are returns
+        rather than equity, so it cannot be mapped onto `PortfolioCandle`
+        without inventing the equity figures.
+        """
+        from pyhood.exceptions import APIError
+
+        raise APIError(
+            "get_portfolio_historicals() is no longer available: Robinhood "
+            "retired /portfolios/historicals/ and it returns 404. Use "
+            "get_portfolio_performance(), which returns the chart view model "
+            "that replaced it."
+        )
+
+    def get_portfolio_performance(self, account_number: str | None = None) -> dict:
+        """Get the portfolio performance chart.
+
+        Replaces `get_portfolio_historicals()`, whose endpoint Robinhood
+        retired.
 
         Args:
-            account_number: Account number. If None, uses first account.
-            interval: 'day', 'week', '5minute', '10minute', 'hour'.
-            span: 'day', 'week', 'month', '3month', 'year', '5year', 'all'.
-            bounds: 'regular', 'extended', 'trading'.
+            account_number: Account number. If None, uses the first account.
+
+        Returns:
+            The raw chart view model: `lines` of plotted points with
+            `x_axis`, `y_axis`, `legend_data`, `fills` and `overlays`.
+
+        Note:
+            Returned unmapped on purpose. This is a rendering payload rather
+            than a time series — the y values are returns, not equity, and
+            each point carries display labels. Forcing it onto a dataclass
+            would mean inventing figures the endpoint does not provide.
         """
         if not account_number:
             accounts = self._session.get_paginated(urls.ACCOUNTS)
             if not accounts:
-                return []
+                return {}
             account_number = accounts[0].get("account_number", "")
 
-        url = urls.PORTFOLIO_HISTORICALS.format(account_number=account_number)
-        data = self._session.get(url, params={
-            "interval": interval,
-            "span": span,
-            "bounds": bounds,
-        })
-        results = data.get("equity_historicals", []) if isinstance(data, dict) else []
-        return [
-            PortfolioCandle(
-                begins_at=item.get("begins_at", ""),
-                adjusted_open_equity=float(item.get("adjusted_open_equity", 0)),
-                adjusted_close_equity=float(item.get("adjusted_close_equity", 0)),
-                open_equity=float(item.get("open_equity", 0)),
-                close_equity=float(item.get("close_equity", 0)),
-                open_market_value=float(item.get("open_market_value", 0)),
-                close_market_value=float(item.get("close_market_value", 0)),
-            )
-            for item in results
-        ]
+        return self._session.get(urls.portfolio_performance_url(account_number))
 
     # ── Option Historicals ────────────────────────────────────────────
 
