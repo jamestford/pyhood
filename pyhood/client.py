@@ -672,39 +672,52 @@ class PyhoodClient:
         span: str = "year",
         bounds: str = "regular",
     ) -> list[PortfolioCandle]:
-        """Get historical portfolio value over time.
+        """Deprecated — Robinhood retired this endpoint.
+
+        Raises:
+            APIError: Always. `/portfolios/historicals/` returns 404 for every
+                parameter combination as of 2026-08-09.
+
+        Use `get_portfolio_performance()` instead. It is not a drop-in: the
+        replacement returns a chart view model whose y values are returns
+        rather than equity, so it cannot be mapped onto `PortfolioCandle`
+        without inventing the equity figures.
+        """
+        from pyhood.exceptions import APIError
+
+        raise APIError(
+            "get_portfolio_historicals() is no longer available: Robinhood "
+            "retired /portfolios/historicals/ and it returns 404. Use "
+            "get_portfolio_performance(), which returns the chart view model "
+            "that replaced it."
+        )
+
+    def get_portfolio_performance(self, account_number: str | None = None) -> dict:
+        """Get the portfolio performance chart.
+
+        Replaces `get_portfolio_historicals()`, whose endpoint Robinhood
+        retired.
 
         Args:
-            account_number: Account number. If None, uses first account.
-            interval: 'day', 'week', '5minute', '10minute', 'hour'.
-            span: 'day', 'week', 'month', '3month', 'year', '5year', 'all'.
-            bounds: 'regular', 'extended', 'trading'.
+            account_number: Account number. If None, uses the first account.
+
+        Returns:
+            The raw chart view model: `lines` of plotted points with
+            `x_axis`, `y_axis`, `legend_data`, `fills` and `overlays`.
+
+        Note:
+            Returned unmapped on purpose. This is a rendering payload rather
+            than a time series — the y values are returns, not equity, and
+            each point carries display labels. Forcing it onto a dataclass
+            would mean inventing figures the endpoint does not provide.
         """
         if not account_number:
             accounts = self._session.get_paginated(urls.ACCOUNTS)
             if not accounts:
-                return []
+                return {}
             account_number = accounts[0].get("account_number", "")
 
-        url = urls.PORTFOLIO_HISTORICALS.format(account_number=account_number)
-        data = self._session.get(url, params={
-            "interval": interval,
-            "span": span,
-            "bounds": bounds,
-        })
-        results = data.get("equity_historicals", []) if isinstance(data, dict) else []
-        return [
-            PortfolioCandle(
-                begins_at=item.get("begins_at", ""),
-                adjusted_open_equity=float(item.get("adjusted_open_equity", 0)),
-                adjusted_close_equity=float(item.get("adjusted_close_equity", 0)),
-                open_equity=float(item.get("open_equity", 0)),
-                close_equity=float(item.get("close_equity", 0)),
-                open_market_value=float(item.get("open_market_value", 0)),
-                close_market_value=float(item.get("close_market_value", 0)),
-            )
-            for item in results
-        ]
+        return self._session.get(urls.portfolio_performance_url(account_number))
 
     # ── Option Historicals ────────────────────────────────────────────
 
@@ -1125,22 +1138,29 @@ class PyhoodClient:
             qty = float(item.get("quantity", 0))
             if qty == 0 and nonzero:
                 continue
-            avg_cost = float(item.get("average_buy_price", 0))
+            # average_buy_price is 0 on positions the clearing system has
+            # settled; clearing_average_cost carries the real figure and is
+            # what the app displays.
+            avg_cost = float(item.get("average_buy_price", 0) or 0)
+            if not avg_cost:
+                avg_cost = float(item.get("clearing_average_cost", 0) or 0)
 
-            # Get current price from the instrument
-            instrument_url = item.get("instrument", "")
+            # The payload carries the symbol, so no instrument lookup is needed.
+            symbol = item.get("symbol", "")
             current_price = 0.0
-            if instrument_url:
-                try:
-                    inst_data = self._session.get(instrument_url)
-                    symbol = inst_data.get("symbol", "")
-                    quote = self.get_quote(symbol)
-                    current_price = quote.price
-                except Exception:
-                    symbol = ""
+            instrument_url = item.get("instrument", "")
+            try:
+                if not symbol and instrument_url:
+                    symbol = self._session.get(instrument_url).get("symbol", "")
+                if symbol:
+                    current_price = self.get_quote(symbol).price
+            except Exception:
+                pass
 
             equity = qty * current_price
-            cost_basis = qty * avg_cost
+            # Prefer the broker's own cost basis; it accounts for lots and
+            # corporate actions that quantity x average price does not.
+            cost_basis = float(item.get("clearing_cost_basis", 0) or 0) or qty * avg_cost
             unrealized_pl = equity - cost_basis
             unrealized_pl_pct = (unrealized_pl / cost_basis * 100) if cost_basis > 0 else 0.0
 

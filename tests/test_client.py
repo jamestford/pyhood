@@ -24,7 +24,6 @@ from pyhood.models import (
     OptionContract,
     OptionsChain,
     Order,
-    PortfolioCandle,
     Quote,
     Rating,
     StockSplit,
@@ -2156,37 +2155,33 @@ class TestSplits:
 
 
 class TestPortfolioHistoricals:
+    def test_portfolio_historicals_is_retired(self, client):
+        """Robinhood returns 404 for /portfolios/historicals/ (2026-08-09)."""
+        from pyhood.exceptions import APIError
+
+        with pytest.raises(APIError, match="no longer available"):
+            client.get_portfolio_historicals()
+
     @responses.activate
-    def test_get_portfolio_historicals(self, client):
+    def test_get_portfolio_performance(self, client):
+        """The replacement is a chart view model, returned unmapped."""
         responses.add(
-            responses.GET,
-            f"{BASE}/portfolios/historicals/123456/",
-            json={
-                "equity_historicals": [
-                    {
-                        "begins_at": "2026-03-28T00:00:00Z",
-                        "adjusted_open_equity": "15000.00",
-                        "adjusted_close_equity": "15200.00",
-                        "open_equity": "15000.00",
-                        "close_equity": "15200.00",
-                        "open_market_value": "14000.00",
-                        "close_market_value": "14200.00",
-                    },
-                ],
-            },
+            responses.GET, urls.ACCOUNTS,
+            json={"results": [{"account_number": "12345",
+                               "url": f"{BASE}/accounts/12345/"}]},
+            status=200,
+        )
+        responses.add(
+            responses.GET, urls.portfolio_performance_url("12345"),
+            json={"lines": [{"identifier": "returns", "segments": []}],
+                  "x_axis": {}, "y_axis": {}, "account_number": "12345"},
             status=200,
         )
 
-        candles = client.get_portfolio_historicals(
-            account_number="123456",
-        )
-        assert len(candles) == 1
-        assert isinstance(candles[0], PortfolioCandle)
-        assert candles[0].adjusted_close_equity == 15200.00
-        assert candles[0].close_market_value == 14200.00
+        data = client.get_portfolio_performance()
+        assert [ln["identifier"] for ln in data["lines"]] == ["returns"]
+        assert data["account_number"] == "12345"
 
-
-class TestOptionHistoricals:
     @responses.activate
     def test_get_option_historicals(self, client):
         responses.add(
