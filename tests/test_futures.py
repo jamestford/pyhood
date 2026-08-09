@@ -83,6 +83,193 @@ class TestGetFuturesContract:
             client.get_futures_contract("FAKE99")
 
 
+class TestLiveApiShapes:
+    """Payloads captured from the live API on 2026-08-09.
+
+    The pre-existing fixtures in this file used a flat, snake_case shape that
+    the API does not return; every contract and quote call failed in practice
+    while those tests passed. These reproduce what the endpoints actually send.
+    """
+
+    CONTRACT_RESPONSE = {
+        "result": {
+            "id": "ade3740f-b580-470d-87b8-6e1a350be133",
+            "productId": "476e059e-79c2-4bd8-810a-af471f78abed",
+            "symbol": "/ESZ26:XCME",
+            "displaySymbol": "/ESZ26",
+            "description": "E-mini Standard and Poor's 500 Stock Price Index Futures, Dec-26",
+            "multiplier": "50",
+            "expirationMmy": "202612",
+            "expiration": "2026-12-18",
+            "tradability": "FUTURES_TRADABILITY_TRADABLE",
+            "state": "FUTURES_STATE_ACTIVE",
+            "settlementDate": "2026-12-18",
+        },
+    }
+
+    QUOTE_RESPONSE = {
+        "status": "SUCCESS",
+        "data": [{
+            "status": "SUCCESS",
+            "data": {
+                "ask_price": "7887.75",
+                "ask_size": 1,
+                "bid_price": "7807",
+                "bid_size": 2,
+                "last_trade_price": "7846.25",
+                "symbol": "/ESZ26:XCME",
+                "instrument_id": "ade3740f-b580-470d-87b8-6e1a350be133",
+                "state": "active",
+            },
+        }],
+    }
+
+    @responses.activate
+    def test_contract_result_envelope(self, client):
+        responses.add(
+            responses.GET, urls.futures_contract_url("ESZ26"),
+            json=self.CONTRACT_RESPONSE, status=200,
+        )
+
+        c = client.get_futures_contract("ESZ26")
+        assert c.contract_id == "ade3740f-b580-470d-87b8-6e1a350be133"
+        assert c.symbol == "ESZ26"  # '/ESZ26:XCME' normalized
+        assert c.name.startswith("E-mini Standard")
+        assert c.expiration == "2026-12-18"
+        assert c.multiplier == 50.0
+        assert c.status == "active"  # 'FUTURES_STATE_ACTIVE' normalized
+
+    @responses.activate
+    def test_quote_nested_data_envelope(self, client):
+        responses.add(
+            responses.GET, urls.futures_contract_url("ESZ26"),
+            json=self.CONTRACT_RESPONSE, status=200,
+        )
+        responses.add(
+            responses.GET, urls.FUTURES_QUOTES,
+            json=self.QUOTE_RESPONSE, status=200,
+        )
+
+        q = client.get_futures_quote("ESZ26")
+        assert q.symbol == "ESZ26"
+        assert q.last_price == 7846.25
+        assert q.bid == 7807.0
+        assert q.ask == 7887.75
+        assert q.contract_id == "ade3740f-b580-470d-87b8-6e1a350be133"
+
+    @responses.activate
+    def test_quote_by_id_skips_contract_lookup(self, client):
+        responses.add(
+            responses.GET, urls.FUTURES_QUOTES,
+            json=self.QUOTE_RESPONSE, status=200,
+        )
+
+        q = client.get_futures_quote_by_id(
+            "ade3740f-b580-470d-87b8-6e1a350be133", symbol="ESZ26",
+        )
+        assert q.last_price == 7846.25
+        # Only the quote call — no contract resolution
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_missing_contract_still_raises(self, client):
+        """An empty envelope must raise, not yield a blank contract."""
+        responses.add(
+            responses.GET, urls.futures_contract_url("BOGUS1"),
+            json={"result": {}}, status=200,
+        )
+
+        with pytest.raises(SymbolNotFoundError):
+            client.get_futures_contract("BOGUS1")
+
+    @responses.activate
+    def test_quote_with_no_data_raises(self, client):
+        responses.add(
+            responses.GET, urls.FUTURES_QUOTES,
+            json={"status": "SUCCESS", "data": []}, status=200,
+        )
+
+        with pytest.raises(SymbolNotFoundError):
+            client.get_futures_quote_by_id("some-id")
+
+    @responses.activate
+    def test_order_info_finds_and_misses(self, client):
+        responses.add(
+            responses.GET, f"{BASE}/futures/accounts/",
+            json={"results": [{"id": "acct-1"}]}, status=200,
+        )
+        responses.add(
+            responses.GET, urls.futures_orders_url("acct-1"),
+            json={"results": [
+                {"id": "order-1", "symbol": "/ESZ26", "side": "buy",
+                 "type": "market", "quantity": "1", "state": "filled"},
+            ]}, status=200,
+        )
+
+        found = client.get_futures_order_info("order-1", account_id="acct-1")
+        assert found is not None and found.order_id == "order-1"
+
+    @responses.activate
+    def test_order_info_returns_none_when_absent(self, client):
+        responses.add(
+            responses.GET, urls.futures_orders_url("acct-1"),
+            json={"results": []}, status=200,
+        )
+
+        assert client.get_futures_order_info("nope", account_id="acct-1") is None
+
+
+class TestGetFuturesPositions:
+    """Route and envelope verified live 2026-08-09; record shape unobserved."""
+
+    @responses.activate
+    def test_empty_positions(self, client):
+        responses.add(
+            responses.GET, urls.futures_positions_url("acct-1"),
+            json={"results": []}, status=200,
+        )
+
+        assert client.get_futures_positions(account_id="acct-1") == []
+
+    @responses.activate
+    def test_positions_returned_unmapped(self, client):
+        responses.add(
+            responses.GET, urls.futures_positions_url("acct-1"),
+            json={"results": [{"id": "pos-1", "anything": "preserved"}]}, status=200,
+        )
+
+        pos = client.get_futures_positions(account_id="acct-1")
+        assert pos == [{"id": "pos-1", "anything": "preserved"}]
+
+    @responses.activate
+    def test_positions_follow_pagination(self, client):
+        responses.add(
+            responses.GET, urls.futures_positions_url("acct-1"),
+            json={"results": [{"id": "p1"}], "next": f"{BASE}/ceres/v1/next-page/"},
+            status=200,
+        )
+        responses.add(
+            responses.GET, f"{BASE}/ceres/v1/next-page/",
+            json={"results": [{"id": "p2"}], "next": None}, status=200,
+        )
+
+        assert [p["id"] for p in client.get_futures_positions("acct-1")] == ["p1", "p2"]
+
+    @responses.activate
+    def test_account_auto_discovered(self, client):
+        responses.add(
+            responses.GET, f"{BASE}/ceres/v1/accounts/",
+            json={"results": [{"id": "auto-acct", "accountType": "FUTURES"}]},
+            status=200,
+        )
+        responses.add(
+            responses.GET, urls.futures_positions_url("auto-acct"),
+            json={"results": []}, status=200,
+        )
+
+        assert client.get_futures_positions() == []
+
+
 class TestGetFuturesContracts:
     @responses.activate
     def test_batch_contracts(self, client):
