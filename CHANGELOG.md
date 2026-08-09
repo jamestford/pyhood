@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-09
+
+### Fixed
+- **`get_news()` crashed on every real call** — `AttributeError: 'str' object has no attribute 'get'` (fixes [#17](https://github.com/jamestford/pyhood/issues/17))
+  - `related_instruments` entries are bare instrument IDs, but were parsed as dicts
+  - IDs are now resolved to ticker symbols via the instruments endpoint, cached per call
+  - Dict entries and instrument URLs are also accepted, so the parser tolerates all observed shapes
+  - A malformed or non-list `related_instruments`, or a failed lookup, no longer raises
+  - Existing tests only ever supplied dicts — the one shape the API does not return — so CI stayed green while the feature was unusable in 0.7.0
+  - 6 new tests (222 total), verified against live API data
+
+### Added
+- `get_news(symbol, resolve_symbols=True)` — pass `resolve_symbols=False` to skip symbol resolution and get raw instrument IDs back, avoiding one request per unique instrument
+
 ## [0.7.0] - 2026-04-09
 
 ### Added

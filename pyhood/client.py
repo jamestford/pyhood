@@ -6,6 +6,7 @@ All methods return typed dataclasses, not raw dicts.
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta
 from typing import Any
@@ -45,6 +46,11 @@ from pyhood.models import (
 )
 
 logger = logging.getLogger("pyhood")
+
+# Robinhood instrument IDs, as returned bare in news related_instruments
+_INSTRUMENT_ID_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE
+)
 
 # Index options use different API paths and chain symbols than equity options.
 # Keys are the base index symbol; values are the chain_symbol Robinhood expects
@@ -537,10 +543,19 @@ class PyhoodClient:
             published_at=data.get("instrument_id", ""),
         )
 
-    def get_news(self, symbol: str) -> list[NewsArticle]:
-        """Get news articles for a symbol."""
+    def get_news(self, symbol: str, resolve_symbols: bool = True) -> list[NewsArticle]:
+        """Get news articles for a symbol.
+
+        Args:
+            symbol: Ticker to fetch news for.
+            resolve_symbols: Resolve each article's related instrument IDs to
+                ticker symbols. Costs one extra request per unique instrument
+                (cached per call). Set False to get the raw IDs back instead.
+        """
         data = self._session.get(urls.NEWS, params={"symbol": symbol.upper()})
         results = data.get("results", []) if isinstance(data, dict) else []
+        # Cache instrument ID/URL -> symbol lookups to avoid repeated requests
+        symbol_cache: dict[str, str] = {}
         return [
             NewsArticle(
                 title=item.get("title", ""),
@@ -548,11 +563,9 @@ class PyhoodClient:
                 url=item.get("url", ""),
                 published_at=item.get("published_at", ""),
                 summary=item.get("summary", ""),
-                related_instruments=[
-                    inst.get("symbol", "")
-                    for inst in item.get("related_instruments", [])
-                    if inst.get("symbol")
-                ],
+                related_instruments=self._related_symbols(
+                    item.get("related_instruments", []), symbol_cache, resolve_symbols
+                ),
             )
             for item in results
         ]
@@ -1213,6 +1226,48 @@ class PyhoodClient:
         if not data:
             raise OrderError("No accounts found")
         return data[0].get("url", "")
+
+    def _related_symbols(
+        self, entries: Any, symbol_cache: dict[str, str], resolve: bool = True
+    ) -> list[str]:
+        """Normalize a news article's related_instruments into symbols.
+
+        Robinhood returns bare instrument IDs here, but the endpoint has also
+        been seen returning dicts with a 'symbol' key and instrument URLs, so
+        all three are accepted. IDs and URLs are resolved via the instruments
+        endpoint; anything else is treated as an already-resolved symbol.
+
+        With resolve=False, IDs and URLs are returned as-is and no extra
+        requests are made.
+        """
+        if not isinstance(entries, list):
+            return []
+
+        symbols: list[str] = []
+        for entry in entries:
+            symbol = ""
+            if isinstance(entry, dict):
+                symbol = entry.get("symbol", "")
+            elif isinstance(entry, str) and (
+                entry.startswith("http") or _INSTRUMENT_ID_RE.fullmatch(entry)
+            ):
+                if not resolve:
+                    symbol = entry
+                else:
+                    symbol = symbol_cache.get(entry, "")
+                    if not symbol:
+                        url = entry if entry.startswith("http") else f"{urls.INSTRUMENTS}{entry}/"
+                        try:
+                            inst = self._session.get(url)
+                            symbol = inst.get("symbol", "")
+                            symbol_cache[entry] = symbol
+                        except Exception:
+                            pass
+            elif isinstance(entry, str):
+                symbol = entry
+            if symbol:
+                symbols.append(symbol)
+        return symbols
 
     def _get_instrument_url(self, symbol: str) -> str:
         """Get instrument URL from INSTRUMENTS endpoint."""
