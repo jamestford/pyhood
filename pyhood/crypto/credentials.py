@@ -91,6 +91,22 @@ def load_credentials(
     return resolved_key, resolved_private
 
 
+def credentials_source() -> str:
+    """Where credentials would be read from: 'environment', 'file' or 'none'.
+
+    Environment variables take precedence, so a stale export silently shadows
+    a correct file — worth being able to check when authentication fails.
+    """
+    if os.environ.get(API_KEY_VAR) and os.environ.get(PRIVATE_KEY_VAR):
+        return "environment"
+    path = credentials_path()
+    if path.exists():
+        values = _parse_env_file(path)
+        if values.get(API_KEY_VAR) and values.get(PRIVATE_KEY_VAR):
+            return "file"
+    return "none"
+
+
 def credentials_available() -> bool:
     """Whether credentials can be resolved, without returning them."""
     try:

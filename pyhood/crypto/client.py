@@ -202,7 +202,15 @@ class CryptoClient:
                 raise RateLimitError("Rate limited by server", retry_after)
 
         if response.status_code == 401:
-            raise AuthError("Authentication failed - check API key and signature")
+            from pyhood.crypto.credentials import credentials_source
+            raise AuthError(
+                "Authentication failed. Credentials were loaded from the "
+                f"{credentials_source()} — note that environment variables "
+                "take precedence over ~/.pyhood/crypto.env, so a stale export "
+                "will shadow a correct file. Robinhood also returns 401 rather "
+                "than 429 when throttling, so a burst of requests can look "
+                "like an auth failure."
+            )
 
         if response.status_code == 403:
             raise AuthError("Access forbidden - check API permissions")
@@ -210,7 +218,24 @@ class CryptoClient:
         if not response.ok:
             try:
                 error_data = response.json()
-                error_msg = error_data.get('message', f'HTTP {response.status_code}')
+                # The Crypto API reports problems as
+                # {"type": ..., "errors": [{"detail": ..., "attr": ...}]}.
+                # Reading only 'message' reduced every failure to "HTTP 400".
+                errors = error_data.get('errors')
+                if isinstance(errors, list) and errors:
+                    parts = []
+                    for err in errors:
+                        if isinstance(err, dict):
+                            detail = err.get('detail', '')
+                            attr = err.get('attr')
+                            parts.append(f"{attr}: {detail}" if attr else detail)
+                        else:
+                            parts.append(str(err))
+                    error_msg = "; ".join(p for p in parts if p)
+                else:
+                    error_msg = error_data.get(
+                        'message', error_data.get('detail', f'HTTP {response.status_code}')
+                    )
             except Exception:
                 error_msg = f'HTTP {response.status_code}'
             raise APIError(
@@ -483,7 +508,6 @@ class CryptoClient:
         path = CRYPTO_ORDERS.replace(CRYPTO_BASE, '')
 
         payload = {
-            'account_number': account_number,
             'client_order_id': client_order_id or str(uuid.uuid4()),
             'side': side,
             'type': order_type,
@@ -492,7 +516,12 @@ class CryptoClient:
         }
 
         body = json.dumps(payload)
-        data = self.make_request('POST', path, body=body)
+        # account_number goes in the query string, not the body — sending it
+        # only in the body is rejected with "The account_number parameter is
+        # required." The same applies to the holdings and orders GETs.
+        data = self.make_request(
+            'POST', path, body=body, params={'account_number': account_number},
+        )
 
         from datetime import datetime
         created_at = datetime.fromisoformat(data.get('created_at', '').replace('Z', '+00:00'))
