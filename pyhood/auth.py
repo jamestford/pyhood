@@ -14,6 +14,8 @@ import logging
 import secrets
 import signal
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +37,41 @@ CLIENT_ID = "c82SH0WZOsabOXGP2sxqcj34FxkvfnWRZBKlBjFS"
 # Default token storage
 DEFAULT_TOKEN_DIR = Path.home() / ".pyhood"
 DEFAULT_TOKEN_FILE = "session.json"
+
+
+@contextmanager
+def _login_alarm(timeout: float) -> Iterator[None]:
+    """Best-effort wall-clock alarm around a blocking login call.
+
+    SIGALRM exists only on Unix and can only be armed from the main thread,
+    so this is a no-op on Windows or in a worker thread. The verification
+    poll loop and the per-request HTTP timeouts still bound the flow there;
+    the alarm is an extra guard, not the only one.
+    """
+    if timeout <= 0 or not hasattr(signal, "SIGALRM"):
+        yield
+        return
+
+    def _timeout_handler(signum: int, frame: Any) -> None:
+        raise LoginTimeout(
+            f"Login timed out after {timeout}s. "
+            "Robinhood may be waiting for device approval — check the Robinhood app."
+        )
+
+    try:
+        original_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+    except ValueError:
+        # Signal handlers can only be installed from the main thread
+        logger.debug("Not on the main thread — login alarm disabled")
+        yield
+        return
+
+    signal.alarm(int(timeout))
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, original_handler)
 
 
 def generate_device_token() -> str:
@@ -325,18 +362,7 @@ def login(
     if mfa_code:
         login_payload["mfa_code"] = mfa_code
 
-    # Set timeout alarm (Unix only)
-    original_handler = None
-    if timeout > 0:
-        def _timeout_handler(signum, frame):
-            raise LoginTimeout(
-                f"Login timed out after {timeout}s. "
-                "Robinhood may be waiting for device approval — check the Robinhood app."
-            )
-        original_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(int(timeout))
-
-    try:
+    with _login_alarm(timeout):
         # Robinhood login returns 400/403 with valid JSON (verification data)
         login_accept = (400, 401, 402, 403)
         data = session.post(urls.LOGIN, data=login_payload, accept_codes=login_accept)
@@ -370,13 +396,6 @@ def login(
         _active_store = store
         logger.info("Login successful")
         return session
-
-    finally:
-        # Clear alarm
-        if timeout > 0:
-            signal.alarm(0)
-            if original_handler is not None:
-                signal.signal(signal.SIGALRM, original_handler)
 
 
 def refresh(
