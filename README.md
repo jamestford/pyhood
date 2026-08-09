@@ -45,6 +45,10 @@ Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and its acti
 
 robin_stocks is the original and by far the most widely used — it earned that. But its last merge was February 2026, and its own issue tracker now [points newcomers to the fork](https://github.com/jmfernandes/robin_stocks/issues/1650). If you are migrating, pyhood is worth a look.
 
+**Also considered:** [pyrh](https://github.com/robinhood-unofficial/pyrh) (1.8k stars) — last release March 2023, last commit March 2024; [fast_arrow](https://github.com/westonplatter/fast_arrow) — options-focused, last commit 2021; [friartuck](https://github.com/codesociety/friartuck) — a backtesting framework rather than an API client, last commit 2023. The comparison above is limited to libraries under active development.
+
+For the API itself, [sanko/Robinhood](https://github.com/sanko/Robinhood) remains the best community reference for Robinhood's unofficial endpoints.
+
 *Verified against both repositories on 2026-08-09 by reading their source, not their docs. Corrections welcome — open an issue if anything here is out of date.*
 
 ## Why pyhood?
