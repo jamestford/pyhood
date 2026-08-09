@@ -2341,6 +2341,36 @@ class PyhoodClient:
 
         return orders
 
+    def get_futures_positions(self, account_id: str | None = None) -> list[dict]:
+        """Get open futures positions.
+
+        Args:
+            account_id: Futures account ID. Auto-discovered if None.
+
+        Returns:
+            List of raw position dicts.
+
+        Note:
+            The endpoint and its `results` envelope are verified, but no
+            populated position record has been observed — the test account
+            holds no futures positions. Records are therefore returned
+            unmapped rather than forced onto a dataclass whose field names
+            would be guesswork.
+        """
+        if not account_id:
+            account_id = self.get_futures_account_id()
+
+        self._set_futures_header()
+        positions: list[dict] = []
+        url: str | None = urls.futures_positions_url(account_id)
+        while url:
+            data = self._session.get(url)
+            if not isinstance(data, dict):
+                break
+            positions.extend(data.get("results", []))
+            url = data.get("next")
+        return positions
+
     def get_futures_order_info(
         self, order_id: str, account_id: str | None = None,
     ) -> FuturesOrder | None:

@@ -219,6 +219,57 @@ class TestLiveApiShapes:
         assert client.get_futures_order_info("nope", account_id="acct-1") is None
 
 
+class TestGetFuturesPositions:
+    """Route and envelope verified live 2026-08-09; record shape unobserved."""
+
+    @responses.activate
+    def test_empty_positions(self, client):
+        responses.add(
+            responses.GET, urls.futures_positions_url("acct-1"),
+            json={"results": []}, status=200,
+        )
+
+        assert client.get_futures_positions(account_id="acct-1") == []
+
+    @responses.activate
+    def test_positions_returned_unmapped(self, client):
+        responses.add(
+            responses.GET, urls.futures_positions_url("acct-1"),
+            json={"results": [{"id": "pos-1", "anything": "preserved"}]}, status=200,
+        )
+
+        pos = client.get_futures_positions(account_id="acct-1")
+        assert pos == [{"id": "pos-1", "anything": "preserved"}]
+
+    @responses.activate
+    def test_positions_follow_pagination(self, client):
+        responses.add(
+            responses.GET, urls.futures_positions_url("acct-1"),
+            json={"results": [{"id": "p1"}], "next": f"{BASE}/ceres/v1/next-page/"},
+            status=200,
+        )
+        responses.add(
+            responses.GET, f"{BASE}/ceres/v1/next-page/",
+            json={"results": [{"id": "p2"}], "next": None}, status=200,
+        )
+
+        assert [p["id"] for p in client.get_futures_positions("acct-1")] == ["p1", "p2"]
+
+    @responses.activate
+    def test_account_auto_discovered(self, client):
+        responses.add(
+            responses.GET, f"{BASE}/ceres/v1/accounts/",
+            json={"results": [{"id": "auto-acct", "accountType": "FUTURES"}]},
+            status=200,
+        )
+        responses.add(
+            responses.GET, urls.futures_positions_url("auto-acct"),
+            json={"results": []}, status=200,
+        )
+
+        assert client.get_futures_positions() == []
+
+
 class TestGetFuturesContracts:
     @responses.activate
     def test_batch_contracts(self, client):

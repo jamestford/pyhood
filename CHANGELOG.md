@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `get_ipo_access_orders(start_date=...)` — typed `Order` objects for orders flagged `is_ipo_access_order`
   - View models are returned as raw dicts: their structure is deeply nested and offering-dependent, and four of the six endpoints 404 outside a live offering, so their populated shapes are unverified. The list, cards and orders paths are verified against the live API.
   - Requesting shares is not wrapped — an IPO order is an ordinary equity order and the submission payload could not be verified without a live offering
+- `get_futures_positions()` — open futures positions. The endpoint (`ceres/v1/accounts/{id}/positions/`) was previously undiscovered; robin_stocks_v2 ships a stub that returns None. Route and `results` envelope verified live; records are returned unmapped because no populated position was observable.
 - `get_futures_quote_by_id(contract_id)` — quote a contract directly, skipping the symbol lookup
 - `get_futures_order_info(order_id)` — fetch a single futures order by ID
 

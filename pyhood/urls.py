@@ -104,6 +104,11 @@ def futures_orders_url(account_id: str) -> str:
     return f"{FUTURES_ACCOUNTS}{account_id}/orders/"
 
 
+def futures_positions_url(account_id: str) -> str:
+    """URL for open futures positions on a specific account."""
+    return f"{FUTURES_ACCOUNTS}{account_id}/positions/"
+
+
 # ── IPO Access ───────────────────────────────────────────────────────
 # Undocumented bonfire view models backing Robinhood's retail IPO
 # allocation program.
