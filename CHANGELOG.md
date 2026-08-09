@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-09
+
+### Added
+- **`start_date` on order history** — avoid paging through years of orders to reach recent ones (re: [#15](https://github.com/jamestford/pyhood/issues/15))
+  - `get_stock_orders(start_date=...)`, `get_option_orders(start_date=...)`, `get_futures_orders(start_date=...)`, `get_filled_futures_orders(start_date=...)`
+  - Accepts a `datetime` or ISO-8601 string (`'2026-01-01'` or a full timestamp); naive values are treated as UTC
+  - Requested server-side via `created_at[gte]` so the API returns fewer pages, and re-applied client-side so an endpoint that ignores the filter still returns correctly filtered results
+  - Server-side filtering is confirmed working on options orders; stock and futures endpoints could not be verified against live data, hence the local fallback
+  - Omitting `start_date` preserves existing behaviour exactly — no param is sent
+  - 8 new tests (235 total)
+
 ## [0.8.1] - 2026-08-09
 
 ### Fixed
