@@ -34,7 +34,34 @@ Built for automated trading — with auth that doesn't break, proper error handl
 - 📋 **Watchlists** — Create, manage, and modify your Robinhood watchlists programmatically.
 - 🔍 **Research & discovery** — Analyst ratings, news feed, S&P 500 movers, trending stocks, instrument popularity, and stock splits.
 - 📑 **Portfolio & documents** — Portfolio historicals, option historicals, account statements, and trade confirmations.
-- 🧪 **Tested and maintained** — 212 tests, CI across Python 3.10-3.13, linted with ruff. If it breaks, we know immediately.
+- 🧪 **Tested and maintained** — 235 tests, CI across Python 3.10-3.13, linted with ruff. If it breaks, we know immediately.
+
+## Comparison
+
+Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and its actively maintained fork [robin_stocks_v2](https://github.com/DhruvaBansal00/robin_stocks_v2):
+
+| | pyhood | robin_stocks | robin_stocks_v2 |
+|---|:---:|:---:|:---:|
+| **Silent token refresh** — renew a session with no credentials and no device approval | ✅ | ❌ | ❌ |
+| **IRA / retirement accounts** — trade stocks and options in Traditional and Roth IRAs | ✅ | ❌ | ❌ |
+| **Official Crypto Trading API** — Ed25519 key auth, not the unofficial endpoints | ✅ | ❌ | ❌ |
+| **Typed responses** — dataclasses with full annotations rather than raw dicts | ✅ | ❌ | partial |
+| **Session storage** | JSON | pickle | JSON |
+| **Index options** (SPX, NDX, VIX, RUT, XSP) | ✅ | partial | ✅ |
+| **Futures trading** | ✅ | ❌ | ✅ more complete |
+| **IPO Access** | ❌ | ❌ | ✅ |
+| **Order history date filter** | ✅ | ✅ | ✅ |
+| **Minimum Python** | 3.10 | 3.9 | 3.10 |
+
+**Where pyhood is the only option:** session refresh, retirement accounts, and the official crypto API. If your automation keeps dying because a Robinhood session expired and nobody was around to approve a device prompt, that is the difference that matters.
+
+**Where the fork is ahead:** futures coverage is more extensive, and it has IPO Access support that pyhood lacks.
+
+**On `pickle`:** robin_stocks stores sessions with `pickle`, which deserializes arbitrary objects ([CWE-502](https://cwe.mitre.org/data/definitions/502.html)) — a fix has been [open since March 2026](https://github.com/jmfernandes/robin_stocks/pull/1646). pyhood has always used JSON; the fork has since switched.
+
+robin_stocks is the original and by far the most widely used — it earned that. But its last merge was February 2026, and its own issue tracker now [points newcomers to the fork](https://github.com/jmfernandes/robin_stocks/issues/1650). If you are migrating, pyhood is worth a look.
+
+*Verified against both repositories on 2026-08-09. Corrections welcome — open an issue if something here is out of date.*
 
 ## Quick Start
 
