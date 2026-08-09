@@ -211,10 +211,8 @@ See the [account documentation](https://jamestford.github.io/pyhood/account/) fo
 ```python
 from pyhood.crypto import CryptoClient
 
-crypto = CryptoClient(
-    api_key="rh-api-...",
-    private_key_base64="...",
-)
+# Credentials are read from ~/.pyhood/crypto.env or the environment
+crypto = CryptoClient()
 
 quotes = crypto.get_best_bid_ask("BTC-USD", "ETH-USD")
 account = crypto.get_account()
@@ -228,7 +226,23 @@ order = crypto.place_order(
 )
 ```
 
-Generate API keys at [robinhood.com/account/crypto](https://robinhood.com/account/crypto). See the [crypto documentation](https://jamestford.github.io/pyhood/crypto/) for details.
+**Getting API keys.** Robinhood does not issue you a key pair — you generate one and register only the public half:
+
+```bash
+python -c "from pyhood.crypto.auth import generate_keypair; priv, pub = generate_keypair(); print('PRIVATE:', priv); print('PUBLIC :', pub)"
+```
+
+Paste the **public** key at [robinhood.com/account/crypto](https://robinhood.com/account/crypto) → API Trading → Add key. Robinhood then issues an **API key**. Save both:
+
+```
+# ~/.pyhood/crypto.env  (chmod 600)
+RH_CRYPTO_API_KEY=the-key-robinhood-issued
+RH_CRYPTO_PRIVATE_KEY=the-private-key-you-generated
+```
+
+The private key is the credential — anyone holding it can trade your crypto. Environment variables take precedence over this file, so a stale export will shadow it; `credentials_source()` reports which is in use.
+
+Only pairs with `api_tradable` set can be ordered through the API — a pair can be tradable in the app but not here. See the [crypto documentation](https://jamestford.github.io/pyhood/crypto/) for details.
 
 ### Futures
 
