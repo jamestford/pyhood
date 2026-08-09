@@ -5,62 +5,58 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.0] - 2026-08-09
 
-### Fixed
-- **Crypto orders parsed almost every field wrong** — the API reports `state`, `filled_asset_quantity`, `average_price` and `fee_charged`, and keeps the requested size and price inside `{type}_order_config`. pyhood read `status`, `quantity`, `price`, `filled_quantity`, `average_filled_price` and `fee` at the top level, so a real order came back with an empty status, zero quantity and no price. The three construction sites are now one `_parse_order()` helper, which also stops the old code raising `ValueError` when a timestamp is absent.
-- **`place_order()` sent `account_number` in the body** — the API requires it as a query parameter and rejects the body form with "The account_number parameter is required". Notably it is absent from `OrderRequest` in Robinhood's published spec.
-
-### Removed
-- **`get_portfolio_historicals()`** now raises `APIError` — Robinhood retired `/portfolios/historicals/`, which returns 404 for every parameter combination. It had a passing test that mocked the dead endpoint. robin_stocks calls the same URL.
-
-### Added
-- **`get_portfolio_performance()`** — the bonfire chart view model that replaced it. Returned unmapped: its y values are returns rather than equity, so mapping it onto `PortfolioCandle` would mean inventing figures the endpoint does not provide.
-
-### Fixed
-- **Position P&L was wrong, reporting gains on losing positions** — `get_positions()` read `average_buy_price`, which Robinhood returns as `0` for settled positions. Cost basis therefore came out as zero and `unrealized_pl` degenerated to equity. It now falls back to `clearing_average_cost` and prefers the broker's own `clearing_cost_basis`, matching what the app displays. Caught by comparing pyhood's output against the Robinhood web UI for the same position.
-- `get_positions()` no longer fetches each instrument to resolve a symbol — the positions payload already carries it, saving a request per position.
-
-### Fixed
-- **Crypto orders could not be placed** — the payload omitted the required `client_order_id` idempotency key, and spread `order_config` flat instead of nesting it under `{type}_order_config` as the API expects. The README example demonstrated the wrong shape.
-- **`get_trading_pairs()` reported every field wrong** — the API uses `asset_code`/`quote_code`/`quote_increment`/`asset_increment`, and reports availability as `status` plus `is_api_tradable`. pyhood read `base_currency`, `price_increment`, `tradable` and similar, so every pair came back with empty currencies, zero increments and `tradable=False`. `TradingPair` now also exposes `api_tradable`, which is what actually governs whether a pair can be ordered through the API.
-- **Crypto quotes always returned 0.0** — `get_best_bid_ask()` read `bid_price`/`ask_price`; the API returns `bid`/`ask`.
-- **Crypto market-data calls failed authentication** — the signature covers the path *including* its query string, but pyhood signed the bare path and let `requests` append the query separately. Every parameterised crypto endpoint returned "Authentication failed".
-- **`get_best_bid_ask()` sent the wrong parameter** — `symbols=` comma-joined, where the API wants `symbol=` repeated; it rejected the former as "Malformed symbol parameter".
-- **`get_estimated_price()` returned zeros** — the estimate is wrapped in a `results` list, and the fee is `est_fee`.
-
-### Removed
-- **`CryptoClient.get_historicals()`** now raises `APIError` — the Crypto Trading API has no historicals endpoint. Every candidate path returns 404 and it is absent from Robinhood's published spec. Its tests mocked an endpoint that does not exist.
+A repair release. Every fix below was found by running pyhood against the live Robinhood API. Each broken feature shipped with passing tests that mocked a response shape the API never returns, so CI stayed green while the feature was unusable.
 
 ### Security
 - **Session tokens were written world-readable** — `~/.pyhood/session.json` holds live access and refresh tokens but was created with the process umask, producing `-rw-r--r--` on a default macOS setup. Any user or process on the machine could read it and act on the account. Credential files are now created `0600` inside a `0700` directory, the mode is applied at creation so contents are never briefly exposed, and loading an over-permissive file logs a warning with the `chmod` to run.
 
-### Added
-- **Crypto credential resolution** — `CryptoClient()` now takes no arguments and resolves credentials from `RH_CRYPTO_API_KEY` / `RH_CRYPTO_PRIVATE_KEY` or `~/.pyhood/crypto.env` (override with `PYHOOD_CRYPTO_ENV`), alongside the existing session file. `load_credentials()` and `credentials_available()` are exported. Explicit arguments still take precedence.
-
 ### Fixed
+
+**Orders**
 - **Market orders, fractional orders and trailing stops were all rejected** — Robinhood refuses orders that omit `order_form_version`, responding "Your app version is missing important stock trading updates". Despite the wording this is the *order form* version, not a client version. pyhood now sends `7`. Any value from 2 upward is accepted; `1` and omission are refused. robin_stocks sends `4` on ordinary stock orders, which works — but omits it on `order_trailing_stop`, so trailing stops fail there.
 - **Rejected orders were reported as successful** — `order_stock()` and `order_option()` only treated a response as an error when it carried a `detail` or `error` key, but Robinhood returns field-level validation errors (`{"field": ["message"]}`) that have neither. Any such rejection returned an `Order` with a blank id and no exception, so callers believed the order was placed. Both now raise when the response has no `id`.
 - Trailing stop rejections now raise a specific `OrderError` explaining that Robinhood gates the feature to its own app versions, rather than surfacing the raw server text.
 - Passing both a `price` and a trail is rejected up front — Robinhood does not support trailing stop limit orders.
 
+**Positions and portfolio**
+- **Position P&L was wrong, reporting gains on losing positions** — `get_positions()` read `average_buy_price`, which Robinhood returns as `0` for settled positions. Cost basis therefore came out as zero and `unrealized_pl` degenerated to equity. It now falls back to `clearing_average_cost` and prefers the broker's own `clearing_cost_basis`, matching what the app displays. Caught by comparing pyhood's output against the Robinhood web UI for the same position.
+- `get_positions()` no longer fetches each instrument to resolve a symbol — the positions payload already carries it, saving a request per position.
+
+**Crypto**
+- **Crypto orders could not be placed** — the payload omitted the required `client_order_id` idempotency key, and spread `order_config` flat instead of nesting it under `{type}_order_config` as the API expects. The README example demonstrated the wrong shape.
+- **`place_order()` sent `account_number` in the body** — the API requires it as a query parameter and rejects the body form with "The account_number parameter is required". Notably it is absent from `OrderRequest` in Robinhood's published spec.
+- **Crypto orders parsed almost every field wrong** — the API reports `state`, `filled_asset_quantity`, `average_price` and `fee_charged`, and keeps the requested size and price inside `{type}_order_config`. pyhood read `status`, `quantity`, `price`, `filled_quantity`, `average_filled_price` and `fee` at the top level, so a real order came back with an empty status, zero quantity and no price. The three construction sites are now one `_parse_order()` helper, which also stops the old code raising `ValueError` when a timestamp is absent.
+- **`get_trading_pairs()` reported every field wrong** — the API uses `asset_code`/`quote_code`/`quote_increment`/`asset_increment`, and reports availability as `status` plus `is_api_tradable`. pyhood read `base_currency`, `price_increment`, `tradable` and similar, so every pair came back with empty currencies, zero increments and `tradable=False`. `TradingPair` now also exposes `api_tradable`, which is what actually governs whether a pair can be ordered through the API.
+- **Crypto market-data calls failed authentication** — the signature covers the path *including* its query string, but pyhood signed the bare path and let `requests` append the query separately. Every parameterised crypto endpoint returned "Authentication failed".
+- **Crypto quotes always returned 0.0** — `get_best_bid_ask()` read `bid_price`/`ask_price`; the API returns `bid`/`ask`.
+- **`get_best_bid_ask()` sent the wrong parameter** — `symbols=` comma-joined, where the API wants `symbol=` repeated; it rejected the former as "Malformed symbol parameter".
+- **`get_estimated_price()` returned zeros** — the estimate is wrapped in a `results` list, and the fee is `est_fee`.
+
 ### Added
 - **`is_market_open()`** — whether trading is open right now, for the regular or extended session. Uses the New York trading date rather than the UTC date, so it stays correct during the evening. Orders placed while closed are queued rather than rejected, which is easy to mistake for a hang.
 - **Extended and 24-hour trading sessions** — `market_hours` on `buy_stock()`, `sell_stock()` and `order_stock()`, accepting `regular_hours`, `extended_hours` or `all_day_hours`. `extended_hours` is derived from it, since Robinhood rejects orders where the two disagree.
-- **Interest, fees and transfers** — `get_interest_payments()`, `get_margin_interest()`, `get_subscription_fees()`, `get_unified_transfers()`. All verified against live data except margin interest, where the endpoint is confirmed but the account has no charges to observe.
-- **Trailing stop orders** — `buy_stock(..., trail_amount=)` / `trail_percent=`, and the same on `sell_stock()` and `order_stock()`. Posted as JSON, since the nested `trailing_peg` cannot survive form encoding. **Robinhood currently rejects these from third-party clients** — see Fixed below.
+- **Trailing stop orders** — `buy_stock(..., trail_amount=)` / `trail_percent=`, and the same on `sell_stock()` and `order_stock()`. Posted as JSON, since the nested `trailing_peg` cannot survive form encoding. **Robinhood currently rejects these from third-party clients** — see Fixed above.
 - **Fractional orders by dollar amount** — `buy_stock_by_price()` and `sell_stock_by_price()`.
 - **Multi-leg option spreads** — `order_option_spread()` for debit and credit spreads, with per-leg ratios.
+- **Interest, fees and transfers** — `get_interest_payments()`, `get_margin_interest()`, `get_subscription_fees()`, `get_unified_transfers()`. All verified against live data except margin interest, where the endpoint is confirmed but the account has no charges to observe.
+- **Crypto credential resolution** — `CryptoClient()` now takes no arguments and resolves credentials from `RH_CRYPTO_API_KEY` / `RH_CRYPTO_PRIVATE_KEY` or `~/.pyhood/crypto.env` (override with `PYHOOD_CRYPTO_ENV`), alongside the existing session file. `load_credentials()` and `credentials_available()` are exported. Explicit arguments still take precedence.
+- **`get_portfolio_performance()`** — the bonfire chart view model that replaced the retired historicals endpoint. Returned unmapped: its y values are returns rather than equity, so mapping it onto `PortfolioCandle` would mean inventing figures the endpoint does not provide.
 - **`cancel_all_option_orders()`** — mirrors the existing stock version.
 - **CSV export** — `export_stock_orders()` and `export_option_orders()`, accepting a file or directory path.
 - **`unlink_bank_account()`** — irreversible; not exercised against a live account.
 - Migration guide from robin_stocks, with every referenced method verified to exist.
 
-Order-placement additions are verified by asserting the request payload, not by placing live orders.
+How order placement was verified: stock and option orders are covered by asserting the outgoing request payload, not by placing live orders. Crypto order placement is verified end to end against the live API with a limit buy priced far below market, which rests unfilled and is then cancelled — the full round trip without a trade executing.
 
 ### Changed
-- Promoted from `Development Status :: 3 - Alpha` to `4 - Beta` on PyPI — 259 tests, CI across Python 3.10-3.13, and ten releases
+- Promoted from `Development Status :: 3 - Alpha` to `4 - Beta` on PyPI — 312 tests, CI across Python 3.10-3.13, and eleven releases
 - PyPI keywords now include `robinhood-api`, `robin_stocks`, `robin-stocks` and `pyrh`, so the package is findable by people searching for the libraries they are migrating from
+
+### Removed
+- **`get_portfolio_historicals()`** now raises `APIError` — Robinhood retired `/portfolios/historicals/`, which returns 404 for every parameter combination. It had a passing test that mocked the dead endpoint. robin_stocks calls the same URL.
+- **`CryptoClient.get_historicals()`** now raises `APIError` — the Crypto Trading API has no historicals endpoint. Every candidate path returns 404 and it is absent from Robinhood's published spec. Its tests mocked an endpoint that does not exist.
 
 ## [0.10.0] - 2026-08-09
 
