@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Omitting `start_date` preserves existing behaviour exactly — no param is sent
   - 8 new tests (235 total)
 
+### Changed
+- **Source distribution reduced from 6.8 MB to 68 KB** — the sdist bundled `assets/`, `docs/` and `.github/`, of which ~6.5 MB was logo source images. It now ships source, tests, README, changelog and licence via an explicit include list. The wheel is unchanged at 46 KB.
+- Example account numbers in the IRA documentation and in the `get_positions()` docstring are now placeholders rather than literal values.
+
 ## [0.8.1] - 2026-08-09
 
 ### Fixed
