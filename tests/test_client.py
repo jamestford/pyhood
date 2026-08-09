@@ -1670,6 +1670,200 @@ class TestNews:
         assert articles[1].related_instruments == ["AAPL", "MSFT"]
 
     @responses.activate
+    def test_get_news_instrument_url_strings(self, client):
+        """related_instruments may be instrument URLs rather than dicts."""
+        responses.add(
+            responses.GET,
+            urls.NEWS,
+            json={
+                "results": [
+                    {
+                        "title": "Apple Reports Record Quarter",
+                        "source": "Reuters",
+                        "url": "https://reuters.com/article/1",
+                        "related_instruments": [
+                            "https://api.robinhood.com/instruments/aapl-id/",
+                            "https://api.robinhood.com/instruments/msft-id/",
+                        ],
+                    },
+                    {
+                        "title": "Apple Suppliers Gain",
+                        "source": "Bloomberg",
+                        "url": "https://bloomberg.com/article/2",
+                        "related_instruments": [
+                            "https://api.robinhood.com/instruments/aapl-id/",
+                        ],
+                    },
+                ],
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.robinhood.com/instruments/aapl-id/",
+            json={"symbol": "AAPL"},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.robinhood.com/instruments/msft-id/",
+            json={"symbol": "MSFT"},
+            status=200,
+        )
+
+        articles = client.get_news("AAPL")
+        assert articles[0].related_instruments == ["AAPL", "MSFT"]
+        assert articles[1].related_instruments == ["AAPL"]
+        # The repeated AAPL instrument is served from cache, not re-fetched
+        aapl_calls = [
+            c for c in responses.calls
+            if c.request.url == "https://api.robinhood.com/instruments/aapl-id/"
+        ]
+        assert len(aapl_calls) == 1
+
+    @responses.activate
+    def test_get_news_instrument_id_strings(self, client):
+        """The live shape: bare instrument IDs, resolved via /instruments/."""
+        aapl_id = "450dfc6d-5510-4d40-abfb-f633b7d9be3e"
+        msft_id = "50810c35-d215-4866-9758-0ada4ac79ffa"
+        responses.add(
+            responses.GET,
+            urls.NEWS,
+            json={
+                "results": [
+                    {
+                        "title": "Apple and Microsoft Rally",
+                        "source": "Reuters",
+                        "url": "https://reuters.com/article/5",
+                        "related_instruments": [aapl_id, msft_id],
+                    },
+                    {
+                        "title": "Apple Alone",
+                        "source": "Bloomberg",
+                        "url": "https://bloomberg.com/article/6",
+                        "related_instruments": [aapl_id],
+                    },
+                ],
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{urls.INSTRUMENTS}{aapl_id}/",
+            json={"symbol": "AAPL"},
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            f"{urls.INSTRUMENTS}{msft_id}/",
+            json={"symbol": "MSFT"},
+            status=200,
+        )
+
+        articles = client.get_news("AAPL")
+        assert articles[0].related_instruments == ["AAPL", "MSFT"]
+        assert articles[1].related_instruments == ["AAPL"]
+        aapl_calls = [
+            c for c in responses.calls
+            if c.request.url == f"{urls.INSTRUMENTS}{aapl_id}/"
+        ]
+        assert len(aapl_calls) == 1
+
+    @responses.activate
+    def test_get_news_no_resolve(self, client):
+        """resolve_symbols=False returns raw IDs and makes no extra requests."""
+        aapl_id = "450dfc6d-5510-4d40-abfb-f633b7d9be3e"
+        responses.add(
+            responses.GET,
+            urls.NEWS,
+            json={
+                "results": [
+                    {
+                        "title": "Apple Rallies",
+                        "source": "Reuters",
+                        "url": "https://reuters.com/article/7",
+                        "related_instruments": [aapl_id],
+                    },
+                ],
+            },
+            status=200,
+        )
+
+        articles = client.get_news("AAPL", resolve_symbols=False)
+        assert articles[0].related_instruments == [aapl_id]
+        # Only the news call — no instrument lookup
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_get_news_bare_symbol_strings(self, client):
+        """Bare symbol strings are passed through as-is."""
+        responses.add(
+            responses.GET,
+            urls.NEWS,
+            json={
+                "results": [
+                    {
+                        "title": "Tech Stocks Rally",
+                        "source": "Bloomberg",
+                        "url": "https://bloomberg.com/article/2",
+                        "related_instruments": ["AAPL", "MSFT"],
+                    },
+                ],
+            },
+            status=200,
+        )
+        assert client.get_news("AAPL")[0].related_instruments == ["AAPL", "MSFT"]
+
+    @responses.activate
+    def test_get_news_unresolvable_instrument(self, client):
+        """A failed instrument lookup drops the entry instead of raising."""
+        responses.add(
+            responses.GET,
+            urls.NEWS,
+            json={
+                "results": [
+                    {
+                        "title": "Mystery Mover",
+                        "source": "Reuters",
+                        "url": "https://reuters.com/article/3",
+                        "related_instruments": [
+                            "https://api.robinhood.com/instruments/gone-id/",
+                            "MSFT",
+                        ],
+                    },
+                ],
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            "https://api.robinhood.com/instruments/gone-id/",
+            json={"detail": "Not found"},
+            status=404,
+        )
+        assert client.get_news("AAPL")[0].related_instruments == ["MSFT"]
+
+    @responses.activate
+    def test_get_news_malformed_related_instruments(self, client):
+        """A non-list related_instruments value yields an empty list."""
+        responses.add(
+            responses.GET,
+            urls.NEWS,
+            json={
+                "results": [
+                    {
+                        "title": "Bad Payload",
+                        "source": "Reuters",
+                        "url": "https://reuters.com/article/4",
+                        "related_instruments": None,
+                    },
+                ],
+            },
+            status=200,
+        )
+        assert client.get_news("AAPL")[0].related_instruments == []
+
+    @responses.activate
     def test_get_news_empty(self, client):
         responses.add(
             responses.GET,
