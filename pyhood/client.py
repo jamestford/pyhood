@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from pyhood import urls
@@ -1227,6 +1227,54 @@ class PyhoodClient:
             raise OrderError("No accounts found")
         return data[0].get("url", "")
 
+    @staticmethod
+    def _parse_start_date(start_date: str | datetime | None) -> datetime | None:
+        """Normalize a start_date into an aware UTC datetime.
+
+        Accepts a datetime or an ISO-8601 string ('2026-01-01' or a full
+        timestamp). Naive values are treated as UTC.
+        """
+        if start_date is None:
+            return None
+        if isinstance(start_date, datetime):
+            dt = start_date
+        else:
+            try:
+                dt = datetime.fromisoformat(str(start_date).replace("Z", "+00:00"))
+            except ValueError as e:
+                raise ValueError(
+                    f"start_date must be a datetime or ISO-8601 string, got {start_date!r}"
+                ) from e
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    @staticmethod
+    def _start_date_params(cutoff: datetime | None) -> dict[str, str] | None:
+        """Server-side filter params for an order-history cutoff."""
+        if cutoff is None:
+            return None
+        return {"created_at[gte]": cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")}
+
+    @staticmethod
+    def _before_cutoff(created_at: str, cutoff: datetime | None) -> bool:
+        """True if an order predates the cutoff and should be dropped.
+
+        Applied client-side as a safety net: not every orders endpoint is
+        confirmed to honour created_at[gte], and an ignored filter would
+        otherwise return silently unfiltered results. Unparseable timestamps
+        are kept rather than dropped.
+        """
+        if cutoff is None or not created_at:
+            return False
+        try:
+            dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt < cutoff
+
     def _related_symbols(
         self, entries: Any, symbol_cache: dict[str, str], resolve: bool = True
     ) -> list[str]:
@@ -1644,18 +1692,30 @@ class PyhoodClient:
             instrument_type="option",
         )
 
-    def get_stock_orders(self) -> list[Order]:
+    def get_stock_orders(self, start_date: str | datetime | None = None) -> list[Order]:
         """Get all stock orders (not options).
+
+        Args:
+            start_date: Only return orders created on or after this point.
+                Accepts a datetime or ISO-8601 string ('2026-01-01'); naive
+                values are treated as UTC. Filtering is requested server-side
+                to avoid paging through a long history, and re-applied locally.
 
         Returns:
             List of Order objects for stock orders.
         """
-        data = self._session.get_paginated(urls.ORDERS)
+        cutoff = self._parse_start_date(start_date)
+        data = self._session.get_paginated(
+            urls.ORDERS, params=self._start_date_params(cutoff),
+        )
         orders = []
 
         for item in data:
             # Skip option orders (they have legs)
             if "legs" in item or item.get("legs"):
+                continue
+
+            if self._before_cutoff(item.get("created_at", ""), cutoff):
                 continue
 
             created_at = None
@@ -1701,16 +1761,28 @@ class PyhoodClient:
 
         return orders
 
-    def get_option_orders(self) -> list[Order]:
+    def get_option_orders(self, start_date: str | datetime | None = None) -> list[Order]:
         """Get all option orders.
+
+        Args:
+            start_date: Only return orders created on or after this point.
+                Accepts a datetime or ISO-8601 string ('2026-01-01'); naive
+                values are treated as UTC. Filtering is requested server-side
+                to avoid paging through a long history, and re-applied locally.
 
         Returns:
             List of Order objects for option orders.
         """
-        data = self._session.get_paginated(urls.OPTIONS_ORDERS)
+        cutoff = self._parse_start_date(start_date)
+        data = self._session.get_paginated(
+            urls.OPTIONS_ORDERS, params=self._start_date_params(cutoff),
+        )
         orders = []
 
         for item in data:
+            if self._before_cutoff(item.get("created_at", ""), cutoff):
+                continue
+
             created_at = None
             filled_at = None
 
@@ -2058,6 +2130,7 @@ class PyhoodClient:
 
     def get_futures_orders(
         self, account_id: str | None = None,
+        start_date: str | datetime | None = None,
     ) -> list[FuturesOrder]:
         """Get all historical futures orders.
 
@@ -2066,10 +2139,16 @@ class PyhoodClient:
 
         Args:
             account_id: Futures account ID. Auto-discovered if None.
+            start_date: Only return orders created on or after this point.
+                Accepts a datetime or ISO-8601 string ('2026-01-01'); naive
+                values are treated as UTC. The futures service is not confirmed
+                to support server-side date filtering, so this may only filter
+                locally rather than reduce the number of pages fetched.
 
         Returns:
             List of FuturesOrder objects.
         """
+        cutoff = self._parse_start_date(start_date)
         if not account_id:
             account_id = self.get_futures_account_id()
 
@@ -2077,9 +2156,13 @@ class PyhoodClient:
         orders: list[FuturesOrder] = []
         url: str | None = urls.futures_orders_url(account_id)
 
+        params = self._start_date_params(cutoff)
         while url:
-            data = self._session.get(url)
+            data = self._session.get(url, params=params)
+            params = None  # Only sent on the first request; cursors carry it after
             for item in data.get("results", []):
+                if self._before_cutoff(item.get("created_at", ""), cutoff):
+                    continue
                 pnl = self._extract_futures_pnl(item)
                 orders.append(FuturesOrder(
                     order_id=item.get("id", ""),
@@ -2102,16 +2185,19 @@ class PyhoodClient:
 
     def get_filled_futures_orders(
         self, account_id: str | None = None,
+        start_date: str | datetime | None = None,
     ) -> list[FuturesOrder]:
         """Get only filled futures orders.
 
         Args:
             account_id: Futures account ID. Auto-discovered if None.
+            start_date: Only return orders created on or after this point.
+                See `get_futures_orders` for accepted formats.
 
         Returns:
             List of filled FuturesOrder objects.
         """
-        all_orders = self.get_futures_orders(account_id=account_id)
+        all_orders = self.get_futures_orders(account_id=account_id, start_date=start_date)
         return [o for o in all_orders if o.status == "filled"]
 
     @staticmethod

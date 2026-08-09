@@ -1,5 +1,7 @@
 """Tests for PyhoodClient — quotes, options, positions, earnings."""
 
+from datetime import datetime, timezone
+
 import pytest
 import responses
 
@@ -647,6 +649,113 @@ class TestStockOrders:
         assert order.price is None
         assert order.status == "filled"
         assert order.instrument_type == "stock"
+
+
+class TestOrderStartDate:
+    """start_date filtering on order history (#15)."""
+
+    ORDERS_PAYLOAD = {
+        "results": [
+            {
+                "id": "old-order",
+                "state": "filled",
+                "side": "buy",
+                "type": "market",
+                "quantity": "1",
+                "created_at": "2024-01-05T12:00:00Z",
+                "updated_at": "2024-01-05T12:00:00Z",
+            },
+            {
+                "id": "new-order",
+                "state": "filled",
+                "side": "buy",
+                "type": "market",
+                "quantity": "1",
+                "created_at": "2026-03-01T12:00:00Z",
+                "updated_at": "2026-03-01T12:00:00Z",
+            },
+        ],
+    }
+
+    @responses.activate
+    def test_start_date_sends_server_side_param(self, client):
+        """The cutoff is requested server-side so history isn't fully paged."""
+        responses.add(responses.GET, urls.ORDERS, json={"results": []}, status=200)
+
+        client.get_stock_orders(start_date="2026-01-01")
+
+        assert "created_at%5Bgte%5D=2026-01-01T00%3A00%3A00Z" in responses.calls[0].request.url
+
+    @responses.activate
+    def test_start_date_filters_locally_when_server_ignores_it(self, client):
+        """An ignored server-side filter must not yield unfiltered results."""
+        responses.add(responses.GET, urls.ORDERS, json=self.ORDERS_PAYLOAD, status=200)
+
+        orders = client.get_stock_orders(start_date="2026-01-01")
+
+        assert [o.order_id for o in orders] == ["new-order"]
+
+    @responses.activate
+    def test_option_orders_start_date(self, client):
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS, json=self.ORDERS_PAYLOAD, status=200,
+        )
+
+        orders = client.get_option_orders(start_date="2026-01-01")
+
+        assert [o.order_id for o in orders] == ["new-order"]
+
+    @responses.activate
+    def test_no_start_date_returns_everything(self, client):
+        """Omitting start_date preserves the old behaviour and sends no param."""
+        responses.add(responses.GET, urls.ORDERS, json=self.ORDERS_PAYLOAD, status=200)
+
+        orders = client.get_stock_orders()
+
+        assert len(orders) == 2
+        assert "created_at" not in responses.calls[0].request.url
+
+    @responses.activate
+    def test_start_date_accepts_datetime(self, client):
+        responses.add(responses.GET, urls.ORDERS, json=self.ORDERS_PAYLOAD, status=200)
+
+        orders = client.get_stock_orders(start_date=datetime(2026, 1, 1))
+
+        assert [o.order_id for o in orders] == ["new-order"]
+
+    @responses.activate
+    def test_naive_and_aware_datetimes_agree(self, client):
+        """A naive cutoff is treated as UTC, matching the explicit-UTC form."""
+        responses.add(responses.GET, urls.ORDERS, json=self.ORDERS_PAYLOAD, status=200)
+        responses.add(responses.GET, urls.ORDERS, json=self.ORDERS_PAYLOAD, status=200)
+
+        naive = client.get_stock_orders(start_date=datetime(2026, 1, 1))
+        aware = client.get_stock_orders(
+            start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+
+        assert [o.order_id for o in naive] == [o.order_id for o in aware]
+
+    def test_invalid_start_date_raises(self, client):
+        with pytest.raises(ValueError, match="ISO-8601"):
+            client.get_stock_orders(start_date="last tuesday")
+
+    @responses.activate
+    def test_unparseable_created_at_is_kept(self, client):
+        """A malformed timestamp is kept rather than silently dropped."""
+        responses.add(
+            responses.GET,
+            urls.ORDERS,
+            json={"results": [{
+                "id": "weird-order", "state": "filled", "side": "buy",
+                "type": "market", "quantity": "1", "created_at": "not-a-date",
+            }]},
+            status=200,
+        )
+
+        orders = client.get_stock_orders(start_date="2026-01-01")
+
+        assert [o.order_id for o in orders] == ["weird-order"]
 
 
 class TestOptionOrders:

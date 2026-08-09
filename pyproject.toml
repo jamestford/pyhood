@@ -7,7 +7,7 @@ packages = ["pyhood"]
 
 [project]
 name = "pyhood"
-version = "0.8.1"
+version = "0.9.0"
 description = "A modern, reliable Python client for the Robinhood API"
 readme = "README.md"
 license = "MIT"
