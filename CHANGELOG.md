@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Session tokens were written world-readable** — `~/.pyhood/session.json` holds live access and refresh tokens but was created with the process umask, producing `-rw-r--r--` on a default macOS setup. Any user or process on the machine could read it and act on the account. Credential files are now created `0600` inside a `0700` directory, the mode is applied at creation so contents are never briefly exposed, and loading an over-permissive file logs a warning with the `chmod` to run.
+
+### Added
+- **Crypto credential resolution** — `CryptoClient()` now takes no arguments and resolves credentials from `RH_CRYPTO_API_KEY` / `RH_CRYPTO_PRIVATE_KEY` or `~/.pyhood/crypto.env` (override with `PYHOOD_CRYPTO_ENV`), alongside the existing session file. `load_credentials()` and `credentials_available()` are exported. Explicit arguments still take precedence.
+
 ### Fixed
 - **Market orders, fractional orders and trailing stops were all rejected** — Robinhood refuses orders that omit `order_form_version`, responding "Your app version is missing important stock trading updates". Despite the wording this is the *order form* version, not a client version. pyhood now sends `7`. Any value from 2 upward is accepted; `1` and omission are refused. robin_stocks sends `4` on ordinary stock orders, which works — but omits it on `order_trailing_stop`, so trailing stops fail there.
 - **Rejected orders were reported as successful** — `order_stock()` and `order_option()` only treated a response as an error when it carried a `detail` or `error` key, but Robinhood returns field-level validation errors (`{"field": ["message"]}`) that have neither. Any such rejection returned an `Order` with a blank id and no exception, so callers believed the order was placed. Both now raise when the response has no `id`.

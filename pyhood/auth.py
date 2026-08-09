@@ -28,6 +28,11 @@ from pyhood.exceptions import (
     RateLimitError,
 )
 from pyhood.http import Session
+from pyhood.secure_files import (
+    ensure_private_dir,
+    warn_if_readable_by_others,
+    write_private,
+)
 
 logger = logging.getLogger("pyhood")
 
@@ -97,12 +102,13 @@ class TokenStore:
 
     def __init__(self, path: Path | None = None):
         self.path = path or (DEFAULT_TOKEN_DIR / DEFAULT_TOKEN_FILE)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_private_dir(self.path.parent)
 
     def load(self) -> dict[str, Any] | None:
         """Load stored tokens. Returns None if no file or corrupt."""
         if not self.path.is_file():
             return None
+        warn_if_readable_by_others(self.path)
         try:
             with open(self.path) as f:
                 data = json.load(f)
@@ -131,8 +137,8 @@ class TokenStore:
             "device_token": device_token,
             "saved_at": time.time(),
         }
-        with open(self.path, "w") as f:
-            json.dump(data, f, indent=2)
+        # Session tokens are credentials — write owner-only.
+        write_private(self.path, json.dumps(data, indent=2))
         logger.debug(f"Tokens saved to {self.path}")
 
     def clear(self) -> None:

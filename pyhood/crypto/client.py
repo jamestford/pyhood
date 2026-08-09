@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 import requests
 
 from pyhood.crypto.auth import sign_request
+from pyhood.crypto.credentials import load_credentials
 from pyhood.crypto.models import (
     CryptoAccount,
     CryptoCandle,
@@ -80,14 +81,25 @@ class CryptoClient:
         quote = client.get_best_bid_ask("BTC-USD")
     """
 
-    def __init__(self, api_key: str, private_key_base64: str, timeout: float = 30.0):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        private_key_base64: str | None = None,
+        timeout: float = 30.0,
+    ):
         """Initialize crypto client with API credentials.
 
         Args:
-            api_key: Robinhood Crypto API key
-            private_key_base64: Base64-encoded ED25519 private key
+            api_key: Robinhood Crypto API key. If omitted, resolved from the
+                RH_CRYPTO_API_KEY environment variable or ~/.pyhood/crypto.env.
+            private_key_base64: Base64-encoded ED25519 private key. Resolved
+                the same way when omitted.
             timeout: Request timeout in seconds
+
+        Raises:
+            FileNotFoundError: If credentials cannot be resolved.
         """
+        api_key, private_key_base64 = load_credentials(api_key, private_key_base64)
         self.api_key = api_key
         self.private_key_base64 = private_key_base64
         self.timeout = timeout
