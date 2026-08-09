@@ -9,7 +9,6 @@ from pyhood.crypto.auth import generate_keypair
 from pyhood.crypto.client import CryptoClient, TokenBucket
 from pyhood.crypto.models import (
     CryptoAccount,
-    CryptoCandle,
     CryptoHolding,
     CryptoOrder,
     CryptoQuote,
@@ -21,7 +20,6 @@ from pyhood.crypto.urls import (
     CRYPTO_BASE,
     CRYPTO_BEST_BID_ASK,
     CRYPTO_ESTIMATED_PRICE,
-    CRYPTO_HISTORICALS,
     CRYPTO_HOLDINGS,
     CRYPTO_ORDERS,
     CRYPTO_TRADING_PAIRS,
@@ -123,35 +121,56 @@ class TestCryptoClient:
 
     @responses.activate
     def test_get_trading_pairs(self):
-        """Test getting trading pairs."""
+        """Fields captured live 2026-08-09.
+
+        The API names these asset_code/quote_code/quote_increment/
+        asset_increment and reports availability as `status` plus
+        `is_api_tradable` — not `tradable`, `base_currency`, or
+        `price_increment` as previously assumed.
+        """
         responses.add(
             responses.GET,
             CRYPTO_TRADING_PAIRS,
             json={
                 "results": [{
-                    "symbol": "BTC-USD",
-                    "tradable": True,
-                    "min_order_size": "0.000001",
+                    "asset_code": "BTC",
+                    "quote_code": "USD",
+                    "quote_increment": "0.01",
+                    "asset_increment": "0.000001",
                     "max_order_size": "100.0",
-                    "price_increment": "0.01",
-                    "quantity_increment": "0.000001",
-                    "base_currency": "BTC",
-                    "quote_currency": "USD",
+                    "status": "tradable",
+                    "symbol": "BTC-USD",
+                    "is_api_tradable": True,
+                }, {
+                    "asset_code": "BILL",
+                    "quote_code": "USD",
+                    "quote_increment": "0.000001",
+                    "asset_increment": "0.1",
+                    "max_order_size": "9900000.0",
+                    "status": "tradable",
+                    "symbol": "BILL-USD",
+                    "is_api_tradable": False,
                 }]
             },
             status=200
         )
 
-        pairs = self.client.get_trading_pairs("BTC-USD")
+        pairs = self.client.get_trading_pairs()
 
-        assert len(pairs) == 1
-        pair = pairs[0]
-        assert isinstance(pair, TradingPair)
-        assert pair.symbol == "BTC-USD"
-        assert pair.tradable is True
-        assert pair.min_order_size == 0.000001
-        assert pair.base_currency == "BTC"
-        assert pair.quote_currency == "USD"
+        assert len(pairs) == 2
+        btc = pairs[0]
+        assert isinstance(btc, TradingPair)
+        assert btc.symbol == "BTC-USD"
+        assert btc.base_currency == "BTC"
+        assert btc.quote_currency == "USD"
+        assert btc.price_increment == 0.01
+        assert btc.quantity_increment == 0.000001
+        assert btc.tradable is True
+        assert btc.api_tradable is True
+
+        # tradable in the app but not through the API
+        assert pairs[1].tradable is True
+        assert pairs[1].api_tradable is False
 
     @responses.activate
     def test_get_best_bid_ask(self):
@@ -162,8 +181,8 @@ class TestCryptoClient:
             json={
                 "results": [{
                     "symbol": "BTC-USD",
-                    "bid_price": "45000.00",
-                    "ask_price": "45100.00",
+                    "bid": "45000.00",
+                    "ask": "45100.00",
                     "timestamp": "2023-10-30T12:00:00Z",
                 }]
             },
@@ -207,70 +226,16 @@ class TestCryptoClient:
         assert price.ask_price == 45100.00
         assert price.fee == 1.50
 
-    @responses.activate
-    def test_get_historicals(self):
-        """Test getting crypto historicals."""
-        responses.add(
-            responses.GET,
-            f"{CRYPTO_HISTORICALS}BTC-USD/",
-            json={
-                "data_points": [
-                    {
-                        "begins_at": "2023-10-30T11:00:00Z",
-                        "open_price": "34100.00",
-                        "close_price": "34200.00",
-                        "high_price": "34250.00",
-                        "low_price": "34050.00",
-                        "volume": "123.45",
-                    },
-                    {
-                        "begins_at": "2023-10-30T12:00:00Z",
-                        "open_price": "34200.00",
-                        "close_price": "34300.00",
-                        "high_price": "34350.00",
-                        "low_price": "34150.00",
-                        "volume": "98.76",
-                    },
-                ]
-            },
-            status=200,
-        )
+    def test_get_historicals_is_retired(self):
+        """The Crypto Trading API has no historicals endpoint (2026-08-09).
 
-        candles = self.client.get_historicals("BTC-USD", interval="hour", span="day")
+        Every candidate path returns 404 and it is absent from Robinhood's
+        published spec. The old tests mocked an endpoint that does not exist.
+        """
+        from pyhood.exceptions import APIError
 
-        assert len(candles) == 2
-        c = candles[0]
-        assert isinstance(c, CryptoCandle)
-        assert c.symbol == "BTC-USD"
-        assert c.begins_at == "2023-10-30T11:00:00Z"
-        assert c.open_price == 34100.00
-        assert c.close_price == 34200.00
-        assert c.high_price == 34250.00
-        assert c.low_price == 34050.00
-        assert c.volume == 123.45
-
-    def test_get_historicals_invalid_interval(self):
-        """Test invalid interval raises ValueError."""
-        with pytest.raises(ValueError, match="interval must be one of"):
-            self.client.get_historicals("BTC-USD", interval="1minute")
-
-    def test_get_historicals_invalid_span(self):
-        """Test invalid span raises ValueError."""
-        with pytest.raises(ValueError, match="span must be one of"):
-            self.client.get_historicals("BTC-USD", span="10year")
-
-    @responses.activate
-    def test_get_historicals_empty(self):
-        """Test empty historicals response."""
-        responses.add(
-            responses.GET,
-            f"{CRYPTO_HISTORICALS}DOGE-USD/",
-            json={"data_points": []},
-            status=200,
-        )
-
-        candles = self.client.get_historicals("DOGE-USD")
-        assert candles == []
+        with pytest.raises(APIError, match="no historicals endpoint"):
+            self.client.get_historicals("BTC-USD")
 
     @responses.activate
     def test_get_holdings(self):

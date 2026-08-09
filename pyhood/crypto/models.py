@@ -34,7 +34,12 @@ class CryptoAccount:
 
 @dataclass(frozen=True)
 class TradingPair:
-    """Trading pair configuration and limits."""
+    """Trading pair configuration and limits.
+
+    `tradable` reflects Robinhood's `status`; `api_tradable` reflects
+    `is_api_tradable`, which is the one that governs API orders. A pair can be
+    tradable in the app but not through the API.
+    """
     symbol: str
     tradable: bool
     min_order_size: float
@@ -43,6 +48,8 @@ class TradingPair:
     quantity_increment: float
     base_currency: str
     quote_currency: str
+    api_tradable: bool = False
+    status: str = ""
 
 
 @dataclass(frozen=True)

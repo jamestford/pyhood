@@ -18,6 +18,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `get_positions()` no longer fetches each instrument to resolve a symbol — the positions payload already carries it, saving a request per position.
 
 ### Fixed
+- **Crypto orders could not be placed** — the payload omitted the required `client_order_id` idempotency key, and spread `order_config` flat instead of nesting it under `{type}_order_config` as the API expects. The README example demonstrated the wrong shape.
+- **`get_trading_pairs()` reported every field wrong** — the API uses `asset_code`/`quote_code`/`quote_increment`/`asset_increment`, and reports availability as `status` plus `is_api_tradable`. pyhood read `base_currency`, `price_increment`, `tradable` and similar, so every pair came back with empty currencies, zero increments and `tradable=False`. `TradingPair` now also exposes `api_tradable`, which is what actually governs whether a pair can be ordered through the API.
+- **Crypto quotes always returned 0.0** — `get_best_bid_ask()` read `bid_price`/`ask_price`; the API returns `bid`/`ask`.
+- **Crypto market-data calls failed authentication** — the signature covers the path *including* its query string, but pyhood signed the bare path and let `requests` append the query separately. Every parameterised crypto endpoint returned "Authentication failed".
+- **`get_best_bid_ask()` sent the wrong parameter** — `symbols=` comma-joined, where the API wants `symbol=` repeated; it rejected the former as "Malformed symbol parameter".
+- **`get_estimated_price()` returned zeros** — the estimate is wrapped in a `results` list, and the fee is `est_fee`.
+
+### Removed
+- **`CryptoClient.get_historicals()`** now raises `APIError` — the Crypto Trading API has no historicals endpoint. Every candidate path returns 404 and it is absent from Robinhood's published spec. Its tests mocked an endpoint that does not exist.
+
+### Security
+- **Session tokens were written world-readable** — `~/.pyhood/session.json` holds live access and refresh tokens but was created with the process umask, producing `-rw-r--r--` on a default macOS setup. Any user or process on the machine could read it and act on the account. Credential files are now created `0600` inside a `0700` directory, the mode is applied at creation so contents are never briefly exposed, and loading an over-permissive file logs a warning with the `chmod` to run.
+
+### Added
+- **Crypto credential resolution** — `CryptoClient()` now takes no arguments and resolves credentials from `RH_CRYPTO_API_KEY` / `RH_CRYPTO_PRIVATE_KEY` or `~/.pyhood/crypto.env` (override with `PYHOOD_CRYPTO_ENV`), alongside the existing session file. `load_credentials()` and `credentials_available()` are exported. Explicit arguments still take precedence.
+
+### Fixed
 - **Market orders, fractional orders and trailing stops were all rejected** — Robinhood refuses orders that omit `order_form_version`, responding "Your app version is missing important stock trading updates". Despite the wording this is the *order form* version, not a client version. pyhood now sends `7`. Any value from 2 upward is accepted; `1` and omission are refused. robin_stocks sends `4` on ordinary stock orders, which works — but omits it on `order_trailing_stop`, so trailing stops fail there.
 - **Rejected orders were reported as successful** — `order_stock()` and `order_option()` only treated a response as an error when it carried a `detail` or `error` key, but Robinhood returns field-level validation errors (`{"field": ["message"]}`) that have neither. Any such rejection returned an `Order` with a blank id and no exception, so callers believed the order was placed. Both now raise when the response has no `id`.
 - Trailing stop rejections now raise a specific `OrderError` explaining that Robinhood gates the feature to its own app versions, rather than surfacing the raw server text.

@@ -8,12 +8,14 @@ from __future__ import annotations
 import json
 import logging
 import time
+import uuid
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 import requests
 
 from pyhood.crypto.auth import sign_request
+from pyhood.crypto.credentials import load_credentials
 from pyhood.crypto.models import (
     CryptoAccount,
     CryptoCandle,
@@ -28,7 +30,6 @@ from pyhood.crypto.urls import (
     CRYPTO_BASE,
     CRYPTO_BEST_BID_ASK,
     CRYPTO_ESTIMATED_PRICE,
-    CRYPTO_HISTORICALS,
     CRYPTO_HOLDINGS,
     CRYPTO_ORDERS,
     CRYPTO_TRADING_PAIRS,
@@ -80,14 +81,25 @@ class CryptoClient:
         quote = client.get_best_bid_ask("BTC-USD")
     """
 
-    def __init__(self, api_key: str, private_key_base64: str, timeout: float = 30.0):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        private_key_base64: str | None = None,
+        timeout: float = 30.0,
+    ):
         """Initialize crypto client with API credentials.
 
         Args:
-            api_key: Robinhood Crypto API key
-            private_key_base64: Base64-encoded ED25519 private key
+            api_key: Robinhood Crypto API key. If omitted, resolved from the
+                RH_CRYPTO_API_KEY environment variable or ~/.pyhood/crypto.env.
+            private_key_base64: Base64-encoded ED25519 private key. Resolved
+                the same way when omitted.
             timeout: Request timeout in seconds
+
+        Raises:
+            FileNotFoundError: If credentials cannot be resolved.
         """
+        api_key, private_key_base64 = load_credentials(api_key, private_key_base64)
         self.api_key = api_key
         self.private_key_base64 = private_key_base64
         self.timeout = timeout
@@ -134,16 +146,28 @@ class CryptoClient:
             else:
                 raise RateLimitError(f"Rate limited, retry after {wait_time:.1f}s", wait_time)
 
+        # The signature covers the path *including* the query string, so the
+        # query is folded in here rather than passed to requests separately —
+        # signing the bare path while sending one with a query produced an
+        # authentication failure on every parameterised endpoint.
+        signed_path = path
+        if params:
+            query = urlencode(params, doseq=True)
+            if query:
+                separator = "&" if "?" in signed_path else "?"
+                signed_path = f"{signed_path}{separator}{query}"
+            params = None
+
         # Sign request
         try:
             api_key_header, signature, timestamp = sign_request(
-                self.api_key, self.private_key_base64, method.upper(), path, body
+                self.api_key, self.private_key_base64, method.upper(), signed_path, body
             )
         except ValueError as e:
             raise AuthError(f"Failed to sign request: {e}") from e
 
         # Prepare request
-        url = self.base_url.rstrip('/') + '/' + path.lstrip('/')
+        url = self.base_url.rstrip('/') + '/' + signed_path.lstrip('/')
         headers = {
             'x-api-key': api_key_header,
             'x-signature': signature,
@@ -178,7 +202,15 @@ class CryptoClient:
                 raise RateLimitError("Rate limited by server", retry_after)
 
         if response.status_code == 401:
-            raise AuthError("Authentication failed - check API key and signature")
+            from pyhood.crypto.credentials import credentials_source
+            raise AuthError(
+                "Authentication failed. Credentials were loaded from the "
+                f"{credentials_source()} — note that environment variables "
+                "take precedence over ~/.pyhood/crypto.env, so a stale export "
+                "will shadow a correct file. Robinhood also returns 401 rather "
+                "than 429 when throttling, so a burst of requests can look "
+                "like an auth failure."
+            )
 
         if response.status_code == 403:
             raise AuthError("Access forbidden - check API permissions")
@@ -186,7 +218,24 @@ class CryptoClient:
         if not response.ok:
             try:
                 error_data = response.json()
-                error_msg = error_data.get('message', f'HTTP {response.status_code}')
+                # The Crypto API reports problems as
+                # {"type": ..., "errors": [{"detail": ..., "attr": ...}]}.
+                # Reading only 'message' reduced every failure to "HTTP 400".
+                errors = error_data.get('errors')
+                if isinstance(errors, list) and errors:
+                    parts = []
+                    for err in errors:
+                        if isinstance(err, dict):
+                            detail = err.get('detail', '')
+                            attr = err.get('attr')
+                            parts.append(f"{attr}: {detail}" if attr else detail)
+                        else:
+                            parts.append(str(err))
+                    error_msg = "; ".join(p for p in parts if p)
+                else:
+                    error_msg = error_data.get(
+                        'message', error_data.get('detail', f'HTTP {response.status_code}')
+                    )
             except Exception:
                 error_msg = f'HTTP {response.status_code}'
             raise APIError(
@@ -288,13 +337,17 @@ class CryptoClient:
         for item in items:
             trading_pairs.append(TradingPair(
                 symbol=item.get('symbol', ''),
-                tradable=item.get('tradable', False),
-                min_order_size=float(item.get('min_order_size', 0)),
-                max_order_size=float(item.get('max_order_size', 0)),
-                price_increment=float(item.get('price_increment', 0)),
-                quantity_increment=float(item.get('quantity_increment', 0)),
-                base_currency=item.get('base_currency', ''),
-                quote_currency=item.get('quote_currency', ''),
+                # `status` is the app-level state; `is_api_tradable` governs
+                # whether the pair can be traded through this API at all.
+                tradable=item.get('status', '') == 'tradable',
+                api_tradable=bool(item.get('is_api_tradable', False)),
+                status=item.get('status', ''),
+                min_order_size=float(item.get('min_order_size', 0) or 0),
+                max_order_size=float(item.get('max_order_size', 0) or 0),
+                price_increment=float(item.get('quote_increment', 0) or 0),
+                quantity_increment=float(item.get('asset_increment', 0) or 0),
+                base_currency=item.get('asset_code', ''),
+                quote_currency=item.get('quote_code', ''),
             ))
 
         return trading_pairs
@@ -309,9 +362,11 @@ class CryptoClient:
             List of CryptoQuote objects
         """
         path = CRYPTO_BEST_BID_ASK.replace(CRYPTO_BASE, '')
-        params = {}
+        # The endpoint takes `symbol` repeated, not a comma-joined `symbols`:
+        # sending `symbols=` is rejected with "Malformed symbol parameter".
+        params: dict[str, Any] = {}
         if symbols:
-            params['symbols'] = ','.join(symbols)
+            params['symbol'] = list(symbols)
 
         items = self._paginate(path, params)
 
@@ -322,8 +377,8 @@ class CryptoClient:
 
             quotes.append(CryptoQuote(
                 symbol=item.get('symbol', ''),
-                bid=float(item.get('bid_price', 0)),
-                ask=float(item.get('ask_price', 0)),
+                bid=float(item.get('bid', 0) or 0),
+                ask=float(item.get('ask', 0) or 0),
                 timestamp=timestamp,
             ))
 
@@ -347,15 +402,21 @@ class CryptoClient:
             'quantity': str(quantity),
         }
 
-        data = self.make_request('GET', path, params=params)
+        response = self.make_request('GET', path, params=params)
+        # The estimate is wrapped in a results list, as with the other
+        # marketdata endpoints.
+        results = response.get('results') if isinstance(response, dict) else None
+        data = results[0] if isinstance(results, list) and results else response
 
         return EstimatedPrice(
             symbol=data.get('symbol', symbol),
             side=data.get('side', side),
             quantity=float(data.get('quantity', quantity)),
-            bid_price=float(data.get('bid_price', 0)),
-            ask_price=float(data.get('ask_price', 0)),
-            fee=float(data.get('fee', 0)),
+            # The endpoint returns whichever side was asked for, as `bid` or
+            # `ask`, and names the fee `est_fee`.
+            bid_price=float(data.get('bid', data.get('bid_price', 0)) or 0),
+            ask_price=float(data.get('ask', data.get('ask_price', 0)) or 0),
+            fee=float(data.get('est_fee', data.get('fee', 0)) or 0),
         )
 
     # ── Historicals ──────────────────────────────────────────────────────
@@ -366,52 +427,24 @@ class CryptoClient:
         interval: str = "hour",
         span: str = "week",
     ) -> list[CryptoCandle]:
-        """Get historical OHLCV data for a crypto asset.
+        """Deprecated — the Crypto Trading API has no historicals endpoint.
 
-        Args:
-            symbol: Crypto symbol (e.g., 'BTC-USD').
-            interval: Candle interval. One of '15second', 'minute',
-                '5minute', '10minute', 'hour', 'day', 'week'. Default: 'hour'.
-            span: Time range. One of 'hour', 'day', 'week', 'month',
-                '3month', 'year', '5year'. Default: 'week'.
+        Raises:
+            APIError: Always.
 
-        Returns:
-            List of CryptoCandle dataclasses with OHLCV data.
+        Verified 2026-08-09: every candidate path returns 404
+        (`marketdata/historicals/`, `marketdata/candles/`,
+        `trading/historicals/`, on both `/api/v1/` and `/api/v2/`), and the
+        endpoint is absent from Robinhood's published OpenAPI spec.
+
+        For crypto price history, use the unofficial endpoints via
+        `PyhoodClient` rather than the official Crypto Trading API.
         """
-        valid_intervals = ("15second", "minute", "5minute", "10minute", "hour", "day", "week")
-        valid_spans = ("hour", "day", "week", "month", "3month", "year", "5year")
-
-        if interval not in valid_intervals:
-            raise ValueError(
-                f"interval must be one of {valid_intervals}, got '{interval}'"
-            )
-        if span not in valid_spans:
-            raise ValueError(
-                f"span must be one of {valid_spans}, got '{span}'"
-            )
-
-        path = f"{CRYPTO_HISTORICALS}{symbol}/".replace(CRYPTO_BASE, '')
-        data = self.make_request('GET', path, params={
-            "interval": interval,
-            "span": span,
-            "bounds": "24_7",
-        })
-
-        candles = []
-        for h in data.get("data_points", []):
-            candles.append(CryptoCandle(
-                symbol=symbol,
-                begins_at=h.get("begins_at", ""),
-                open_price=float(h.get("open_price", 0)),
-                close_price=float(h.get("close_price", 0)),
-                high_price=float(h.get("high_price", 0)),
-                low_price=float(h.get("low_price", 0)),
-                volume=float(h.get("volume", 0)),
-            ))
-
-        return candles
-
-    # ── Holdings ─────────────────────────────────────────────────────────
+        raise APIError(
+            "The Crypto Trading API has no historicals endpoint — every "
+            "candidate path returns 404 and it is absent from Robinhood's "
+            "published spec. Use the unofficial API for crypto price history."
+        )
 
     def get_holdings(self, account_number: str, *asset_codes: str) -> list[CryptoHolding]:
         """Get crypto holdings for account.
@@ -449,31 +482,46 @@ class CryptoClient:
         order_type: str,
         symbol: str,
         order_config: dict[str, Any],
+        client_order_id: str | None = None,
     ) -> CryptoOrder:
         """Place a crypto order.
 
         Args:
             account_number: Crypto account number
             side: 'buy' or 'sell'
-            order_type: 'market' or 'limit'
+            order_type: 'market', 'limit', 'stop_loss' or 'stop_limit'
             symbol: Crypto symbol (e.g., 'BTC-USD')
-            order_config: Order-specific configuration
+            order_config: Configuration for this order type, e.g.
+                ``{"asset_quantity": "0.001"}`` for a market order. It is
+                nested under ``{order_type}_order_config`` for you.
+            client_order_id: Idempotency key. Generated if omitted — resending
+                the same value returns the original order rather than placing
+                a second one.
 
         Returns:
             CryptoOrder object
+
+        Note:
+            Only pairs with `api_tradable` set can be ordered through this API;
+            a pair can be tradable in the app but not here.
         """
         path = CRYPTO_ORDERS.replace(CRYPTO_BASE, '')
 
         payload = {
-            'account_number': account_number,
+            'client_order_id': client_order_id or str(uuid.uuid4()),
             'side': side,
             'type': order_type,
             'symbol': symbol,
-            **order_config,
+            f'{order_type}_order_config': order_config,
         }
 
         body = json.dumps(payload)
-        data = self.make_request('POST', path, body=body)
+        # account_number goes in the query string, not the body — sending it
+        # only in the body is rejected with "The account_number parameter is
+        # required." The same applies to the holdings and orders GETs.
+        data = self.make_request(
+            'POST', path, body=body, params={'account_number': account_number},
+        )
 
         from datetime import datetime
         created_at = datetime.fromisoformat(data.get('created_at', '').replace('Z', '+00:00'))
