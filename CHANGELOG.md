@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-08-09
+
+### Fixed
+- **`login()` crashed on Windows** — `AttributeError: module 'signal' has no attribute 'SIGALRM'` (fixes [#16](https://github.com/jamestford/pyhood/issues/16))
+  - The login timeout was armed with `signal.SIGALRM`, which exists only on Unix
+  - The alarm is now best-effort: skipped when `SIGALRM` is unavailable, so login works on Windows
+  - Also skipped when `login()` is called off the main thread, where `signal.signal()` raises `ValueError`
+  - Timeouts are still enforced on those platforms by the verification poll loop and per-request HTTP timeouts
+  - Alarm setup/teardown moved into a context manager, so the handler is always restored
+  - 4 new tests (227 total) simulating a Windows environment and a worker thread
+
 ## [0.8.0] - 2026-08-09
 
 ### Fixed

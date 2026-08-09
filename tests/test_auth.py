@@ -1,6 +1,7 @@
 """Tests for authentication — token store, login flow, error handling."""
 
 import json
+import signal
 import time
 from pathlib import Path
 
@@ -8,7 +9,15 @@ import pytest
 import responses
 
 from pyhood import urls
-from pyhood.auth import TokenStore, generate_device_token, get_session, login, logout, refresh
+from pyhood.auth import (
+    TokenStore,
+    _login_alarm,
+    generate_device_token,
+    get_session,
+    login,
+    logout,
+    refresh,
+)
 from pyhood.exceptions import AuthError, TokenExpiredError
 
 
@@ -303,6 +312,76 @@ class TestLoginFlow:
 
         assert session.is_authenticated
         assert not token_path.exists()
+
+
+class TestLoginAlarm:
+    """SIGALRM is Unix/main-thread only — login must work without it (#16)."""
+
+    def _login_response(self):
+        responses.add(
+            responses.POST,
+            urls.LOGIN,
+            json={
+                "access_token": "win-access-token",
+                "token_type": "Bearer",
+                "refresh_token": "win-refresh-token",
+                "expires_in": 86400,
+                "scope": "internal",
+            },
+            status=200,
+        )
+
+    @responses.activate
+    def test_login_without_sigalrm(self, monkeypatch, tmp_path):
+        """Windows: signal has no SIGALRM at all."""
+        monkeypatch.delattr(signal, "SIGALRM", raising=False)
+        monkeypatch.delattr(signal, "alarm", raising=False)
+        self._login_response()
+
+        session = login(
+            username="test@example.com",
+            password="testpass",
+            timeout=10,
+            token_path=tmp_path / "session.json",
+        )
+        assert session.is_authenticated
+
+    @responses.activate
+    def test_login_off_main_thread(self, monkeypatch, tmp_path):
+        """Worker thread: signal.signal raises ValueError."""
+        def _raise(*args, **kwargs):
+            raise ValueError("signal only works in main thread")
+
+        monkeypatch.setattr(signal, "signal", _raise)
+        self._login_response()
+
+        session = login(
+            username="test@example.com",
+            password="testpass",
+            timeout=10,
+            token_path=tmp_path / "session.json",
+        )
+        assert session.is_authenticated
+
+    def test_alarm_cleared_on_exception(self):
+        """The alarm is disarmed and the handler restored even if the body raises."""
+        if not hasattr(signal, "SIGALRM"):
+            pytest.skip("SIGALRM unavailable on this platform")
+
+        original = signal.getsignal(signal.SIGALRM)
+        with pytest.raises(RuntimeError):
+            with _login_alarm(30):
+                raise RuntimeError("boom")
+
+        assert signal.getsignal(signal.SIGALRM) is original
+
+    def test_no_alarm_when_timeout_disabled(self, monkeypatch):
+        """timeout=0 must not arm an alarm."""
+        armed = []
+        monkeypatch.setattr(signal, "alarm", lambda n: armed.append(n))
+        with _login_alarm(0):
+            pass
+        assert armed == []
 
 
 class TestLogout:

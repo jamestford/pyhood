@@ -1,6 +1,6 @@
 """pyhood — A modern, reliable Python client for the Robinhood API."""
 
-__version__ = "0.8.0"
+__version__ = "0.8.1"
 
 from pyhood.auth import login, logout, refresh
 from pyhood.client import PyhoodClient
