@@ -5,9 +5,14 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.12.0] - 2026-08-09
+
+Adds a command line. `pyhood setup login` and `pyhood setup crypto` replace the copy-paste snippets that previously lived in the README — including one that printed your Crypto API private key to the terminal.
 
 ### Added
+- **`pyhood` command** — installed as a console script, and equivalent to `python -m pyhood`
+  - `pyhood version` prints the installed version
+  - Suggested commands in output match how pyhood was invoked, rather than always naming the module form
 - **`pyhood setup`** — guided credential setup, replacing the copy-paste snippets in the README
   - `setup login` establishes a session. The stored session is tried first, so a valid or refreshable one needs no password at all; only when that fails does it prompt, handling MFA and device approval.
   - `setup crypto` generates an Ed25519 key pair, shows only the public half for registration, reads the API key Robinhood issues, writes both owner-only, and then makes one signed read-only call to confirm the pair is accepted. That last step is the point: writing a file proves nothing, and without it a mistyped or placeholder key is not discovered until a real request fails with an authentication error that reads like a service outage.
