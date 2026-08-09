@@ -309,11 +309,21 @@ class CryptoClient:
         else:
             account_data = data
 
+        # Fees arrive as a `fee_tier_status` object, not a `fee_tier` name.
+        # Reading `fee_tier` left the field empty on every real account.
+        fees = account_data.get('fee_tier_status') or {}
+        fee_ratio = float(fees.get('fee_ratio', 0) or 0)
+
         return CryptoAccount(
             account_number=account_data.get('account_number', ''),
             buying_power=float(account_data.get('buying_power', 0)),
             status=account_data.get('status', ''),
-            fee_tier=account_data.get('fee_tier', ''),
+            fee_tier=f"{fee_ratio:.2%}" if fee_ratio else '',
+            fee_ratio=fee_ratio,
+            thirty_day_volume=float(fees.get('thirty_day_volume', 0) or 0),
+            next_fee_tier_ratio=float(fees.get('next_fee_tier_ratio', 0) or 0),
+            next_fee_tier_threshold=float(fees.get('next_fee_tier_threshold', 0) or 0),
+            api_tradable=bool(account_data.get('is_api_tradable', False)),
         )
 
     # ── Market Data ──────────────────────────────────────────────────────

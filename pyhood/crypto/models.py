@@ -25,11 +25,20 @@ class CryptoHolding:
 
 @dataclass(frozen=True)
 class CryptoAccount:
-    """Crypto trading account information."""
+    """Crypto trading account information.
+
+    Fee information arrives as a `fee_tier_status` object rather than a tier
+    name, so `fee_tier` is rendered from `fee_ratio` — e.g. `'0.95%'`.
+    """
     account_number: str
     buying_power: float
     status: str
-    fee_tier: str
+    fee_tier: str = ""
+    fee_ratio: float = 0.0
+    thirty_day_volume: float = 0.0
+    next_fee_tier_ratio: float = 0.0
+    next_fee_tier_threshold: float = 0.0
+    api_tradable: bool = False
 
 
 @dataclass(frozen=True)

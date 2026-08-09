@@ -2,9 +2,28 @@
 
 ## Installation
 
+pyhood needs **Python 3.10 or newer**. Install it into a virtual environment rather than your system Python:
+
 ```bash
-pip install pyhood
+python3.14 -m venv pyhood-env
+source pyhood-env/bin/activate
+python -m pip install --upgrade pip
+python -m pip install pyhood
 ```
+
+Substitute whichever interpreter you have — 3.10 through 3.14 are tested in CI. On Windows the activate line is `pyhood-env\Scripts\activate`.
+
+!!! warning "Name the Python version explicitly"
+    A virtual environment inherits the version of the interpreter that creates it, and `python3` on macOS is still 3.9. Using bare `python3` there produces a 3.9 environment where the install fails with `no matching distribution found` — which reads like the package is missing rather than a version problem.
+
+    ```bash
+    brew install python@3.14
+    ```
+
+!!! note "Why the virtual environment is not optional"
+    Homebrew and Debian-based distributions mark their Python as [externally managed](https://peps.python.org/pep-0668/), so installing into it is refused outright. Overriding that with `--break-system-packages` can break OS tooling that depends on the system packages.
+
+    A virtual environment also keeps pyhood's dependencies — `requests`, `cryptography`, `pynacl` — from colliding with other projects, and `rm -rf pyhood-env` undoes the whole install.
 
 For development:
 
@@ -27,7 +46,7 @@ Open the Robinhood app on your phone. You'll need to tap "Yes, it's me" when pro
 ### Step 2: Login
 
 ```bash
-python -m pyhood setup login
+pyhood setup login
 ```
 
 It prompts for your username and password — the password is read without echoing and is never stored — then Robinhood sends a device approval push notification to your phone. Tap **"Yes, it's me"** to approve. The session is saved to `~/.pyhood/session.json`, readable only by you.

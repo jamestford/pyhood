@@ -8,14 +8,14 @@ pyhood needs two unrelated kinds of credential, depending on what you trade.
 | **Stored at** | `~/.pyhood/session.json` | `~/.pyhood/crypto.env` |
 | **Obtained by** | Logging in | Generating a key pair and registering the public half |
 | **Lifetime** | Short, refreshes automatically | Long-lived; cannot be refreshed, only revoked |
-| **Set up with** | `python -m pyhood setup login` | `python -m pyhood setup crypto` |
+| **Set up with** | `pyhood setup login` | `pyhood setup crypto` |
 
 Both are written `0600` inside a `0700` directory, with the mode applied at creation so the contents are never briefly readable by other users on the machine.
 
 ## Checking what is configured
 
 ```bash
-python -m pyhood setup
+pyhood setup
 ```
 
 ```
@@ -40,7 +40,7 @@ It reports three things that are easy to get wrong and hard to diagnose:
 ## Logging in
 
 ```bash
-python -m pyhood setup login
+pyhood setup login
 ```
 
 The stored session is tried first — if it is valid, or can be refreshed, no password is needed at all. Only when that fails does it prompt:
@@ -61,7 +61,7 @@ Only the resulting tokens are written to disk. The password is not stored anywhe
 ## Setting up crypto keys
 
 ```bash
-python -m pyhood setup crypto
+pyhood setup crypto
 ```
 
 Robinhood does not issue you a key pair. You generate one, register the public half, and Robinhood issues an API key that identifies it. The command runs the whole exchange:
@@ -77,7 +77,7 @@ Step 5 is the point of the command. Writing a file proves nothing; the question 
 If credentials already exist, the command refuses to run rather than replacing them — overwriting would orphan a key that still works. Pass `--force` when you actually intend to rotate.
 
 ```bash
-python -m pyhood setup crypto --force
+pyhood setup crypto --force
 ```
 
 Use `--no-verify` to skip the live check, for example when registering the public key on a different machine from the one that will use it.
@@ -121,7 +121,7 @@ The same functions are importable, which is what the tests use:
 from pyhood.onboarding import crypto_status, session_status, print_status
 
 if not session_status()["exists"]:
-    raise SystemExit("run: python -m pyhood setup login")
+    raise SystemExit("run: pyhood setup login")
 
 status = crypto_status()
 if not status["private_key_valid"]:

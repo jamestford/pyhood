@@ -75,20 +75,28 @@ class TestCryptoClient:
         self.client.rate_limiter.tokens = 999999
         self.client.rate_limiter.capacity = 999999
 
+    # Shape captured from the live API on 2026-08-09. Fees arrive as a
+    # `fee_tier_status` object; there is no `fee_tier` key.
+    ACCOUNT_PAYLOAD = {
+        "account_number": "12345",
+        "buying_power": "1000.50",
+        "buying_power_currency": "USD",
+        "status": "active",
+        "account_type": "individual",
+        "is_api_tradable": True,
+        "fee_tier_status": {
+            "fee_ratio": 0.0095,
+            "thirty_day_volume": 0.0,
+            "next_fee_tier_ratio": 0.0025,
+            "next_fee_tier_threshold": 50000.0,
+        },
+    }
+
     @responses.activate
     def test_get_account(self):
         """Test getting crypto account information."""
-        # Mock API response
         responses.add(
-            responses.GET,
-            CRYPTO_ACCOUNTS,
-            json={
-                "account_number": "12345",
-                "buying_power": "1000.50",
-                "status": "active",
-                "fee_tier": "standard",
-            },
-            status=200
+            responses.GET, CRYPTO_ACCOUNTS, json=self.ACCOUNT_PAYLOAD, status=200,
         )
 
         account = self.client.get_account()
@@ -97,22 +105,41 @@ class TestCryptoClient:
         assert account.account_number == "12345"
         assert account.buying_power == 1000.50
         assert account.status == "active"
-        assert account.fee_tier == "standard"
+        assert account.api_tradable is True
+
+    @responses.activate
+    def test_fee_tier_is_read_from_fee_tier_status(self):
+        """The old code read a `fee_tier` key the API never sends."""
+        responses.add(
+            responses.GET, CRYPTO_ACCOUNTS, json=self.ACCOUNT_PAYLOAD, status=200,
+        )
+
+        account = self.client.get_account()
+
+        assert account.fee_ratio == 0.0095
+        assert account.fee_tier == "0.95%"
+        assert account.thirty_day_volume == 0.0
+        assert account.next_fee_tier_ratio == 0.0025
+        assert account.next_fee_tier_threshold == 50000.0
+
+    @responses.activate
+    def test_missing_fee_tier_status_does_not_raise(self):
+        responses.add(
+            responses.GET, CRYPTO_ACCOUNTS,
+            json={"account_number": "12345", "buying_power": "0", "status": "active"},
+            status=200,
+        )
+
+        account = self.client.get_account()
+
+        assert account.fee_tier == ""
+        assert account.fee_ratio == 0.0
 
     @responses.activate
     def test_get_account_list_response(self):
         """Test getting account when API returns a list."""
-        # Mock API response as list
         responses.add(
-            responses.GET,
-            CRYPTO_ACCOUNTS,
-            json=[{
-                "account_number": "12345",
-                "buying_power": "1000.50",
-                "status": "active",
-                "fee_tier": "standard",
-            }],
-            status=200
+            responses.GET, CRYPTO_ACCOUNTS, json=[self.ACCOUNT_PAYLOAD], status=200,
         )
 
         account = self.client.get_account()

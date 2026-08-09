@@ -19,7 +19,7 @@ pyhood wraps Robinhood's **official, documented** Crypto Trading API. This is se
 Robinhood does not issue you a key pair. You generate one, register the public half at [robinhood.com/account/crypto](https://robinhood.com/account/crypto) → API Trading → Add key, and Robinhood issues an **API key** that identifies it.
 
 ```bash
-python -m pyhood setup crypto
+pyhood setup crypto
 ```
 
 This generates the pair, shows you the public key to register, reads the API key back without echoing it, writes both to `~/.pyhood/crypto.env` at mode `0600`, and confirms with one signed read-only call that Robinhood accepts them. The private key is written straight to disk and never displayed.
@@ -37,7 +37,7 @@ crypto = CryptoClient()
 Credentials resolve from `RH_CRYPTO_API_KEY` / `RH_CRYPTO_PRIVATE_KEY`, then from `~/.pyhood/crypto.env` (override the path with `PYHOOD_CRYPTO_ENV`). Passing `api_key=` and `private_key_base64=` explicitly still works and takes precedence, but hardcoding them in source is how keys end up committed.
 
 !!! warning "The private key is the credential"
-    Anyone holding it can trade your crypto, and unlike a session token it cannot be refreshed — only revoked. Environment variables take precedence over the credentials file, so a stale `export` will silently shadow it; run `python -m pyhood setup` to see which source is actually in use.
+    Anyone holding it can trade your crypto, and unlike a session token it cannot be refreshed — only revoked. Environment variables take precedence over the credentials file, so a stale `export` will silently shadow it; run `pyhood setup` to see which source is actually in use.
 
 ## Market Data
 
