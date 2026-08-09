@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-09
+
 ### Fixed
 - **Futures contracts and quotes never worked** — `get_futures_contract()` raised `SymbolNotFound` for every valid symbol, and `get_futures_quote()` failed with it
   - The contract endpoint wraps its body in a `result` envelope with camelCase keys; the parser expected a flat snake_case object
