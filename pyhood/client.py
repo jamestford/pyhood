@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import csv
 import logging
+import math
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from pyhood import urls
 from pyhood.auth import get_session
@@ -1015,6 +1017,47 @@ class PyhoodClient:
             extended_closes_at=data.get("extended_closes_at", "") or "",
         )
 
+    def is_market_open(
+        self, market: str = "XNAS", extended_hours: bool = False,
+    ) -> bool:
+        """Whether the market is open for trading right now.
+
+        Args:
+            market: Market MIC code. Defaults to 'XNAS' (Nasdaq).
+            extended_hours: Check the extended session rather than the
+                regular one.
+
+        Returns:
+            True if trading is open now. False on weekends, holidays, and
+            outside session hours.
+
+        Note:
+            An order placed while closed is accepted and queued rather than
+            rejected — it executes at the next open. Check this first if that
+            distinction matters.
+        """
+        now = datetime.now(timezone.utc)
+        # The trading date is the market's local date, which differs from the
+        # UTC date during the evening in New York.
+        local_date = now.astimezone(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+
+        hours = self.get_market_hours(market, local_date)
+        if not hours.is_open:
+            return False
+
+        opens = hours.extended_opens_at if extended_hours else hours.opens_at
+        closes = hours.extended_closes_at if extended_hours else hours.closes_at
+        if not opens or not closes:
+            return False
+
+        try:
+            opens_dt = datetime.fromisoformat(opens.replace("Z", "+00:00"))
+            closes_dt = datetime.fromisoformat(closes.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+
+        return opens_dt <= now <= closes_dt
+
     # ── Dividends ──────────────────────────────────────────────────────
 
     def get_dividends(self) -> list[Dividend]:
@@ -1990,11 +2033,17 @@ class PyhoodClient:
         if amount_in_dollars < 1:
             raise OrderError("Fractional orders must be at least $1")
 
-        price = self.get_quote(symbol).price
+        quote = self.get_quote(symbol)
+        # Size against the lowest plausible execution price so the notional
+        # still clears Robinhood's $1 minimum if the order fills at the bid.
+        # Rounding down against the last price puts a $1 order under the
+        # minimum and it is rejected.
+        price = min(p for p in (quote.price, quote.bid, quote.ask) if p and p > 0) \
+            if any(p and p > 0 for p in (quote.price, quote.bid, quote.ask)) else 0
         if price <= 0:
             raise OrderError(f"Cannot price fractional order for {symbol}")
 
-        shares = round(amount_in_dollars / price, 6)
+        shares = math.ceil(amount_in_dollars / price * 1_000_000) / 1_000_000
         return self.order_stock(
             symbol=symbol,
             quantity=shares,

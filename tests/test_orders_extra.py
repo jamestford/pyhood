@@ -402,3 +402,39 @@ class TestOrderFormVersion:
         client.buy_stock("AAPL", 1, price=100.0)
 
         assert "order_form_version=7" in str(responses.calls[-1].request.body)
+
+
+class TestFractionalSizing:
+    """Sizing must clear Robinhood's $1 minimum at any plausible fill price.
+
+    Live 2026-08-09: $1.00 / last $313.30 = 0.003192 shares, which is only
+    $0.9933 against the $311.19 bid — rejected with "Fractional orders must
+    be at least $1."
+    """
+
+    @responses.activate
+    def test_sizes_against_the_lowest_price(self, client):
+        _mock_account()
+        responses.add(
+            responses.GET, f"{urls.QUOTES}AAPL/",
+            json={"symbol": "AAPL", "last_trade_price": "313.30",
+                  "previous_close": "312.00", "bid_price": "311.19",
+                  "ask_price": "315.53"},
+            status=200,
+        )
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        responses.add(
+            responses.POST, urls.ORDERS, json={"id": "f-1", "state": "queued"},
+            status=201,
+        )
+
+        client.buy_stock_by_price("AAPL", 1.0)
+
+        body = str(responses.calls[-1].request.body)
+        qty = float(body.split("quantity=")[1].split("&")[0])
+        # Must clear $1 even if it fills at the bid
+        assert qty * 311.19 >= 1.0
