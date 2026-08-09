@@ -8,6 +8,14 @@ pyhood handles Robinhood's OAuth2 authentication with three layers of session ma
 
 When you call `pyhood.login()`, it tries each layer in order, falling back only when necessary.
 
+The quickest way to establish a session is the setup command, which drives the same three layers and prompts only for what it actually needs:
+
+```bash
+python -m pyhood setup login
+```
+
+See [Setup](setup.md) for what it prompts for and how the tokens are stored.
+
 ## Login Flow
 
 ```python

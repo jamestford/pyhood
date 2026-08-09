@@ -18,13 +18,21 @@ pip install -e ".[dev]"
 
 ## First Login
 
-hood requires a one-time device approval through the Robinhood mobile app. After that, sessions refresh automatically.
+pyhood requires a one-time device approval through the Robinhood mobile app. After that, sessions refresh automatically.
 
 ### Step 1: Have Your Phone Ready
 
 Open the Robinhood app on your phone. You'll need to tap "Yes, it's me" when prompted.
 
 ### Step 2: Login
+
+```bash
+python -m pyhood setup login
+```
+
+It prompts for your username and password — the password is read without echoing and is never stored — then Robinhood sends a device approval push notification to your phone. Tap **"Yes, it's me"** to approve. The session is saved to `~/.pyhood/session.json`, readable only by you.
+
+To log in from code instead:
 
 ```python
 import pyhood
@@ -36,14 +44,16 @@ session = pyhood.login(
 )
 ```
 
-When you run this, Robinhood will send a device approval push notification to your phone. Tap **"Yes, it's me"** to approve.
+Prefer the command where you can. A password written into a script tends to end up committed.
 
 ### Step 3: Use the Client
 
 ```python
+import pyhood
 from pyhood.client import PyhoodClient
 
-client = PyhoodClient(session)
+# No credentials needed — reuses the stored session.
+client = PyhoodClient(pyhood.login())
 
 # Get a stock quote
 quote = client.get_quote("AAPL")

@@ -37,6 +37,7 @@ theme:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Setup: setup.md
   - Migrating from robin_stocks: migrating-from-robin-stocks.md
   - Authentication: authentication.md
   - Usage:
@@ -52,6 +53,7 @@ nav:
     - PyhoodClient: api/client.md
     - CryptoClient: api/crypto.md
     - Authentication: api/auth.md
+    - Setup: api/onboarding.md
     - Models: api/models.md
     - Exceptions: api/exceptions.md
   - Contributing: contributing.md
