@@ -9,6 +9,7 @@ import json
 import logging
 import time
 import uuid
+from datetime import datetime
 from typing import Any
 from urllib.parse import urlencode, urlparse
 
@@ -475,6 +476,53 @@ class CryptoClient:
 
     # ── Orders ───────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _parse_order(data: dict[str, Any]) -> CryptoOrder:
+        """Build a CryptoOrder from an API order payload.
+
+        Field names captured live 2026-08-09. The API uses `state`,
+        `filled_asset_quantity`, `average_price` and `fee_charged`, and keeps
+        the requested size and price inside `{type}_order_config` rather than
+        at the top level. Reading `status`, `quantity` or `price` directly
+        yields empty values on a real order.
+        """
+        def _dt(value):
+            if not value:
+                return None
+            try:
+                return datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+            except ValueError:
+                return None
+
+        order_type = data.get('type', '')
+        config = data.get(f'{order_type}_order_config') or {}
+        quantity = float(config.get('asset_quantity', 0) or 0)
+        filled = float(data.get('filled_asset_quantity', 0) or 0)
+        limit_price = config.get('limit_price')
+
+        return CryptoOrder(
+            order_id=data.get('id', ''),
+            client_order_id=data.get('client_order_id'),
+            side=data.get('side', ''),
+            order_type=order_type,
+            symbol=data.get('symbol', ''),
+            status=data.get('state', ''),
+            price=float(limit_price) if limit_price is not None else None,
+            quantity=quantity,
+            filled_quantity=filled,
+            remaining_quantity=max(quantity - filled, 0.0),
+            average_filled_price=(
+                float(data['average_price'])
+                if data.get('average_price') is not None else None
+            ),
+            fee=(
+                float(data['fee_charged'])
+                if data.get('fee_charged') is not None else None
+            ),
+            created_at=_dt(data.get('created_at')),
+            updated_at=_dt(data.get('updated_at')),
+        )
+
     def place_order(
         self,
         account_number: str,
@@ -523,29 +571,8 @@ class CryptoClient:
             'POST', path, body=body, params={'account_number': account_number},
         )
 
-        from datetime import datetime
-        created_at = datetime.fromisoformat(data.get('created_at', '').replace('Z', '+00:00'))
-        updated_at = datetime.fromisoformat(data.get('updated_at', '').replace('Z', '+00:00'))
 
-        return CryptoOrder(
-            order_id=data.get('id', ''),
-            client_order_id=data.get('client_order_id'),
-            side=data.get('side', side),
-            order_type=data.get('type', order_type),
-            symbol=data.get('symbol', symbol),
-            status=data.get('status', ''),
-            price=float(data['price']) if data.get('price') is not None else None,
-            quantity=float(data.get('quantity', 0)),
-            filled_quantity=float(data.get('filled_quantity', 0)),
-            remaining_quantity=float(data.get('remaining_quantity', 0)),
-            average_filled_price=(
-                float(data['average_filled_price'])
-                if data.get('average_filled_price') is not None else None
-            ),
-            fee=float(data['fee']) if data.get('fee') is not None else None,
-            created_at=created_at,
-            updated_at=updated_at,
-        )
+        return self._parse_order(data)
 
     def get_order(self, account_number: str, order_id: str) -> CryptoOrder:
         """Get a specific crypto order.
@@ -562,29 +589,8 @@ class CryptoClient:
 
         data = self.make_request('GET', path, params=params)
 
-        from datetime import datetime
-        created_at = datetime.fromisoformat(data.get('created_at', '').replace('Z', '+00:00'))
-        updated_at = datetime.fromisoformat(data.get('updated_at', '').replace('Z', '+00:00'))
 
-        return CryptoOrder(
-            order_id=data.get('id', order_id),
-            client_order_id=data.get('client_order_id'),
-            side=data.get('side', ''),
-            order_type=data.get('type', ''),
-            symbol=data.get('symbol', ''),
-            status=data.get('status', ''),
-            price=float(data['price']) if data.get('price') is not None else None,
-            quantity=float(data.get('quantity', 0)),
-            filled_quantity=float(data.get('filled_quantity', 0)),
-            remaining_quantity=float(data.get('remaining_quantity', 0)),
-            average_filled_price=(
-                float(data['average_filled_price'])
-                if data.get('average_filled_price') is not None else None
-            ),
-            fee=float(data['fee']) if data.get('fee') is not None else None,
-            created_at=created_at,
-            updated_at=updated_at,
-        )
+        return self._parse_order(data)
 
     def get_orders(self, account_number: str) -> list[CryptoOrder]:
         """Get all crypto orders for account.
@@ -602,29 +608,8 @@ class CryptoClient:
 
         orders = []
         for item in items:
-            from datetime import datetime
-            created_at = datetime.fromisoformat(item.get('created_at', '').replace('Z', '+00:00'))
-            updated_at = datetime.fromisoformat(item.get('updated_at', '').replace('Z', '+00:00'))
 
-            orders.append(CryptoOrder(
-                order_id=item.get('id', ''),
-                client_order_id=item.get('client_order_id'),
-                side=item.get('side', ''),
-                order_type=item.get('type', ''),
-                symbol=item.get('symbol', ''),
-                status=item.get('status', ''),
-                price=float(item['price']) if item.get('price') is not None else None,
-                quantity=float(item.get('quantity', 0)),
-                filled_quantity=float(item.get('filled_quantity', 0)),
-                remaining_quantity=float(item.get('remaining_quantity', 0)),
-                average_filled_price=(
-                    float(item['average_filled_price'])
-                    if item.get('average_filled_price') is not None else None
-                ),
-                fee=float(item['fee']) if item.get('fee') is not None else None,
-                created_at=created_at,
-                updated_at=updated_at,
-            ))
+            orders.append(self._parse_order(item))
 
         return orders
 

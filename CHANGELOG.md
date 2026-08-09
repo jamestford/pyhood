@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Crypto orders parsed almost every field wrong** — the API reports `state`, `filled_asset_quantity`, `average_price` and `fee_charged`, and keeps the requested size and price inside `{type}_order_config`. pyhood read `status`, `quantity`, `price`, `filled_quantity`, `average_filled_price` and `fee` at the top level, so a real order came back with an empty status, zero quantity and no price. The three construction sites are now one `_parse_order()` helper, which also stops the old code raising `ValueError` when a timestamp is absent.
+- **`place_order()` sent `account_number` in the body** — the API requires it as a query parameter and rejects the body form with "The account_number parameter is required". Notably it is absent from `OrderRequest` in Robinhood's published spec.
+
 ### Removed
 - **`get_portfolio_historicals()`** now raises `APIError` — Robinhood retired `/portfolios/historicals/`, which returns 404 for every parameter combination. It had a passing test that mocked the dead endpoint. robin_stocks calls the same URL.
 

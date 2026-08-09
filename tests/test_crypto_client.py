@@ -1,5 +1,6 @@
 """Tests for crypto client module."""
 
+import json
 from datetime import datetime
 
 import pytest
@@ -264,25 +265,32 @@ class TestCryptoClient:
 
     @responses.activate
     def test_place_order(self):
-        """Test placing a crypto order."""
+        """Payload and response shape captured live 2026-08-09.
+
+        The API reports `state`, `filled_asset_quantity`, `average_price` and
+        `fee_charged`, and keeps size and price inside `{type}_order_config`.
+        """
         responses.add(
             responses.POST,
             CRYPTO_ORDERS,
             json={
-                "id": "order-123",
+                "symbol": "BTC-USD",
                 "client_order_id": "client-123",
                 "side": "buy",
-                "type": "market",
-                "symbol": "BTC-USD",
-                "status": "pending",
-                "price": None,
-                "quantity": "0.001",
-                "filled_quantity": "0.0",
-                "remaining_quantity": "0.001",
-                "average_filled_price": None,
-                "fee": None,
-                "created_at": "2023-10-30T12:00:00Z",
-                "updated_at": "2023-10-30T12:00:00Z",
+                "type": "limit",
+                "id": "order-123",
+                "account_number": "12345",
+                "state": "open",
+                "filled_asset_quantity": "0.000000000000000000",
+                "executions": [],
+                "average_price": None,
+                "created_at": "2026-08-09T16:42:33.494640-04:00",
+                "updated_at": "2026-08-09T16:42:34.198331-04:00",
+                "fee_charged": 0.0,
+                "limit_order_config": {
+                    "asset_quantity": "0.000100000000000000",
+                    "limit_price": "32548.380000000000000000",
+                },
             },
             status=200
         )
@@ -290,55 +298,61 @@ class TestCryptoClient:
         order = self.client.place_order(
             account_number="12345",
             side="buy",
-            order_type="market",
+            order_type="limit",
             symbol="BTC-USD",
-            order_config={"quantity": "0.001"}
+            order_config={"asset_quantity": "0.0001", "limit_price": "32548.38"},
         )
 
         assert isinstance(order, CryptoOrder)
         assert order.order_id == "order-123"
-        assert order.client_order_id == "client-123"
-        assert order.side == "buy"
-        assert order.order_type == "market"
-        assert order.symbol == "BTC-USD"
-        assert order.status == "pending"
-        assert order.price is None
-        assert order.quantity == 0.001
+        assert order.status == "open"
+        assert order.quantity == 0.0001
+        assert order.price == 32548.38
+        assert order.filled_quantity == 0.0
+        assert order.remaining_quantity == 0.0001
+        assert order.fee == 0.0
+        assert order.average_filled_price is None
+
+        # account_number belongs in the query string, not the body
+        request = responses.calls[-1].request
+        assert "account_number=12345" in request.url
+        body = json.loads(request.body)
+        assert "account_number" not in body
+        assert body["limit_order_config"] == {
+            "asset_quantity": "0.0001", "limit_price": "32548.38",
+        }
+        assert body["client_order_id"]
 
     @responses.activate
     def test_get_order(self):
-        """Test getting a specific order."""
+        """A cancelled order reports state, not status."""
         responses.add(
             responses.GET,
             f"{CRYPTO_ORDERS}order-123/",
             json={
-                "id": "order-123",
+                "symbol": "BTC-USD",
                 "client_order_id": "client-123",
                 "side": "buy",
                 "type": "limit",
-                "symbol": "BTC-USD",
-                "status": "filled",
-                "price": "45000.00",
-                "quantity": "0.001",
-                "filled_quantity": "0.001",
-                "remaining_quantity": "0.0",
-                "average_filled_price": "45000.00",
-                "fee": "1.50",
-                "created_at": "2023-10-30T12:00:00Z",
-                "updated_at": "2023-10-30T12:05:00Z",
+                "id": "order-123",
+                "state": "canceled",
+                "filled_asset_quantity": "0.0",
+                "average_price": None,
+                "fee_charged": 0.0,
+                "created_at": "2026-08-09T16:42:33.494640-04:00",
+                "updated_at": "2026-08-09T16:43:47.340423-04:00",
+                "limit_order_config": {
+                    "asset_quantity": "0.0001", "limit_price": "32548.38",
+                },
             },
             status=200
         )
 
         order = self.client.get_order("12345", "order-123")
 
-        assert isinstance(order, CryptoOrder)
         assert order.order_id == "order-123"
-        assert order.status == "filled"
-        assert order.price == 45000.00
-        assert order.average_filled_price == 45000.00
-        assert order.fee == 1.50
-
+        assert order.status == "canceled"
+        assert order.price == 32548.38
     @responses.activate
     def test_get_orders(self):
         """Test getting all orders."""
