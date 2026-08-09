@@ -183,7 +183,7 @@ pyhood also supports Robinhood's **official** Crypto Trading API — no device a
 ```python
 from pyhood.crypto import CryptoClient
 
-# API key auth — generate keys at robinhood.com/account/crypto
+# API key auth — see "Getting Crypto API keys" below
 crypto = CryptoClient(api_key="rh-api-...", private_key_base64="...")
 
 # Market data
@@ -209,7 +209,38 @@ order = crypto.place_order(
 )
 ```
 
-Generate your API keys at [robinhood.com/account/crypto](https://robinhood.com/account/crypto). See the [Crypto documentation](https://jamestford.github.io/pyhood/crypto/) for full details.
+See the [Crypto documentation](https://jamestford.github.io/pyhood/crypto/) for full details.
+
+### Getting Crypto API keys
+
+Robinhood does not issue you a key pair. You generate one locally and register only the public half.
+
+**1. Generate a key pair:**
+
+```bash
+python -c "from pyhood.crypto.auth import generate_keypair; priv, pub = generate_keypair(); print('PRIVATE:', priv); print('PUBLIC :', pub)"
+```
+
+Keep the private key secret — it is the credential. Anyone holding it can trade your crypto.
+
+**2. Register the public key** at [robinhood.com/account/crypto](https://robinhood.com/account/crypto) → **API Trading** → **Add key**. Paste the **public** value. Robinhood then issues an **API key**.
+
+**3. Use both:**
+
+```python
+import os
+from pyhood.crypto import CryptoClient
+
+crypto = CryptoClient(
+    api_key=os.environ["RH_CRYPTO_API_KEY"],
+    private_key_base64=os.environ["RH_CRYPTO_PRIVATE_KEY"],
+)
+```
+
+Read them from the environment rather than hardcoding them.
+
+> Robinhood describes API trading as "currently limited and subject to change" — key creation may not be available on every account.
+
 
 ## Futures Trading
 
