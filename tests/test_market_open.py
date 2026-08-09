@@ -3,7 +3,7 @@
 Payloads captured live 2026-08-09 (a Sunday) and for 2026-08-10 (a Monday).
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
