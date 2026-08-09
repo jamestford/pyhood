@@ -121,35 +121,56 @@ class TestCryptoClient:
 
     @responses.activate
     def test_get_trading_pairs(self):
-        """Test getting trading pairs."""
+        """Fields captured live 2026-08-09.
+
+        The API names these asset_code/quote_code/quote_increment/
+        asset_increment and reports availability as `status` plus
+        `is_api_tradable` — not `tradable`, `base_currency`, or
+        `price_increment` as previously assumed.
+        """
         responses.add(
             responses.GET,
             CRYPTO_TRADING_PAIRS,
             json={
                 "results": [{
-                    "symbol": "BTC-USD",
-                    "tradable": True,
-                    "min_order_size": "0.000001",
+                    "asset_code": "BTC",
+                    "quote_code": "USD",
+                    "quote_increment": "0.01",
+                    "asset_increment": "0.000001",
                     "max_order_size": "100.0",
-                    "price_increment": "0.01",
-                    "quantity_increment": "0.000001",
-                    "base_currency": "BTC",
-                    "quote_currency": "USD",
+                    "status": "tradable",
+                    "symbol": "BTC-USD",
+                    "is_api_tradable": True,
+                }, {
+                    "asset_code": "BILL",
+                    "quote_code": "USD",
+                    "quote_increment": "0.000001",
+                    "asset_increment": "0.1",
+                    "max_order_size": "9900000.0",
+                    "status": "tradable",
+                    "symbol": "BILL-USD",
+                    "is_api_tradable": False,
                 }]
             },
             status=200
         )
 
-        pairs = self.client.get_trading_pairs("BTC-USD")
+        pairs = self.client.get_trading_pairs()
 
-        assert len(pairs) == 1
-        pair = pairs[0]
-        assert isinstance(pair, TradingPair)
-        assert pair.symbol == "BTC-USD"
-        assert pair.tradable is True
-        assert pair.min_order_size == 0.000001
-        assert pair.base_currency == "BTC"
-        assert pair.quote_currency == "USD"
+        assert len(pairs) == 2
+        btc = pairs[0]
+        assert isinstance(btc, TradingPair)
+        assert btc.symbol == "BTC-USD"
+        assert btc.base_currency == "BTC"
+        assert btc.quote_currency == "USD"
+        assert btc.price_increment == 0.01
+        assert btc.quantity_increment == 0.000001
+        assert btc.tradable is True
+        assert btc.api_tradable is True
+
+        # tradable in the app but not through the API
+        assert pairs[1].tradable is True
+        assert pairs[1].api_tradable is False
 
     @responses.activate
     def test_get_best_bid_ask(self):

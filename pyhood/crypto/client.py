@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import uuid
 from typing import Any
 from urllib.parse import urlencode, urlparse
 
@@ -311,13 +312,17 @@ class CryptoClient:
         for item in items:
             trading_pairs.append(TradingPair(
                 symbol=item.get('symbol', ''),
-                tradable=item.get('tradable', False),
-                min_order_size=float(item.get('min_order_size', 0)),
-                max_order_size=float(item.get('max_order_size', 0)),
-                price_increment=float(item.get('price_increment', 0)),
-                quantity_increment=float(item.get('quantity_increment', 0)),
-                base_currency=item.get('base_currency', ''),
-                quote_currency=item.get('quote_currency', ''),
+                # `status` is the app-level state; `is_api_tradable` governs
+                # whether the pair can be traded through this API at all.
+                tradable=item.get('status', '') == 'tradable',
+                api_tradable=bool(item.get('is_api_tradable', False)),
+                status=item.get('status', ''),
+                min_order_size=float(item.get('min_order_size', 0) or 0),
+                max_order_size=float(item.get('max_order_size', 0) or 0),
+                price_increment=float(item.get('quote_increment', 0) or 0),
+                quantity_increment=float(item.get('asset_increment', 0) or 0),
+                base_currency=item.get('asset_code', ''),
+                quote_currency=item.get('quote_code', ''),
             ))
 
         return trading_pairs
@@ -452,27 +457,38 @@ class CryptoClient:
         order_type: str,
         symbol: str,
         order_config: dict[str, Any],
+        client_order_id: str | None = None,
     ) -> CryptoOrder:
         """Place a crypto order.
 
         Args:
             account_number: Crypto account number
             side: 'buy' or 'sell'
-            order_type: 'market' or 'limit'
+            order_type: 'market', 'limit', 'stop_loss' or 'stop_limit'
             symbol: Crypto symbol (e.g., 'BTC-USD')
-            order_config: Order-specific configuration
+            order_config: Configuration for this order type, e.g.
+                ``{"asset_quantity": "0.001"}`` for a market order. It is
+                nested under ``{order_type}_order_config`` for you.
+            client_order_id: Idempotency key. Generated if omitted — resending
+                the same value returns the original order rather than placing
+                a second one.
 
         Returns:
             CryptoOrder object
+
+        Note:
+            Only pairs with `api_tradable` set can be ordered through this API;
+            a pair can be tradable in the app but not here.
         """
         path = CRYPTO_ORDERS.replace(CRYPTO_BASE, '')
 
         payload = {
             'account_number': account_number,
+            'client_order_id': client_order_id or str(uuid.uuid4()),
             'side': side,
             'type': order_type,
             'symbol': symbol,
-            **order_config,
+            f'{order_type}_order_config': order_config,
         }
 
         body = json.dumps(payload)

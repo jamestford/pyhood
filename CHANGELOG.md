@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Crypto orders could not be placed** — the payload omitted the required `client_order_id` idempotency key, and spread `order_config` flat instead of nesting it under `{type}_order_config` as the API expects. The README example demonstrated the wrong shape.
+- **`get_trading_pairs()` reported every field wrong** — the API uses `asset_code`/`quote_code`/`quote_increment`/`asset_increment`, and reports availability as `status` plus `is_api_tradable`. pyhood read `base_currency`, `price_increment`, `tradable` and similar, so every pair came back with empty currencies, zero increments and `tradable=False`. `TradingPair` now also exposes `api_tradable`, which is what actually governs whether a pair can be ordered through the API.
 - **Crypto quotes always returned 0.0** — `get_best_bid_ask()` read `bid_price`/`ask_price`; the API returns `bid`/`ask`.
 - **Crypto market-data calls failed authentication** — the signature covers the path *including* its query string, but pyhood signed the bare path and let `requests` append the query separately. Every parameterised crypto endpoint returned "Authentication failed".
 - **`get_best_bid_ask()` sent the wrong parameter** — `symbols=` comma-joined, where the API wants `symbol=` repeated; it rejected the former as "Malformed symbol parameter".
