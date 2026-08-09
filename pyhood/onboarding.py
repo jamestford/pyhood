@@ -8,11 +8,13 @@ pyhood uses two unrelated kinds of credential:
   Trading API. Long-lived and *not* refreshable — a leaked private key can
   trade until it is revoked.
 
-Run interactively::
+Run interactively, either as the ``pyhood`` console script or as a module
+(``python -m pyhood``) — the two are equivalent::
 
-    python -m pyhood setup           # what is configured, and what is not
-    python -m pyhood setup crypto    # generate and register a key pair
-    python -m pyhood setup login     # obtain session tokens
+    pyhood version         # the installed version
+    pyhood setup           # what is configured, and what is not
+    pyhood setup login     # obtain session tokens
+    pyhood setup crypto    # generate and register a key pair
 
 Handling of secrets, which the rest of this module is built around:
 
@@ -58,6 +60,23 @@ ED25519_KEY_SIZES = (32, 64)
 
 Printer = Callable[[str], Any]
 Prompt = Callable[[str], str]
+
+
+class CancelledError(Exception):
+    """The operator interrupted a prompt."""
+
+
+def _ask(prompt: Prompt, question: str) -> str:
+    """Read an answer, turning an interrupt into a clean exit.
+
+    Ctrl-C at a credential prompt is an ordinary way to back out, so it
+    should print one line rather than a traceback — which on a shared screen
+    would also expose local paths.
+    """
+    try:
+        return prompt(question)
+    except (KeyboardInterrupt, EOFError) as e:
+        raise CancelledError from e
 
 
 # ── Status ───────────────────────────────────────────────────────────
@@ -170,12 +189,12 @@ def print_status(out: Printer = print) -> int:
         if note:
             out(note)
     else:
-        out("    not configured — run: python -m pyhood setup login")
+        out(f"    not configured — run: {invocation()} setup login")
 
     out("")
     out("Crypto API (official Crypto Trading API)")
     if crypto["source"] == "none":
-        out("    not configured — run: python -m pyhood setup crypto")
+        out(f"    not configured — run: {invocation()} setup crypto")
     else:
         out(f"    source: {crypto['source']}")
         if crypto["source"] == "file":
@@ -279,7 +298,13 @@ def setup_crypto(
     out("Robinhood will then show you an API key. Copy it.")
     out("")
 
-    api_key = secret_prompt("Step 3 — paste the API key Robinhood issued (hidden): ").strip()
+    try:
+        prompt_text = "Step 3 — paste the API key Robinhood issued (hidden): "
+        api_key = _ask(secret_prompt, prompt_text).strip()
+    except CancelledError:
+        out("")
+        out("Cancelled — no credentials were saved.")
+        return 1
     if not api_key:
         out("Nothing entered — no credentials were saved.")
         return 1
@@ -335,14 +360,23 @@ def setup_login(
     out("The password is read without echoing, is not stored, and is not")
     out("written anywhere — only the resulting tokens are saved to disk.")
     out("")
+    out("Afterwards Robinhood sends a device approval prompt to your phone —")
+    out("open the Robinhood app and tap 'Yes, it's me' when it appears.")
+    out("")
 
-    username = prompt("Robinhood email/username: ").strip()
-    if not username:
-        out("Nothing entered — no login attempted.")
-        return 1
-    password = secret_prompt("Password (hidden): ")
-    if not password:
-        out("Nothing entered — no login attempted.")
+    try:
+        username = _ask(prompt, "Robinhood email/username: ").strip()
+        if not username:
+            out("Nothing entered — no login attempted.")
+            return 1
+        password = _ask(secret_prompt, "Password (hidden): ")
+        if not password:
+            out("Nothing entered — no login attempted.")
+            return 1
+    except CancelledError:
+        out("")
+        out("Cancelled — no login attempted. Nothing was saved.")
+        out("Run this again when you have the Robinhood app to hand.")
         return 1
 
     out("")
@@ -351,8 +385,12 @@ def setup_login(
         try:
             login(username, password)
         except MFARequiredError:
-            code = prompt("MFA code: ").strip()
+            code = _ask(prompt, "MFA code: ").strip()
             login(username, password, mfa_code=code)
+    except CancelledError:
+        out("")
+        out("Cancelled — no login attempted.")
+        return 1
     except AuthError as e:
         out(f"    FAILED — {type(e).__name__}: {e}")
         return 1
@@ -366,10 +404,24 @@ def setup_login(
 # ── Command line ─────────────────────────────────────────────────────
 
 
+def invocation() -> str:
+    """How pyhood was invoked, for help text and hints.
+
+    Installed as a console script this is ``pyhood``; run as a module it is
+    ``python -m pyhood``. Messages that suggest a command should match what
+    the reader actually typed.
+    """
+    try:
+        name = Path(sys.argv[0]).name
+    except (IndexError, TypeError):  # pragma: no cover - defensive
+        return "python -m pyhood"
+    return "pyhood" if name == "pyhood" else "python -m pyhood"
+
+
 def build_parser() -> argparse.ArgumentParser:
-    """The `python -m pyhood` argument parser."""
+    """The command-line parser for `pyhood` / `python -m pyhood`."""
     parser = argparse.ArgumentParser(
-        prog="python -m pyhood",
+        prog=invocation(),
         description="Set up the credentials pyhood needs.",
     )
     from pyhood import __version__
@@ -377,6 +429,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"pyhood {__version__}")
 
     commands = parser.add_subparsers(dest="command")
+    commands.add_parser("version", help="print the installed pyhood version")
     setup = commands.add_parser(
         "setup",
         help="configure credentials, or report what is configured",
@@ -406,10 +459,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Entry point for `python -m pyhood`."""
+    """Entry point for `pyhood` and `python -m pyhood`."""
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    if args.command == "version":
+        from pyhood import __version__
+
+        print(f"pyhood {__version__}")
+        return 0
     if args.command != "setup":
         parser.print_help()
         return 0

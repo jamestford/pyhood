@@ -1,6 +1,6 @@
 # Setup
 
-The functions behind `python -m pyhood setup`. See [Setup](../setup.md) for the command-line walkthrough.
+The functions behind `pyhood setup`. See [Setup](../setup.md) for the command-line walkthrough.
 
 None of the status functions return a secret value, and none of them make network calls.
 

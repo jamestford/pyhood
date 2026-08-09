@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **`python -m pyhood setup`** — guided credential setup, replacing the copy-paste snippets in the README
+- **`pyhood setup`** — guided credential setup, replacing the copy-paste snippets in the README
   - `setup login` establishes a session. The stored session is tried first, so a valid or refreshable one needs no password at all; only when that fails does it prompt, handling MFA and device approval.
   - `setup crypto` generates an Ed25519 key pair, shows only the public half for registration, reads the API key Robinhood issues, writes both owner-only, and then makes one signed read-only call to confirm the pair is accepted. That last step is the point: writing a file proves nothing, and without it a mistyped or placeholder key is not discovered until a real request fails with an authentication error that reads like a service outage.
   - `setup` with no target reports what is configured — which source credentials resolve from, file permissions, and whether the private key is a real Ed25519 key. No network calls, and lengths and validity only, never values.
@@ -16,9 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Existing crypto credentials are not replaced without `--force` — overwriting would orphan a key that still works.
   - Available programmatically as `pyhood.onboarding.crypto_status()`, `session_status()` and `print_status()`.
 
+- **Verification examples** — `examples/verify_stocks.py` and `examples/verify_crypto.py`, read-only checks that confirm credentials work and print what is wrong when they do not. Both are restricted to data that is safe to publish: quotes, an options chain, market hours, fee tier and counts. No positions, balances or account numbers.
+- Ctrl-C at a credential prompt now exits with one line instead of a traceback, which on a shared screen would also expose local paths. `EOFError` is treated the same way.
+- `setup login` explains the device approval step *before* asking for a password, rather than after. Previously anyone who read ahead or backed out never learned they needed their phone.
+
+### Fixed
+- **`CryptoAccount.fee_tier` was always empty** — fees arrive as a `fee_tier_status` object (`fee_ratio`, `thirty_day_volume`, `next_fee_tier_ratio`, `next_fee_tier_threshold`), and pyhood read a `fee_tier` key the API does not send. `fee_tier` is now rendered from the ratio (`'0.95%'`), the underlying figures are exposed as fields, and `api_tradable` is read from `is_api_tradable`. The existing test mocked `"fee_tier": "standard"` — a shape the API never returns — so it passed against code that could not work.
+
 ### Changed
-- The README's key-generation snippet printed the private key to the terminal, where it lands in scrollback. It now points at `python -m pyhood setup crypto`, with the manual file format kept as a fallback.
+- The README's key-generation snippet printed the private key to the terminal, where it lands in scrollback. It now points at `pyhood setup crypto`, with the manual file format kept as a fallback.
 - Quick Start no longer opens with a hardcoded password — it uses the stored session.
+- README now carries three terminal recordings — install, stock setup, crypto setup — each reproducible from a checked-in VHS tape.
+- Python 3.14 added to the CI matrix and the PyPI classifiers. The full suite passes on it; `requires-python` already allowed it, so the package was installable on a version nothing tested.
+- **Install instructions were wrong for most systems.** They gave a bare `pip install pyhood`, which Homebrew and Debian-based distributions refuse outright as an [externally managed environment](https://peps.python.org/pep-0668/). The macOS case is worse: `python3` is 3.9, and since a virtualenv inherits the version of the interpreter that creates it, `python3 -m venv` there yields a 3.9 environment where the install fails with `no matching distribution found` rather than a version error. Both the README and Getting Started now check the version first and name an explicit interpreter.
 
 ### Fixed
 - The README's portfolio example still called `get_portfolio_historicals()`, which raises `APIError` as of 0.11.0. It now shows `get_portfolio_performance()`.

@@ -35,3 +35,6 @@ htmlcov/
 
 # Docs build
 site/
+
+# Demo recordings
+pyhood-env/

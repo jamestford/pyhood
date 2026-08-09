@@ -441,3 +441,90 @@ class TestCommandLine:
 
         for leaky in ("--api-key", "--password", "--private-key", "--token"):
             assert leaky not in flags
+
+
+class TestCancellation:
+    """Ctrl-C at a prompt must exit cleanly, not raise through to a traceback."""
+
+    def _interrupt(self, _):
+        raise KeyboardInterrupt
+
+    def test_crypto_cancelled_saves_nothing(self, crypto_env):
+        out = Recorder()
+
+        code = onboarding.setup_crypto(verify=False, secret_prompt=self._interrupt, out=out)
+
+        assert code == 1
+        assert not crypto_env.exists()
+        assert "Cancelled" in out.text
+
+    def test_login_cancelled_at_username(self, session_file, monkeypatch):
+        monkeypatch.setattr("pyhood.login", lambda *a, **k: pytest.fail("should not log in"))
+        out = Recorder()
+
+        code = onboarding.setup_login(
+            prompt=self._interrupt, secret_prompt=self._interrupt, out=out,
+        )
+
+        assert code == 1
+        assert "Cancelled" in out.text
+
+    def test_login_cancelled_at_password(self, session_file, monkeypatch):
+        monkeypatch.setattr("pyhood.login", lambda *a, **k: pytest.fail("should not log in"))
+        out = Recorder()
+
+        code = onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=self._interrupt, out=out,
+        )
+
+        assert code == 1
+        assert "Cancelled" in out.text
+
+    def test_eof_is_treated_as_cancellation(self, crypto_env):
+        def eof(_):
+            raise EOFError
+
+        out = Recorder()
+
+        assert onboarding.setup_crypto(verify=False, secret_prompt=eof, out=out) == 1
+        assert "Cancelled" in out.text
+
+
+class TestVersionCommand:
+    def test_version_subcommand(self, capsys):
+        from pyhood import __version__
+
+        assert onboarding.main(["version"]) == 0
+        assert capsys.readouterr().out.strip() == f"pyhood {__version__}"
+
+    def test_version_flag(self, capsys):
+        from pyhood import __version__
+
+        with pytest.raises(SystemExit) as exc:
+            onboarding.main(["--version"])
+
+        assert exc.value.code == 0
+        assert capsys.readouterr().out.strip() == f"pyhood {__version__}"
+
+
+class TestInvocation:
+    """Suggested commands should match how the user actually invoked pyhood."""
+
+    def test_console_script(self, monkeypatch):
+        monkeypatch.setattr(onboarding.sys, "argv", ["/usr/local/bin/pyhood", "setup"])
+
+        assert onboarding.invocation() == "pyhood"
+
+    def test_module(self, monkeypatch):
+        monkeypatch.setattr(onboarding.sys, "argv", ["/path/to/pyhood/__main__.py"])
+
+        assert onboarding.invocation() == "python -m pyhood"
+
+    def test_hints_follow_invocation(self, crypto_env, session_file, monkeypatch):
+        monkeypatch.setattr(onboarding.sys, "argv", ["/usr/local/bin/pyhood"])
+        out = Recorder()
+
+        onboarding.print_status(out=out)
+
+        assert "run: pyhood setup login" in out.text
+        assert "python -m pyhood" not in out.text
