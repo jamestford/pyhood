@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Interest, fees and transfers** — `get_interest_payments()`, `get_margin_interest()`, `get_subscription_fees()`, `get_unified_transfers()`. All verified against live data except margin interest, where the endpoint is confirmed but the account has no charges to observe.
+- **Trailing stop orders** — `buy_stock(..., trail_amount=)` / `trail_percent=`, and the same on `sell_stock()` and `order_stock()`. Posted as JSON, since the nested `trailing_peg` cannot survive form encoding.
+- **Fractional orders by dollar amount** — `buy_stock_by_price()` and `sell_stock_by_price()`.
+- **Multi-leg option spreads** — `order_option_spread()` for debit and credit spreads, with per-leg ratios.
+- **`cancel_all_option_orders()`** — mirrors the existing stock version.
+- **CSV export** — `export_stock_orders()` and `export_option_orders()`, accepting a file or directory path.
+- **`unlink_bank_account()`** — irreversible; not exercised against a live account.
+- Migration guide from robin_stocks, with every referenced method verified to exist.
+
+Order-placement additions are verified by asserting the request payload, not by placing live orders.
+
 ### Changed
 - Promoted from `Development Status :: 3 - Alpha` to `4 - Beta` on PyPI — 259 tests, CI across Python 3.10-3.13, and ten releases
 - PyPI keywords now include `robinhood-api`, `robin_stocks`, `robin-stocks` and `pyrh`, so the package is findable by people searching for the libraries they are migrating from

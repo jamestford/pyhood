@@ -94,7 +94,16 @@ pyhood collapses robin_stocks' many `order_buy_*` / `order_sell_*` variants into
 | `cancel_stock_order(order_id)` | `client.cancel_order(order_id)` |
 | `cancel_all_stock_orders()` | `client.cancel_all_stock_orders()` |
 
-**Not yet in pyhood:** trailing stop orders (`order_buy_trailing_stop`, `order_sell_trailing_stop`, `order_trailing_stop`) and fractional-by-price variants. If you rely on these, [open an issue](https://github.com/jamestford/pyhood/issues).
+Trailing stops and fractional orders:
+
+| robin_stocks | pyhood |
+| --- | --- |
+| `order_buy_trailing_stop(symbol, qty, trailAmount)` | `client.buy_stock(symbol, qty, trail_amount=amt)` |
+| `order_sell_trailing_stop(symbol, qty, trailAmount)` | `client.sell_stock(symbol, qty, trail_amount=amt)` |
+| `order_trailing_stop(..., trailType='percentage')` | `client.buy_stock(..., trail_percent=pct)` |
+| `order_buy_fractional_by_price(symbol, dollars)` | `client.buy_stock_by_price(symbol, dollars)` |
+| `order_sell_fractional_by_price(symbol, dollars)` | `client.sell_stock_by_price(symbol, dollars)` |
+| `order_buy_fractional_by_quantity(symbol, qty)` | `client.buy_stock(symbol, qty)` — fractional quantities are accepted |
 
 Order history takes `start_date=` to avoid paging through years of orders:
 
@@ -112,7 +121,25 @@ client.get_stock_orders(start_date="2026-01-01")
 | `get_option_order_info(order_id)` | `client.get_order(order_id)` |
 | `cancel_option_order(order_id)` | `client.cancel_order(order_id)` |
 
-**Not yet in pyhood:** multi-leg spread orders (`order_option_spread`, `order_option_credit_spread`, `order_option_debit_spread`) and `cancel_all_option_orders()`.
+Spreads and bulk cancel:
+
+| robin_stocks | pyhood |
+| --- | --- |
+| `order_option_spread(direction, price, symbol, qty, spread)` | `client.order_option_spread(symbol, qty, price, legs, direction)` |
+| `order_option_credit_spread(...)` | `client.order_option_spread(..., direction="credit")` |
+| `order_option_debit_spread(...)` | `client.order_option_spread(..., direction="debit")` |
+| `cancel_all_option_orders()` | `client.cancel_all_option_orders()` |
+
+Each leg is a dict with `strike`, `expiration`, `option_type`, `side` and `effect`, plus an optional `ratio`:
+
+```python
+client.order_option_spread("AAPL", 1, 1.50, direction="debit", legs=[
+    {"strike": 100.0, "expiration": "2026-09-18", "option_type": "call",
+     "side": "buy", "effect": "open"},
+    {"strike": 105.0, "expiration": "2026-09-18", "option_type": "call",
+     "side": "sell", "effect": "open"},
+])
+```
 
 ## Options chains and contracts
 
@@ -150,7 +177,22 @@ Chain results carry Greeks, volume and open interest as typed fields. Index opti
 | `get_dividends()` | `client.get_dividends()` |
 | `get_dividends_by_instrument(...)` | `client.get_dividends_by_symbol(symbol)` |
 
-**Not yet in pyhood:** `get_interest_payments()`, `get_margin_interest()`, `get_wire_transfers()`, `unlink_bank_account()`.
+| `get_interest_payments()` | `client.get_interest_payments()` |
+| `get_margin_interest()` | `client.get_margin_interest()` |
+| `get_unified_transfers()` | `client.get_unified_transfers()` |
+| `unlink_bank_account(id)` | `client.unlink_bank_account(id)` |
+| — | `client.get_subscription_fees()` — Gold subscription charges |
+
+`get_wire_transfers()` has no pyhood equivalent: the `/wire/transfers` endpoint robin_stocks calls returns 404, so there is nothing to wrap.
+
+## Exporting
+
+| robin_stocks | pyhood |
+| --- | --- |
+| `export_completed_stock_orders(dir)` | `client.export_stock_orders(path)` |
+| `export_completed_option_orders(dir)` | `client.export_option_orders(path)` |
+
+Both accept a file path or a directory, and take `start_date=` to bound the range.
 
 ## Watchlists
 
@@ -201,19 +243,6 @@ No robin_stocks equivalent exists for these:
 - `CryptoClient` — the official Crypto Trading API
 - `client.get_futures_*()` — futures contracts, quotes, positions, orders and P&L
 - `client.get_ipo_access_*()` — IPO Access offerings, eligibility and allocations
-
-## What robin_stocks has that pyhood does not
-
-Being straightforward about the gaps, so you can decide before you start:
-
-- Trailing stop orders, and fractional-by-price order variants
-- Multi-leg option spreads (`order_option_spread` and friends)
-- `cancel_all_option_orders()` and `cancel_all_crypto_orders()`
-- CSV export helpers (`export_completed_stock_orders` and friends)
-- Interest payments, margin interest, wire transfers
-- Recurring investments, tax lot selling
-
-If one of these blocks you, [open an issue](https://github.com/jamestford/pyhood/issues) — the list is not a statement of intent, just current state.
 
 ## Getting help
 

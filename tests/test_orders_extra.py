@@ -1,0 +1,210 @@
+"""Tests for spreads, fractional orders and CSV export.
+
+Order-placement tests assert the request payload. Confirming a spread or a
+fractional order against the live API would mean opening a real position with
+real money, which has not been done.
+"""
+
+import csv
+import json
+
+import pytest
+import responses
+
+from pyhood import urls
+from pyhood.client import PyhoodClient
+from pyhood.exceptions import OrderError
+from pyhood.http import Session
+
+BASE = "https://api.robinhood.com"
+
+
+@pytest.fixture
+def client():
+    session = Session(timeout=5)
+    session.set_auth("Bearer", "test-token")
+    return PyhoodClient(session=session)
+
+
+def _mock_account():
+    responses.add(
+        responses.GET, urls.ACCOUNTS,
+        json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
+        status=200,
+    )
+
+
+def _mock_option_lookup(count=2):
+    for i in range(count):
+        responses.add(
+            responses.GET, urls.OPTIONS_INSTRUMENTS,
+            json={"results": [{"id": f"opt-{i}", "url": f"{urls.OPTIONS_INSTRUMENTS}opt-{i}/"}]},
+            status=200,
+        )
+
+
+class TestOptionSpread:
+    LEGS = [
+        {"strike": 100.0, "expiration": "2026-09-18", "option_type": "call",
+         "side": "buy", "effect": "open"},
+        {"strike": 105.0, "expiration": "2026-09-18", "option_type": "call",
+         "side": "sell", "effect": "open"},
+    ]
+
+    def test_requires_two_legs(self, client):
+        with pytest.raises(OrderError, match="at least two legs"):
+            client.order_option_spread("AAPL", 1, 1.50, [self.LEGS[0]], "debit")
+
+    def test_rejects_leg_missing_keys(self, client):
+        bad = [self.LEGS[0], {"strike": 105.0, "side": "sell"}]
+        with pytest.raises(OrderError, match="missing"):
+            client.order_option_spread("AAPL", 1, 1.50, bad, "debit")
+
+    @responses.activate
+    def test_builds_multi_leg_payload(self, client):
+        _mock_account()
+        _mock_option_lookup(2)
+        responses.add(
+            responses.POST, urls.OPTIONS_ORDERS,
+            json={"id": "spread-1", "state": "queued",
+                  "created_at": "2026-08-09T12:00:00Z"},
+            status=201,
+        )
+
+        order = client.order_option_spread("AAPL", 1, 1.50, self.LEGS, "debit")
+
+        body = json.loads(responses.calls[-1].request.body)
+        assert len(body["legs"]) == 2
+        assert body["direction"] == "debit"
+        assert body["type"] == "limit"
+        assert body["price"] == "1.5"
+        assert [leg["side"] for leg in body["legs"]] == ["buy", "sell"]
+        assert all(leg["ratio_quantity"] == 1 for leg in body["legs"])
+        assert order.order_id == "spread-1"
+
+    @responses.activate
+    def test_custom_leg_ratio(self, client):
+        _mock_account()
+        _mock_option_lookup(2)
+        responses.add(
+            responses.POST, urls.OPTIONS_ORDERS, json={"id": "s-2"}, status=201,
+        )
+
+        legs = [dict(self.LEGS[0], ratio=1), dict(self.LEGS[1], ratio=2)]
+        client.order_option_spread("AAPL", 1, 1.50, legs, "credit")
+
+        body = json.loads(responses.calls[-1].request.body)
+        assert [leg["ratio_quantity"] for leg in body["legs"]] == [1, 2]
+
+    @responses.activate
+    def test_rejected_order_raises(self, client):
+        _mock_account()
+        _mock_option_lookup(2)
+        responses.add(
+            responses.POST, urls.OPTIONS_ORDERS,
+            json={"detail": "Not enough buying power"}, status=400,
+        )
+
+        with pytest.raises(OrderError, match="Not enough buying power"):
+            client.order_option_spread("AAPL", 1, 1.50, self.LEGS, "debit")
+
+
+class TestFractionalOrders:
+    def _mock_prereqs(self, price="200.00"):
+        _mock_account()
+        responses.add(
+            responses.GET, f"{urls.QUOTES}AAPL/",
+            json={"symbol": "AAPL", "last_trade_price": price,
+                  "previous_close": price},
+            status=200,
+        )
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        responses.add(
+            responses.POST, urls.ORDERS,
+            json={"id": "frac-1", "state": "queued", "side": "buy",
+                  "type": "market", "quantity": "0.5"},
+            status=201,
+        )
+
+    @responses.activate
+    def test_dollars_convert_to_shares(self, client):
+        self._mock_prereqs("200.00")
+
+        client.buy_stock_by_price("AAPL", 100.0)
+
+        body = responses.calls[-1].request.body
+        assert "quantity=0.5" in str(body)  # $100 / $200
+
+    @responses.activate
+    def test_uses_gfd_by_default(self, client):
+        self._mock_prereqs()
+
+        client.buy_stock_by_price("AAPL", 100.0)
+
+        assert "time_in_force=gfd" in str(responses.calls[-1].request.body)
+
+    def test_below_one_dollar_rejected(self, client):
+        with pytest.raises(OrderError, match="at least \\$1"):
+            client.buy_stock_by_price("AAPL", 0.5)
+
+    @responses.activate
+    def test_zero_price_rejected(self, client):
+        _mock_account()
+        responses.add(
+            responses.GET, f"{urls.QUOTES}AAPL/",
+            json={"symbol": "AAPL", "last_trade_price": "0", "previous_close": "0"},
+            status=200,
+        )
+
+        with pytest.raises(OrderError, match="Cannot price"):
+            client.buy_stock_by_price("AAPL", 100.0)
+
+
+class TestCsvExport:
+    ORDERS = {"results": [
+        {"id": "o-1", "state": "filled", "side": "buy", "type": "market",
+         "quantity": "10", "average_price": "150.00",
+         "created_at": "2026-03-01T12:00:00Z", "updated_at": "2026-03-01T12:01:00Z"},
+        {"id": "o-2", "state": "cancelled", "side": "sell", "type": "limit",
+         "quantity": "5", "created_at": "2026-03-02T12:00:00Z"},
+    ]}
+
+    @responses.activate
+    def test_writes_only_filled_orders(self, client, tmp_path):
+        responses.add(responses.GET, urls.ORDERS, json=self.ORDERS, status=200)
+
+        out = client.export_stock_orders(tmp_path / "orders.csv")
+
+        rows = list(csv.DictReader(out.open()))
+        assert [r["order_id"] for r in rows] == ["o-1"]
+        assert rows[0]["side"] == "buy"
+
+    @responses.activate
+    def test_directory_gets_default_filename(self, client, tmp_path):
+        responses.add(responses.GET, urls.ORDERS, json=self.ORDERS, status=200)
+
+        out = client.export_stock_orders(tmp_path)
+
+        assert out.name == "stock_orders.csv"
+        assert out.exists()
+
+    @responses.activate
+    def test_datetimes_are_serialized(self, client, tmp_path):
+        responses.add(responses.GET, urls.ORDERS, json=self.ORDERS, status=200)
+
+        out = client.export_stock_orders(tmp_path / "o.csv")
+
+        row = next(csv.DictReader(out.open()))
+        assert row["created_at"].startswith("2026-03-01T12:00:00")
+
+    @responses.activate
+    def test_empty_export_still_writes_header(self, client, tmp_path):
+        responses.add(responses.GET, urls.ORDERS, json={"results": []}, status=200)
+
+        out = client.export_stock_orders(tmp_path / "empty.csv")
+
+        assert out.read_text().strip().startswith("order_id,symbol,side")

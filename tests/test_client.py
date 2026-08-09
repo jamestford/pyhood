@@ -1,5 +1,6 @@
 """Tests for PyhoodClient — quotes, options, positions, earnings."""
 
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -2282,3 +2283,86 @@ class TestDepositSchedules:
         schedules = client.get_deposit_schedules()
         assert len(schedules) == 1
         assert schedules[0]["frequency"] == "weekly"
+
+
+class TestTrailingStopOrders:
+    """Payload construction for trailing stops.
+
+    These assert the request body only. Confirming a trailing stop against the
+    live API would mean placing a real order with real money, which has not
+    been done — the payload follows the shape robin_stocks uses in production.
+    """
+
+    def _mock_order_prereqs(self, last_price="100.00"):
+        responses.add(
+            responses.GET, urls.ACCOUNTS,
+            json={"results": [{"url": f"{BASE}/accounts/12345/", "account_number": "12345"}]},
+            status=200,
+        )
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        responses.add(
+            responses.GET, f"{urls.QUOTES}AAPL/",
+            json={
+                "symbol": "AAPL", "last_trade_price": last_price,
+                "previous_close": last_price, "bid_price": last_price,
+                "ask_price": last_price,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.POST, urls.ORDERS,
+            json={"id": "o-1", "state": "queued", "side": "sell", "type": "market",
+                  "quantity": "1", "created_at": "2026-08-09T12:00:00Z"},
+            status=201,
+        )
+
+    @responses.activate
+    def test_trail_amount_builds_price_peg(self, client):
+        self._mock_order_prereqs("100.00")
+
+        client.sell_stock("AAPL", 1, trail_amount=5.0)
+
+        body = json.loads(responses.calls[-1].request.body)
+        assert body["trailing_peg"] == {
+            "type": "price", "price": {"amount": "5.0", "currency_code": "USD"},
+        }
+        assert body["trigger"] == "stop"
+        assert body["type"] == "market"
+        assert body["stop_price"] == "95.0"  # 100 - 5 for a sell
+
+    @responses.activate
+    def test_trail_percent_builds_percentage_peg(self, client):
+        self._mock_order_prereqs("100.00")
+
+        client.sell_stock("AAPL", 1, trail_percent=10.0)
+
+        body = json.loads(responses.calls[-1].request.body)
+        assert body["trailing_peg"] == {"type": "percentage", "percentage": "10.0"}
+        assert body["stop_price"] == "90.0"  # 100 - 10%
+
+    @responses.activate
+    def test_buy_trail_sets_limit_above_stop(self, client):
+        self._mock_order_prereqs("100.00")
+
+        client.buy_stock("AAPL", 1, trail_amount=5.0)
+
+        body = json.loads(responses.calls[-1].request.body)
+        assert body["stop_price"] == "105.0"  # 100 + 5 for a buy
+        assert float(body["price"]) > float(body["stop_price"])
+
+    def test_both_trail_args_rejected(self, client):
+        with pytest.raises(OrderError, match="not both"):
+            client.sell_stock("AAPL", 1, trail_amount=5.0, trail_percent=10.0)
+
+    @responses.activate
+    def test_no_trailing_peg_on_ordinary_order(self, client):
+        self._mock_order_prereqs()
+
+        client.sell_stock("AAPL", 1)
+
+        body = responses.calls[-1].request.body
+        assert "trailing_peg" not in str(body)

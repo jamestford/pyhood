@@ -190,6 +190,55 @@ class ACHTransfer:
     ach_relationship: str = ""
 
 
+# ── Interest / Fees ──────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class InterestPayment:
+    """Cash sweep interest payment."""
+    id: str
+    amount: float
+    currency: str = "USD"
+    direction: str = ""  # 'credit' or 'debit'
+    pay_date: str = ""
+    pay_period_start: str = ""
+    pay_period_end: str = ""
+    payout_type: str = ""
+    reason: str = ""
+    account_number: str = ""
+
+
+@dataclass(frozen=True)
+class SubscriptionFee:
+    """Robinhood Gold subscription fee."""
+    id: str
+    amount: float
+    date: str = ""
+    state: str = ""
+    credit: float = 0.0
+    carry_forward_credit: float = 0.0
+    created_at: str = ""
+    account_number: str = ""
+
+
+@dataclass(frozen=True)
+class UnifiedTransfer:
+    """Transfer from the unified payment hub — ACH, internal, and others."""
+    id: str
+    amount: float
+    currency: str = "usd"
+    direction: str = ""
+    transfer_type: str = ""
+    state: str = ""
+    description: str = ""
+    originating_account_id: str = ""
+    originating_account_type: str = ""
+    receiving_account_id: str = ""
+    receiving_account_type: str = ""
+    created_at: str = ""
+    completed_at: str = ""
+
+
 # ── Debit Card ──────────────────────────────────────────────────────
 
 
