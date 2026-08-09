@@ -220,7 +220,7 @@ class TestTrailingStopServerLimits:
 
     @responses.activate
     def test_app_version_gate_gets_explanatory_error(self, client):
-        """The raw 'app version' message is wrapped with what it actually means."""
+        """The gate applies to market orders generally, not just trailing stops."""
         _mock_account()
         responses.add(
             responses.GET, f"{urls.QUOTES}AAPL/",
@@ -242,7 +242,7 @@ class TestTrailingStopServerLimits:
             status=400,
         )
 
-        with pytest.raises(OrderError, match="gates trailing stops"):
+        with pytest.raises(OrderError, match="gates MARKET orders"):
             client.buy_stock("AAPL", 1, trail_percent=50.0)
 
     @responses.activate
@@ -261,3 +261,67 @@ class TestTrailingStopServerLimits:
 
         with pytest.raises(OrderError, match="rejected"):
             client.buy_stock("AAPL", 1, price=50.0)
+
+
+class TestServerSideOrderConstraints:
+    """Constraints confirmed against the live API on 2026-08-09.
+
+    | order type | whole shares | fractional |
+    | limit      | accepted     | rejected — "cannot include fractional shares" |
+    | market     | app-version gate | app-version gate |
+
+    Fractional trading is therefore unreachable: it needs a market order, and
+    market orders are gated. These tests pin the error handling so the
+    constraints stay documented in code.
+    """
+
+    def _mock_quote(self, symbol="AAPL", price="200.00"):
+        responses.add(
+            responses.GET, f"{urls.QUOTES}{symbol}/",
+            json={"symbol": symbol, "last_trade_price": price,
+                  "previous_close": price, "ask_price": price, "bid_price": price},
+            status=200,
+        )
+
+    @responses.activate
+    def test_fractional_limit_rejection_surfaces(self, client):
+        _mock_account()
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        responses.add(
+            responses.POST, urls.ORDERS,
+            json={"non_field_errors": [
+                "Limit order quantity cannot include fractional shares."
+            ]},
+            status=400,
+        )
+
+        with pytest.raises(OrderError, match="fractional shares"):
+            client.buy_stock("AAPL", 0.003, price=200.0)
+
+    @responses.activate
+    def test_market_order_sends_collar_price(self, client):
+        """Market orders must carry a collar price or Robinhood rejects them."""
+        _mock_account()
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        self._mock_quote()
+        responses.add(
+            responses.POST, urls.ORDERS,
+            json={"id": "m-1", "state": "queued"}, status=201,
+        )
+
+        order = client.buy_stock("AAPL", 1)
+
+        body = str(responses.calls[-1].request.body)
+        assert "price=200.0" in body
+        assert "ask_price=200.0" in body
+        assert "bid_price=200.0" in body
+        # The collar is a protocol detail, not a limit the caller set
+        assert order.price is None

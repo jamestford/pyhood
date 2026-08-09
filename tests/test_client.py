@@ -529,6 +529,16 @@ class TestStockOrders:
             status=200,
         )
 
+        # Market orders need a collar price, so the quote is fetched
+        responses.add(
+            responses.GET,
+            f"{urls.QUOTES}AAPL/",
+            json={"symbol": "AAPL", "last_trade_price": "150.00",
+                  "previous_close": "149.00", "ask_price": "150.05",
+                  "bid_price": "149.95"},
+            status=200,
+        )
+
         # Mock order placement
         responses.add(
             responses.POST,
@@ -572,6 +582,16 @@ class TestStockOrders:
             responses.GET,
             urls.INSTRUMENTS,
             json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "AAPL"}]},
+            status=200,
+        )
+
+        # Market orders need a collar price, so the quote is fetched
+        responses.add(
+            responses.GET,
+            f"{urls.QUOTES}AAPL/",
+            json={"symbol": "AAPL", "last_trade_price": "150.00",
+                  "previous_close": "149.00", "ask_price": "150.05",
+                  "bid_price": "149.95"},
             status=200,
         )
 
@@ -619,6 +639,16 @@ class TestStockOrders:
             responses.GET,
             urls.INSTRUMENTS,
             json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "TSLA"}]},
+            status=200,
+        )
+
+        # Market orders need a collar price, so the quote is fetched
+        responses.add(
+            responses.GET,
+            f"{urls.QUOTES}TSLA/",
+            json={"symbol": "TSLA", "last_trade_price": "200.00",
+                  "previous_close": "199.00", "ask_price": "200.05",
+                  "bid_price": "199.95"},
             status=200,
         )
 
@@ -975,6 +1005,16 @@ class TestOrderManagement:
             responses.GET,
             urls.INSTRUMENTS,
             json={"results": [{"url": f"{BASE}/instruments/abc123/", "symbol": "AAPL"}]},
+            status=200,
+        )
+
+        # Market orders need a collar price, so the quote is fetched
+        responses.add(
+            responses.GET,
+            f"{urls.QUOTES}AAPL/",
+            json={"symbol": "AAPL", "last_trade_price": "150.00",
+                  "previous_close": "149.00", "ask_price": "150.05",
+                  "bid_price": "149.95"},
             status=200,
         )
 

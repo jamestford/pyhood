@@ -1509,11 +1509,25 @@ class PyhoodClient:
             order_type = "limit"
             trigger = "stop"
 
+        # Robinhood requires a collar price on market orders: submitting one
+        # without it is rejected with "Market buy order requested, but no price
+        # provided." The collar is the current ask for a buy, bid for a sell.
+        ask_price = None
+        bid_price = None
+        collar_price = None
+        if order_type == "market" and price is None:
+            quote = self.get_quote(symbol)
+            ask_price = quote.ask or quote.price
+            bid_price = quote.bid or quote.price
+            collar_price = ask_price if side == "buy" else bid_price
+            if not collar_price:
+                raise OrderError(f"No price available to collar a market order for {symbol}")
+
         payload = {
             "account": self._get_account_url(account_number),
             "instrument": self._get_instrument_url(symbol),
             "symbol": symbol.upper(),
-            "price": str(price) if price else None,
+            "price": str(price) if price else (str(collar_price) if collar_price else None),
             "stop_price": str(stop_price) if stop_price else None,
             "quantity": str(quantity),
             "side": side,
@@ -1528,6 +1542,16 @@ class PyhoodClient:
 
         if trailing_peg is not None:
             payload["trailing_peg"] = trailing_peg
+
+        # The app sends the quote alongside a market order; include it so the
+        # collar price can be validated server-side.
+        if ask_price is not None:
+            payload["ask_price"] = str(ask_price)
+            payload["bid_price"] = str(bid_price)
+
+        # A market order carries no stop price unless it is stop-triggered.
+        if order_type == "market" and trigger == "immediate":
+            payload.pop("stop_price", None)
 
         # Remove None values
         payload = {k: v for k, v in payload.items() if v is not None}
@@ -1562,11 +1586,12 @@ class PyhoodClient:
             errors = " ".join(data.get("non_field_errors", [])) if isinstance(data, dict) else ""
             if "app version" in errors:
                 raise OrderError(
-                    "Robinhood rejected this order because it gates trailing stops "
-                    "to its own current app versions. The accepted version is not "
-                    "published and arbitrary values return 412, so no third-party "
-                    "client can place trailing stops at present. Server said: "
-                    f"{errors}"
+                    "Robinhood rejected this order because it gates MARKET orders "
+                    "to its own current app versions. Limit orders are unaffected — "
+                    "pass an explicit price, or use a marketable limit (a price at "
+                    "or through the current quote) for immediate execution. The "
+                    "accepted app version is not published and arbitrary values "
+                    f"return 412. Server said: {errors}"
                 )
             raise OrderError(f"Order rejected: {data}")
 
@@ -1895,6 +1920,13 @@ class PyhoodClient:
 
         Raises:
             OrderError: If the amount is below $1 or the quote is unusable.
+
+        Note:
+            Verified 2026-08-09: Robinhood currently blocks this for
+            third-party clients. Fractional quantities require a market order
+            ("Limit order quantity cannot include fractional shares"), and
+            market orders are gated to Robinhood's own app versions. The call
+            is left in place so it works unchanged if that gate is lifted.
         """
         return self._order_stock_by_price(
             symbol, amount_in_dollars, "buy", account_number, time_in_force,

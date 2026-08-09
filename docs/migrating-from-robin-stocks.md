@@ -105,18 +105,29 @@ Trailing stops and fractional orders:
 | `order_sell_fractional_by_price(symbol, dollars)` | `client.sell_stock_by_price(symbol, dollars)` |
 | `order_buy_fractional_by_quantity(symbol, qty)` | `client.buy_stock(symbol, qty)` — fractional quantities are accepted |
 
-**Trailing stops are blocked by Robinhood, not by pyhood.** Tested against the live API on 2026-08-09, the server rejects them from any third-party client:
+**Some order types are blocked by Robinhood, not by pyhood.** Tested against the live API on 2026-08-09:
+
+| Order type | Whole shares | Fractional |
+| --- | --- | --- |
+| **Limit** | works | rejected — *"Limit order quantity cannot include fractional shares"* |
+| **Market** | rejected — app-version gate | rejected — app-version gate |
+
+Market orders are refused for third-party clients with:
 
 ```
 Your app version is missing important stock trading updates.
 You can still place orders on the web.
 ```
 
-Robinhood gates trailing stops to its own current app versions. The accepted version is not published, and sending any other value returns `412 Precondition Failed`, so there is no header a third-party library can send. robin_stocks sends the same `X-Robinhood-API-Version: 1.431.4` and fails identically.
+Robinhood gates them to its own current app versions. Only `1.431.4` is a recognised value and it is too old; any other value returns `412 Precondition Failed`; omitting the header, sending web-client headers, and varying `time_in_force` all fail identically. robin_stocks sends the same `1.431.4`.
 
-pyhood raises an `OrderError` explaining this rather than silently failing. The methods stay in place: if Robinhood widens the accepted versions, they will start working with no code change.
+Consequences:
 
-Separately, Robinhood returns *"Trailing stop limit orders not supported"* — a trailing stop is always a market order, so passing both `price` and a trail is rejected up front.
+- **Market orders** — use a limit price instead. A limit at or through the quote executes immediately.
+- **Fractional orders** (`buy_stock_by_price`) — unreachable. Fractional needs a market order, and limits reject fractional quantities.
+- **Trailing stops** — unreachable. They are market orders. Robinhood also reports *"Trailing stop limit orders not supported"*, so there is no limit variant.
+
+pyhood raises an explanatory `OrderError` in each case rather than failing opaquely, and the methods remain so they work unchanged if the gate lifts.
 
 Order history takes `start_date=` to avoid paging through years of orders:
 
