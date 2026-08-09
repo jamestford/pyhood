@@ -15,9 +15,7 @@
 [![Security](https://github.com/jamestford/pyhood/actions/workflows/security.yml/badge.svg)](https://github.com/jamestford/pyhood/actions/workflows/security.yml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-A modern, reliable Python client for the Robinhood API.
-
-Built for automated trading — with auth that doesn't break, proper error handling, and sane defaults.
+A modern, reliable Python client for the Robinhood API. Built for automated trading with auth that doesn't break, proper error handling, and sane defaults. Key features include silent refresh of credentials, retirement accounts, and the official crypto API are pyhood-only.
 
 ## How pyhood compares
 
@@ -37,26 +35,11 @@ Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and its acti
 | **Order history date filter** | ✅ | ✅ | ✅ |
 | **Minimum Python** | 3.10 | 3.9 | 3.10 |
 
-**If your automation keeps dying because a session expired and nobody was around to approve a device prompt, that is the row that matters.** Silent refresh, retirement accounts, and the official crypto API are pyhood-only.
-
-**On futures positions:** the endpoint lives at `ceres/v1/accounts/{id}/positions/`. It was previously undiscovered — the fork ships a placeholder that prints "endpoint not yet discovered" and returns `None`.
-
-**On `pickle`:** robin_stocks stores sessions with `pickle`, which deserializes arbitrary objects ([CWE-502](https://cwe.mitre.org/data/definitions/502.html)); a fix has been [open since March 2026](https://github.com/jmfernandes/robin_stocks/pull/1646). pyhood has always used JSON; the fork has since switched.
-
-**Migrating?** See the [robin_stocks → pyhood migration guide](docs/migrating-from-robin-stocks.md) for a function-by-function map.
-
-robin_stocks is the original and by far the most widely used — it earned that. But its last merge was February 2026, and its own issue tracker now [points newcomers to the fork](https://github.com/jmfernandes/robin_stocks/issues/1650). If you are migrating, pyhood is worth a look.
-
-**Also considered:** [pyrh](https://github.com/robinhood-unofficial/pyrh) (1.8k stars) — last release March 2023, last commit March 2024; [fast_arrow](https://github.com/westonplatter/fast_arrow) — options-focused, last commit 2021; [friartuck](https://github.com/codesociety/friartuck) — a backtesting framework rather than an API client, last commit 2023. The comparison above is limited to libraries under active development.
-
-For the API itself, [sanko/Robinhood](https://github.com/sanko/Robinhood) remains the best community reference for Robinhood's unofficial endpoints.
-
-*Verified against both repositories on 2026-08-09 by reading their source, not their docs. Corrections welcome — open an issue if anything here is out of date.*
+**Migrating from robin_stocks?** See the [migration guide](docs/migrating-from-robin-stocks.md) for a function-by-function map.
 
 ## Why pyhood?
 
 - 🪙 **Dual API support** — The only Python library that wraps both Robinhood's unofficial stocks/options API and their official Crypto Trading API. One library, full coverage.
-
 - 🔐 **Auth that just works** — Login with timeouts, automatic token refresh, and session persistence. Authenticate once, stay connected for days. No more scripts that hang forever waiting for device approval.
 - 🔄 **Automatic token refresh** — pyhood uses OAuth refresh tokens to renew your session silently — no credentials, no device approval, no human in the loop. Built for unattended automation.
 - 🏷️ **Type hints everywhere** — Full type annotations, dataclass responses, IDE-friendly. No more guessing what's in a dict.
@@ -342,22 +325,6 @@ candles = client.get_option_historicals("option-id-here", interval="day", span="
 # Account documents (statements, trade confirms, tax docs)
 docs = client.get_documents(doc_type="account_statement")
 ```
-
-## Development Status
-- ✅ Stocks/options market data (unofficial API) — functional (equity + index options)
-- ✅ Futures trading (contracts, quotes, orders, P&L) — functional
-- ✅ Crypto trading (official API) — functional
-- ✅ Authentication with automatic token refresh — functional
-- ✅ Full order management for stocks/options — functional
-- ✅ Banking (ACH transfers, deposits/withdrawals) — functional
-- ✅ Watchlists (create/manage) — functional
-- ✅ Dividends (query history) — functional
-- ✅ Markets/Trading Hours (exchange schedules) — functional
-- ✅ User profile & notification settings — functional
-- ✅ Research & discovery (ratings, news, movers, tags, popularity) — functional
-- ✅ Portfolio historicals & option historicals — functional
-- ✅ Documents & statements — functional
-- ✅ Day trades, margin calls, deposit schedules — functional
 
 ## Acknowledgments
 
