@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Promoted from `Development Status :: 3 - Alpha` to `4 - Beta` on PyPI — 259 tests, CI across Python 3.10-3.13, and ten releases
+- PyPI keywords now include `robinhood-api`, `robin_stocks`, `robin-stocks` and `pyrh`, so the package is findable by people searching for the libraries they are migrating from
+
 ## [0.10.0] - 2026-08-09
 
 ### Fixed
