@@ -5,6 +5,19 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["pyhood"]
 
+[tool.hatch.build.targets.sdist]
+# Ship source, tests and the readable docs — not the multi-megabyte logo
+# sources, the built docs site config, or CI plumbing.
+include = [
+    "/pyhood",
+    "/tests",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE",
+    "/SECURITY.md",
+    "/pyproject.toml",
+]
+
 [project]
 name = "pyhood"
 version = "0.9.0"
