@@ -105,29 +105,16 @@ Trailing stops and fractional orders:
 | `order_sell_fractional_by_price(symbol, dollars)` | `client.sell_stock_by_price(symbol, dollars)` |
 | `order_buy_fractional_by_quantity(symbol, qty)` | `client.buy_stock(symbol, qty)` — fractional quantities are accepted |
 
-**Some order types are blocked by Robinhood, not by pyhood.** Tested against the live API on 2026-08-09:
-
-| Order type | Whole shares | Fractional |
-| --- | --- | --- |
-| **Limit** | works | rejected — *"Limit order quantity cannot include fractional shares"* |
-| **Market** | rejected — app-version gate | rejected — app-version gate |
-
-Market orders are refused for third-party clients with:
+**A note on `order_form_version`.** Robinhood versions its order form and refuses orders from clients sending an old value or none, with:
 
 ```
 Your app version is missing important stock trading updates.
 You can still place orders on the web.
 ```
 
-This is **not** a version-header problem. The web app sends the same `X-Robinhood-API-Version: 1.431.4` that pyhood does, and adding its other headers (`X-TimeZone-Id`, `X-Hyper-Ex`, `Rh-Contract-Protected`) changes nothing. Every consistent `market_hours` / `extended_hours` combination is refused for market orders, while the same combination on a **limit** order reaches business-logic validation. The gate is on market orders specifically.
+This reads like a client-version block but is not — it means the *order form* version. pyhood sends the current value (`7`, captured from the web client). robin_stocks does not send this field at all, so its market orders, fractional orders and trailing stops are subject to this rejection.
 
-Consequences:
-
-- **Market orders** — use a limit price instead. A limit at or through the quote executes immediately.
-- **Fractional orders** (`buy_stock_by_price`) — unreachable. Fractional needs a market order, and limits reject fractional quantities.
-- **Trailing stops** — unreachable. They are market orders. Robinhood also reports *"Trailing stop limit orders not supported"*, so there is no limit variant.
-
-pyhood raises an explanatory `OrderError` in each case rather than failing opaquely, and the methods remain so they work unchanged if the gate lifts.
+If that message reappears, Robinhood has moved to a newer form version: raise `ORDER_FORM_VERSION` in `pyhood/client.py`. pyhood's error message says so explicitly rather than failing opaquely.
 
 Order history takes `start_date=` to avoid paging through years of orders:
 

@@ -52,6 +52,12 @@ from pyhood.models import (
 
 logger = logging.getLogger("pyhood")
 
+# Robinhood versions its order form and refuses orders from clients sending an
+# older value (or none) with "Your app version is missing important stock
+# trading updates." Captured from the web client on 2026-08-09; 6 is also
+# accepted, 1 is not. Bump this if that error reappears.
+ORDER_FORM_VERSION = 7
+
 # Robinhood instrument IDs, as returned bare in news related_instruments
 _INSTRUMENT_ID_RE = re.compile(
     r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE
@@ -1558,6 +1564,7 @@ class PyhoodClient:
             "override_day_trade_checks": False,
             "override_dtbp_checks": False,
             "ref_id": str(uuid.uuid4()),
+            "order_form_version": ORDER_FORM_VERSION,
         }
 
         if trailing_peg is not None:
@@ -1609,12 +1616,10 @@ class PyhoodClient:
             errors = " ".join(data.get("non_field_errors", [])) if isinstance(data, dict) else ""
             if "app version" in errors:
                 raise OrderError(
-                    "Robinhood rejected this order because it gates MARKET orders "
-                    "to its own current app versions. Limit orders are unaffected — "
-                    "pass an explicit price, or use a marketable limit (a price at "
-                    "or through the current quote) for immediate execution. The "
-                    "accepted app version is not published and arbitrary values "
-                    f"return 412. Server said: {errors}"
+                    "Robinhood rejected this order for sending an outdated order "
+                    f"form version (pyhood sends {ORDER_FORM_VERSION}). Robinhood "
+                    "has likely moved to a newer one — raise ORDER_FORM_VERSION in "
+                    f"pyhood/client.py. Server said: {errors}"
                 )
             raise OrderError(f"Order rejected: {data}")
 

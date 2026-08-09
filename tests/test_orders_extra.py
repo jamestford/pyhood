@@ -220,7 +220,7 @@ class TestTrailingStopServerLimits:
 
     @responses.activate
     def test_app_version_gate_gets_explanatory_error(self, client):
-        """The gate applies to market orders generally, not just trailing stops."""
+        """A stale order_form_version points the reader at the constant to bump."""
         _mock_account()
         responses.add(
             responses.GET, f"{urls.QUOTES}AAPL/",
@@ -242,7 +242,7 @@ class TestTrailingStopServerLimits:
             status=400,
         )
 
-        with pytest.raises(OrderError, match="gates MARKET orders"):
+        with pytest.raises(OrderError, match="outdated order form version"):
             client.buy_stock("AAPL", 1, trail_percent=50.0)
 
     @responses.activate
@@ -378,3 +378,27 @@ class TestMarketHoursSession:
     def test_invalid_session_rejected(self, client):
         with pytest.raises(OrderError, match="market_hours must be one of"):
             client.buy_stock("AAPL", 1, price=100.0, market_hours="overnight")
+
+
+class TestOrderFormVersion:
+    """Confirmed live 2026-08-09: without this field Robinhood refuses the
+    order with "Your app version is missing important stock trading updates".
+    Sending 7 (or 6) is accepted; 1 is not. Captured from the web client.
+    """
+
+    @responses.activate
+    def test_order_payload_carries_form_version(self, client):
+        _mock_account()
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        responses.add(
+            responses.POST, urls.ORDERS, json={"id": "o-1", "state": "queued"},
+            status=201,
+        )
+
+        client.buy_stock("AAPL", 1, price=100.0)
+
+        assert "order_form_version=7" in str(responses.calls[-1].request.body)
