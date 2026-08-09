@@ -104,6 +104,14 @@ def futures_orders_url(account_id: str) -> str:
     return f"{FUTURES_ACCOUNTS}{account_id}/orders/"
 
 
+# ── Interest / Fees ──────────────────────────────────────────────────
+
+INTEREST_PAYMENTS = f"{BASE}/accounts/sweeps/"
+MARGIN_INTEREST = f"{BASE}/cash_journal/margin_interest_charges/"
+SUBSCRIPTION_FEES = f"{BASE}/subscription/subscription_fees/"
+UNIFIED_TRANSFERS = "https://bonfire.robinhood.com/paymenthub/unified_transfers/"
+
+
 def futures_positions_url(account_id: str) -> str:
     """URL for open futures positions on a specific account."""
     return f"{FUTURES_ACCOUNTS}{account_id}/positions/"

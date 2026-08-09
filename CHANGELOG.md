@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Market orders, fractional orders and trailing stops were all rejected** — Robinhood refuses orders that omit `order_form_version`, responding "Your app version is missing important stock trading updates". Despite the wording this is the *order form* version, not a client version. pyhood now sends `7`. Any value from 2 upward is accepted; `1` and omission are refused. robin_stocks sends `4` on ordinary stock orders, which works — but omits it on `order_trailing_stop`, so trailing stops fail there.
+- **Rejected orders were reported as successful** — `order_stock()` and `order_option()` only treated a response as an error when it carried a `detail` or `error` key, but Robinhood returns field-level validation errors (`{"field": ["message"]}`) that have neither. Any such rejection returned an `Order` with a blank id and no exception, so callers believed the order was placed. Both now raise when the response has no `id`.
+- Trailing stop rejections now raise a specific `OrderError` explaining that Robinhood gates the feature to its own app versions, rather than surfacing the raw server text.
+- Passing both a `price` and a trail is rejected up front — Robinhood does not support trailing stop limit orders.
+
+### Added
+- **`is_market_open()`** — whether trading is open right now, for the regular or extended session. Uses the New York trading date rather than the UTC date, so it stays correct during the evening. Orders placed while closed are queued rather than rejected, which is easy to mistake for a hang.
+- **Extended and 24-hour trading sessions** — `market_hours` on `buy_stock()`, `sell_stock()` and `order_stock()`, accepting `regular_hours`, `extended_hours` or `all_day_hours`. `extended_hours` is derived from it, since Robinhood rejects orders where the two disagree.
+- **Interest, fees and transfers** — `get_interest_payments()`, `get_margin_interest()`, `get_subscription_fees()`, `get_unified_transfers()`. All verified against live data except margin interest, where the endpoint is confirmed but the account has no charges to observe.
+- **Trailing stop orders** — `buy_stock(..., trail_amount=)` / `trail_percent=`, and the same on `sell_stock()` and `order_stock()`. Posted as JSON, since the nested `trailing_peg` cannot survive form encoding. **Robinhood currently rejects these from third-party clients** — see Fixed below.
+- **Fractional orders by dollar amount** — `buy_stock_by_price()` and `sell_stock_by_price()`.
+- **Multi-leg option spreads** — `order_option_spread()` for debit and credit spreads, with per-leg ratios.
+- **`cancel_all_option_orders()`** — mirrors the existing stock version.
+- **CSV export** — `export_stock_orders()` and `export_option_orders()`, accepting a file or directory path.
+- **`unlink_bank_account()`** — irreversible; not exercised against a live account.
+- Migration guide from robin_stocks, with every referenced method verified to exist.
+
+Order-placement additions are verified by asserting the request payload, not by placing live orders.
+
 ### Changed
 - Promoted from `Development Status :: 3 - Alpha` to `4 - Beta` on PyPI — 259 tests, CI across Python 3.10-3.13, and ten releases
 - PyPI keywords now include `robinhood-api`, `robin_stocks`, `robin-stocks` and `pyrh`, so the package is findable by people searching for the libraries they are migrating from

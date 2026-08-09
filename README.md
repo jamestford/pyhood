@@ -35,6 +35,8 @@ Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and its acti
 | **Order history date filter** | ✅ | ✅ | ✅ |
 | **Minimum Python** | 3.10 | 3.9 | 3.10 |
 
+**Migrating from robin_stocks?** See the [migration guide](docs/migrating-from-robin-stocks.md) for a function-by-function map.
+
 ## Why pyhood?
 
 - 🪙 **Dual API support** — The only Python library that wraps both Robinhood's unofficial stocks/options API and their official Crypto Trading API. One library, full coverage.

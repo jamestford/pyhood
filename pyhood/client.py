@@ -5,11 +5,15 @@ All methods return typed dataclasses, not raw dicts.
 
 from __future__ import annotations
 
+import csv
 import logging
+import math
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from pyhood import urls
 from pyhood.auth import get_session
@@ -27,6 +31,7 @@ from pyhood.models import (
     FuturesOrder,
     FuturesPnL,
     FuturesQuote,
+    InterestPayment,
     Market,
     MarketHours,
     Mover,
@@ -41,11 +46,19 @@ from pyhood.models import (
     Quote,
     Rating,
     StockSplit,
+    SubscriptionFee,
+    UnifiedTransfer,
     UserProfile,
     Watchlist,
 )
 
 logger = logging.getLogger("pyhood")
+
+# Robinhood versions its order form and refuses orders from clients sending an
+# older value (or none) with "Your app version is missing important stock
+# trading updates." Captured from the web client on 2026-08-09; 6 is also
+# accepted, 1 is not. Bump this if that error reappears.
+ORDER_FORM_VERSION = 7
 
 # Robinhood instrument IDs, as returned bare in news related_instruments
 _INSTRUMENT_ID_RE = re.compile(
@@ -1004,6 +1017,47 @@ class PyhoodClient:
             extended_closes_at=data.get("extended_closes_at", "") or "",
         )
 
+    def is_market_open(
+        self, market: str = "XNAS", extended_hours: bool = False,
+    ) -> bool:
+        """Whether the market is open for trading right now.
+
+        Args:
+            market: Market MIC code. Defaults to 'XNAS' (Nasdaq).
+            extended_hours: Check the extended session rather than the
+                regular one.
+
+        Returns:
+            True if trading is open now. False on weekends, holidays, and
+            outside session hours.
+
+        Note:
+            An order placed while closed is accepted and queued rather than
+            rejected — it executes at the next open. Check this first if that
+            distinction matters.
+        """
+        now = datetime.now(timezone.utc)
+        # The trading date is the market's local date, which differs from the
+        # UTC date during the evening in New York.
+        local_date = now.astimezone(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+
+        hours = self.get_market_hours(market, local_date)
+        if not hours.is_open:
+            return False
+
+        opens = hours.extended_opens_at if extended_hours else hours.opens_at
+        closes = hours.extended_closes_at if extended_hours else hours.closes_at
+        if not opens or not closes:
+            return False
+
+        try:
+            opens_dt = datetime.fromisoformat(opens.replace("Z", "+00:00"))
+            closes_dt = datetime.fromisoformat(closes.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+
+        return opens_dt <= now <= closes_dt
+
     # ── Dividends ──────────────────────────────────────────────────────
 
     def get_dividends(self) -> list[Dividend]:
@@ -1351,6 +1405,9 @@ class PyhoodClient:
         stop_price: float | None = None,
         time_in_force: str = "gtc",
         extended_hours: bool = False,
+        trail_amount: float | None = None,
+        trail_percent: float | None = None,
+        market_hours: str | None = None,
         account_number: str | None = None,
     ) -> Order:
         """Buy stock shares.
@@ -1376,6 +1433,9 @@ class PyhoodClient:
             time_in_force=time_in_force,
             extended_hours=extended_hours,
             account_number=account_number,
+            trail_amount=trail_amount,
+            trail_percent=trail_percent,
+            market_hours=market_hours,
         )
 
     def sell_stock(
@@ -1386,6 +1446,9 @@ class PyhoodClient:
         stop_price: float | None = None,
         time_in_force: str = "gtc",
         extended_hours: bool = False,
+        trail_amount: float | None = None,
+        trail_percent: float | None = None,
+        market_hours: str | None = None,
         account_number: str | None = None,
     ) -> Order:
         """Sell stock shares.
@@ -1411,6 +1474,9 @@ class PyhoodClient:
             time_in_force=time_in_force,
             extended_hours=extended_hours,
             account_number=account_number,
+            trail_amount=trail_amount,
+            trail_percent=trail_percent,
+            market_hours=market_hours,
         )
 
     def order_stock(
@@ -1423,6 +1489,9 @@ class PyhoodClient:
         time_in_force: str = "gtc",
         extended_hours: bool = False,
         account_number: str | None = None,
+        trail_amount: float | None = None,
+        trail_percent: float | None = None,
+        market_hours: str | None = None,
     ) -> Order:
         """Place a stock order (core method).
 
@@ -1435,12 +1504,67 @@ class PyhoodClient:
             time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
             extended_hours: Whether to allow extended hours trading.
             account_number: Specific account (e.g. IRA). None = default.
+            trail_amount: Trail by a dollar amount, for a trailing stop.
+            trail_percent: Trail by a percentage, for a trailing stop.
+                Note that Robinhood currently blocks trailing stops for
+                third-party clients — see the module docs.
+            market_hours: Trading session — 'regular_hours', 'extended_hours'
+                or 'all_day_hours'. Defaults to regular hours. Anything other
+                than regular hours sets extended_hours automatically; the two
+                must agree or Robinhood rejects the order.
 
         Returns:
             Order object with details.
+
+        Raises:
+            OrderError: If both trail_amount and trail_percent are given.
         """
+        if trail_amount is not None and trail_percent is not None:
+            raise OrderError("Pass trail_amount or trail_percent, not both")
+
+        valid_sessions = ("regular_hours", "extended_hours", "all_day_hours")
+        if market_hours is not None and market_hours not in valid_sessions:
+            raise OrderError(f"market_hours must be one of {valid_sessions}")
+
+        if market_hours is not None:
+            # Robinhood rejects a session that disagrees with extended_hours
+            # ("Extended hours and market hours mismatch"), so derive it.
+            extended_hours = market_hours != "regular_hours"
+
+        if (trail_amount is not None or trail_percent is not None) and price is not None:
+            # Confirmed against the live API: "Trailing stop limit orders not
+            # supported." A trailing stop is always a market order.
+            raise OrderError(
+                "Robinhood does not support trailing stop limit orders — "
+                "omit price to place a trailing stop market order"
+            )
+
+        trailing_peg = None
+        if trail_amount is not None or trail_percent is not None:
+            # A trailing stop is a stop order whose stop price follows the
+            # market; the initial stop is anchored off the current quote.
+            last = self.get_quote(symbol).price
+            if trail_amount is not None:
+                margin = trail_amount
+                trailing_peg = {
+                    "type": "price",
+                    "price": {"amount": str(trail_amount), "currency_code": "USD"},
+                }
+            else:
+                margin = last * (trail_percent or 0) / 100
+                trailing_peg = {"type": "percentage", "percentage": str(trail_percent)}
+
+            stop_price = round(last + margin if side == "buy" else last - margin, 2)
+            if side == "buy":
+                # Buy stops need a limit above the stop; 5% headroom, as the
+                # app itself uses.
+                price = round(stop_price * 1.05, 2)
+
         # Determine order type and trigger
-        if price is None and stop_price is None:
+        if trailing_peg is not None:
+            order_type = "market"
+            trigger = "stop"
+        elif price is None and stop_price is None:
             order_type = "market"
             trigger = "immediate"
         elif price is not None and stop_price is None:
@@ -1454,11 +1578,25 @@ class PyhoodClient:
             order_type = "limit"
             trigger = "stop"
 
+        # Robinhood requires a collar price on market orders: submitting one
+        # without it is rejected with "Market buy order requested, but no price
+        # provided." The collar is the current ask for a buy, bid for a sell.
+        ask_price = None
+        bid_price = None
+        collar_price = None
+        if order_type == "market" and price is None:
+            quote = self.get_quote(symbol)
+            ask_price = quote.ask or quote.price
+            bid_price = quote.bid or quote.price
+            collar_price = ask_price if side == "buy" else bid_price
+            if not collar_price:
+                raise OrderError(f"No price available to collar a market order for {symbol}")
+
         payload = {
             "account": self._get_account_url(account_number),
             "instrument": self._get_instrument_url(symbol),
             "symbol": symbol.upper(),
-            "price": str(price) if price else None,
+            "price": str(price) if price else (str(collar_price) if collar_price else None),
             "stop_price": str(stop_price) if stop_price else None,
             "quantity": str(quantity),
             "side": side,
@@ -1469,13 +1607,37 @@ class PyhoodClient:
             "override_day_trade_checks": False,
             "override_dtbp_checks": False,
             "ref_id": str(uuid.uuid4()),
+            "order_form_version": ORDER_FORM_VERSION,
         }
+
+        if trailing_peg is not None:
+            payload["trailing_peg"] = trailing_peg
+
+        if market_hours is not None:
+            payload["market_hours"] = market_hours
+
+        # The app sends the quote alongside a market order; include it so the
+        # collar price can be validated server-side.
+        if ask_price is not None:
+            payload["ask_price"] = str(ask_price)
+            payload["bid_price"] = str(bid_price)
+
+        # A market order carries no stop price unless it is stop-triggered.
+        if order_type == "market" and trigger == "immediate":
+            payload.pop("stop_price", None)
 
         # Remove None values
         payload = {k: v for k, v in payload.items() if v is not None}
 
         try:
-            data = self._session.post(urls.ORDERS, data=payload, accept_codes=(400,))
+            # trailing_peg is a nested object and cannot survive form encoding,
+            # so trailing stops are posted as JSON.
+            if trailing_peg is not None:
+                data = self._session.post(
+                    urls.ORDERS, json_data=payload, accept_codes=(400,),
+                )
+            else:
+                data = self._session.post(urls.ORDERS, data=payload, accept_codes=(400,))
         except Exception as e:
             if hasattr(e, 'response') and e.response:
                 error_details = e.response
@@ -1489,6 +1651,20 @@ class PyhoodClient:
         if "detail" in data or "error" in data:
             error_msg = data.get("detail") or data.get("error") or "Unknown order error"
             raise OrderError(f"Order rejected: {error_msg}")
+
+        # Field-level validation errors carry neither 'detail' nor 'error' —
+        # they come back as {field: [messages]}. Without this, a rejected order
+        # returns an Order with a blank id and the caller believes it worked.
+        if "id" not in data:
+            errors = " ".join(data.get("non_field_errors", [])) if isinstance(data, dict) else ""
+            if "app version" in errors:
+                raise OrderError(
+                    "Robinhood rejected this order for sending an outdated order "
+                    f"form version (pyhood sends {ORDER_FORM_VERSION}). Robinhood "
+                    "has likely moved to a newer one — raise ORDER_FORM_VERSION in "
+                    f"pyhood/client.py. Server said: {errors}"
+                )
+            raise OrderError(f"Order rejected: {data}")
 
         # Parse successful response
         created_at = None
@@ -1670,6 +1846,11 @@ class PyhoodClient:
             error_msg = data.get("detail") or data.get("error") or "Unknown option order error"
             raise OrderError(f"Option order rejected: {error_msg}")
 
+        # Field-level validation errors carry neither key; without this an
+        # order with a blank id is returned as if it succeeded.
+        if "id" not in data:
+            raise OrderError(f"Option order rejected: {data}")
+
         # Parse successful response
         created_at = None
         if data.get("created_at"):
@@ -1690,6 +1871,185 @@ class PyhoodClient:
             time_in_force=time_in_force,
             trigger="immediate",
             instrument_type="option",
+        )
+
+    def order_option_spread(
+        self,
+        symbol: str,
+        quantity: int,
+        price: float,
+        legs: list[dict],
+        direction: str,
+        time_in_force: str = "gtc",
+        account_number: str | None = None,
+    ) -> Order:
+        """Place a multi-leg option spread order.
+
+        Args:
+            symbol: Underlying stock symbol.
+            quantity: Number of spreads.
+            price: Net limit price per spread.
+            legs: One dict per leg, each with `strike`, `expiration`,
+                `option_type` ('call'/'put'), `side` ('buy'/'sell') and
+                `effect` ('open'/'close').
+            direction: 'debit' or 'credit'.
+            time_in_force: 'gtc', 'gtd', 'ioc' or 'fok'.
+            account_number: Specific account (e.g. IRA). None = default.
+
+        Returns:
+            Order object with details.
+
+        Raises:
+            OrderError: If fewer than two legs are given, or a leg is missing
+                a required key.
+
+        Note:
+            The payload shape matches what robin_stocks sends in production,
+            but placing a spread has not been verified against the live API —
+            that would mean opening a real position.
+        """
+        if len(legs) < 2:
+            raise OrderError("A spread needs at least two legs")
+
+        # Validate every leg before any instrument lookup, so a malformed
+        # spread fails without making network calls.
+        required = {"strike", "expiration", "option_type", "side", "effect"}
+        for i, leg in enumerate(legs):
+            missing = required - set(leg)
+            if missing:
+                raise OrderError(f"Leg {i} missing {sorted(missing)}")
+
+        built_legs = []
+        for leg in legs:
+            built_legs.append({
+                "position_effect": leg["effect"],
+                "side": leg["side"],
+                "ratio_quantity": leg.get("ratio", 1),
+                "option": self._get_option_id(
+                    symbol, leg["expiration"], leg["strike"], leg["option_type"],
+                ),
+            })
+
+        payload = {
+            "account": self._get_account_url(account_number),
+            "legs": built_legs,
+            "price": str(price),
+            "quantity": str(quantity),
+            "direction": direction,
+            "time_in_force": time_in_force,
+            "trigger": "immediate",
+            "type": "limit",
+            "override_day_trade_checks": False,
+            "override_dtbp_checks": False,
+            "ref_id": str(uuid.uuid4()),
+        }
+
+        data = self._session.post(
+            urls.OPTIONS_ORDERS, json_data=payload, accept_codes=(400,),
+        )
+        if "id" not in data:
+            raise OrderError(f"Spread order failed: {data.get('detail', data)}")
+
+        created_at = None
+        if data.get("created_at"):
+            try:
+                created_at = datetime.fromisoformat(data["created_at"].replace("Z", "+00:00"))
+            except ValueError:
+                pass
+
+        return Order(
+            order_id=data.get("id", ""),
+            symbol=symbol.upper(),
+            side=direction,
+            order_type="limit",
+            quantity=float(quantity),
+            price=price,
+            status=data.get("state", "unknown"),
+            created_at=created_at,
+            time_in_force=time_in_force,
+            trigger="immediate",
+            instrument_type="option",
+        )
+
+    def buy_stock_by_price(
+        self,
+        symbol: str,
+        amount_in_dollars: float,
+        account_number: str | None = None,
+        time_in_force: str = "gfd",
+    ) -> Order:
+        """Buy fractional shares by dollar amount.
+
+        Args:
+            symbol: Stock ticker symbol.
+            amount_in_dollars: Dollar amount to buy (minimum $1).
+            account_number: Specific account (e.g. IRA). None = default.
+            time_in_force: Defaults to 'gfd', which fractional orders require.
+
+        Returns:
+            Order object with details.
+
+        Raises:
+            OrderError: If the amount is below $1 or the quote is unusable.
+
+        Note:
+            Verified 2026-08-09: Robinhood currently blocks this for
+            third-party clients. Fractional quantities require a market order
+            ("Limit order quantity cannot include fractional shares"), and
+            market orders are gated to Robinhood's own app versions. The call
+            is left in place so it works unchanged if that gate is lifted.
+        """
+        return self._order_stock_by_price(
+            symbol, amount_in_dollars, "buy", account_number, time_in_force,
+        )
+
+    def sell_stock_by_price(
+        self,
+        symbol: str,
+        amount_in_dollars: float,
+        account_number: str | None = None,
+        time_in_force: str = "gfd",
+    ) -> Order:
+        """Sell fractional shares by dollar amount.
+
+        Args:
+            symbol: Stock ticker symbol.
+            amount_in_dollars: Dollar amount to sell (minimum $1).
+            account_number: Specific account (e.g. IRA). None = default.
+            time_in_force: Defaults to 'gfd', which fractional orders require.
+
+        Returns:
+            Order object with details.
+        """
+        return self._order_stock_by_price(
+            symbol, amount_in_dollars, "sell", account_number, time_in_force,
+        )
+
+    def _order_stock_by_price(
+        self, symbol: str, amount_in_dollars: float, side: str,
+        account_number: str | None, time_in_force: str,
+    ) -> Order:
+        """Convert a dollar amount to fractional shares and place the order."""
+        if amount_in_dollars < 1:
+            raise OrderError("Fractional orders must be at least $1")
+
+        quote = self.get_quote(symbol)
+        # Size against the lowest plausible execution price so the notional
+        # still clears Robinhood's $1 minimum if the order fills at the bid.
+        # Rounding down against the last price puts a $1 order under the
+        # minimum and it is rejected.
+        price = min(p for p in (quote.price, quote.bid, quote.ask) if p and p > 0) \
+            if any(p and p > 0 for p in (quote.price, quote.bid, quote.ask)) else 0
+        if price <= 0:
+            raise OrderError(f"Cannot price fractional order for {symbol}")
+
+        shares = math.ceil(amount_in_dollars / price * 1_000_000) / 1_000_000
+        return self.order_stock(
+            symbol=symbol,
+            quantity=shares,
+            side=side,
+            time_in_force=time_in_force,
+            account_number=account_number,
         )
 
     def get_stock_orders(self, start_date: str | datetime | None = None) -> list[Order]:
@@ -2002,6 +2362,169 @@ class PyhoodClient:
 
         return results
 
+    # ── Export ───────────────────────────────────────────────────────────
+
+    def export_stock_orders(
+        self, path: str | Path, start_date: str | datetime | None = None,
+    ) -> Path:
+        """Write completed stock orders to a CSV file.
+
+        Args:
+            path: Destination file, or a directory to write a default filename into.
+            start_date: Only include orders created on or after this point.
+
+        Returns:
+            The path written.
+        """
+        orders = [o for o in self.get_stock_orders(start_date=start_date) if o.status == "filled"]
+        return self._write_orders_csv(path, orders, "stock_orders")
+
+    def export_option_orders(
+        self, path: str | Path, start_date: str | datetime | None = None,
+    ) -> Path:
+        """Write completed option orders to a CSV file.
+
+        Args:
+            path: Destination file, or a directory to write a default filename into.
+            start_date: Only include orders created on or after this point.
+
+        Returns:
+            The path written.
+        """
+        orders = [o for o in self.get_option_orders(start_date=start_date) if o.status == "filled"]
+        return self._write_orders_csv(path, orders, "option_orders")
+
+    @staticmethod
+    def _write_orders_csv(path: str | Path, orders: list[Order], stem: str) -> Path:
+        """Write orders to CSV, accepting either a file or a directory path."""
+        target = Path(path)
+        if target.is_dir():
+            target = target / f"{stem}.csv"
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+        fields = [
+            "order_id", "symbol", "side", "order_type", "quantity", "price",
+            "average_price", "status", "created_at", "filled_at",
+            "time_in_force", "instrument_type",
+        ]
+        with open(target, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
+            writer.writeheader()
+            for o in orders:
+                row = {f: getattr(o, f, "") for f in fields}
+                for k, v in row.items():
+                    if isinstance(v, datetime):
+                        row[k] = v.isoformat()
+                    elif v is None:
+                        row[k] = ""
+                writer.writerow(row)
+        return target
+
+    def unlink_bank_account(self, relationship_id: str) -> dict:
+        """Unlink a connected bank account.
+
+        Args:
+            relationship_id: ACH relationship ID from `get_bank_accounts()`.
+
+        Returns:
+            The API response.
+
+        Warning:
+            This is irreversible — relinking requires re-verifying the account
+            with Robinhood. Not exercised against a live account.
+        """
+        return self._session.post(f"{urls.ACH_RELATIONSHIPS}{relationship_id}/unlink/")
+
+    # ── Interest / Fees ──────────────────────────────────────────────────
+
+    def get_interest_payments(self) -> list[InterestPayment]:
+        """Get cash sweep interest payments.
+
+        Returns:
+            List of InterestPayment, newest first as returned by the API.
+        """
+        data = self._session.get_paginated(urls.INTEREST_PAYMENTS)
+        payments: list[InterestPayment] = []
+        for item in data:
+            amount = item.get("amount") or {}
+            payments.append(InterestPayment(
+                id=item.get("id", ""),
+                amount=float(amount.get("amount", 0) or 0),
+                currency=amount.get("currency_code", "USD"),
+                direction=item.get("direction", ""),
+                pay_date=item.get("pay_date", ""),
+                pay_period_start=item.get("pay_period_start", ""),
+                pay_period_end=item.get("pay_period_end", ""),
+                payout_type=item.get("payout_type", ""),
+                reason=item.get("reason", ""),
+                account_number=item.get("account_number", ""),
+            ))
+        return payments
+
+    def get_margin_interest(self) -> list[dict]:
+        """Get margin interest charges.
+
+        Returns:
+            List of raw charge dicts.
+
+        Note:
+            The endpoint and its `results` envelope are verified, but the test
+            account has never been charged margin interest, so no populated
+            record has been observed. Records are returned unmapped rather
+            than forced onto a dataclass built from guessed field names.
+        """
+        return self._session.get_paginated(urls.MARGIN_INTEREST)
+
+    def get_subscription_fees(self) -> list[SubscriptionFee]:
+        """Get Robinhood Gold subscription fees.
+
+        Returns:
+            List of SubscriptionFee.
+        """
+        data = self._session.get_paginated(urls.SUBSCRIPTION_FEES)
+        return [
+            SubscriptionFee(
+                id=item.get("id", ""),
+                amount=float(item.get("amount", 0) or 0),
+                date=item.get("date", ""),
+                state=item.get("state", ""),
+                credit=float(item.get("credit", 0) or 0),
+                carry_forward_credit=float(item.get("carry_forward_credit", 0) or 0),
+                created_at=item.get("created_at", ""),
+                account_number=item.get("account_number", ""),
+            )
+            for item in data
+        ]
+
+    def get_unified_transfers(self) -> list[UnifiedTransfer]:
+        """Get transfers from the unified payment hub.
+
+        Broader than `get_transfers()`, which covers ACH only — this also
+        includes internal transfers such as brokerage to IRA.
+
+        Returns:
+            List of UnifiedTransfer.
+        """
+        data = self._session.get_paginated(urls.UNIFIED_TRANSFERS)
+        return [
+            UnifiedTransfer(
+                id=item.get("id", ""),
+                amount=float(item.get("amount", 0) or 0),
+                currency=item.get("currency", "usd"),
+                direction=item.get("direction", ""),
+                transfer_type=item.get("transfer_type", ""),
+                state=item.get("state", ""),
+                description=item.get("description", ""),
+                originating_account_id=item.get("originating_account_id", ""),
+                originating_account_type=item.get("originating_account_type", ""),
+                receiving_account_id=item.get("receiving_account_id", ""),
+                receiving_account_type=item.get("receiving_account_type", ""),
+                created_at=item.get("created_at", ""),
+                completed_at=item.get("completed_at", ""),
+            )
+            for item in data
+        ]
+
     # ── IPO Access ───────────────────────────────────────────────────────
 
     def get_ipo_access_list(self) -> dict:
@@ -2105,6 +2628,26 @@ class PyhoodClient:
             o for o in self.get_stock_orders(start_date=start_date)
             if o.order_id in ipo_ids
         ]
+
+    def cancel_all_option_orders(self) -> list[dict]:
+        """Cancel all pending option orders.
+
+        Returns:
+            List of response dicts from cancellations.
+        """
+        orders = self.get_option_orders()
+        results = []
+
+        for order in orders:
+            if order.status in ("pending", "unconfirmed", "queued"):
+                try:
+                    result = self.cancel_order(order.order_id)
+                    results.append(result)
+                except Exception as e:
+                    logger.warning(f"Failed to cancel option order {order.order_id}: {e}")
+                    results.append({"error": str(e), "order_id": order.order_id})
+
+        return results
 
     # ── Futures ──────────────────────────────────────────────────────────
 
