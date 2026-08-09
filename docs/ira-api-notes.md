@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-23
 **Account:** Roth IRA (ira_roth)
-**Account Number:** 915060792
+**Account Number:** <IRA_ACCOUNT_NUMBER>
 **Status:** ✅ Fully working — stock and option orders confirmed
 
 ---
@@ -10,7 +10,7 @@
 ## 1. Discovery: Finding the IRA Account
 
 ### Problem
-The standard `/accounts/` endpoint only returns the individual margin account (946351343).
+The standard `/accounts/` endpoint only returns the individual margin account (<INDIVIDUAL_ACCOUNT_NUMBER>).
 The IRA account is **invisible** to `/accounts/` — no query parameter (`type`, `brokerage_account_type`, `all`, `include_retirement`, `page_size`, etc.) makes it appear.
 
 ### Solution
@@ -31,7 +31,7 @@ This returns a `results` array with **all** accounts (individual + IRA). Each en
 Once you know the account number, you can access it directly through the standard API:
 
 ```
-GET https://api.robinhood.com/accounts/915060792/
+GET https://api.robinhood.com/accounts/<IRA_ACCOUNT_NUMBER>/
 ```
 
 This returns the full account object (same schema as individual accounts), including:
@@ -47,7 +47,7 @@ This returns the full account object (same schema as individual accounts), inclu
 
 | Field | Value | Notes |
 |-------|-------|-------|
-| `account_number` | `915060792` | |
+| `account_number` | `<IRA_ACCOUNT_NUMBER>` | |
 | `type` | `cash` | No margin on IRA |
 | `brokerage_account_type` | `ira_roth` | |
 | `option_level` | `option_level_2` (max) | Level 3 capped to 2 |
@@ -73,7 +73,7 @@ By default, `option_level` is `null` (options not enabled).
 
 ### Enable via PATCH
 ```
-PATCH https://api.robinhood.com/accounts/915060792/
+PATCH https://api.robinhood.com/accounts/<IRA_ACCOUNT_NUMBER>/
 Content-Type: application/json
 
 {"option_level": "option_level_3"}
@@ -100,7 +100,7 @@ Standard `/orders/` endpoint works. Just use the IRA account URL:
 
 ```python
 payload = {
-    'account': 'https://api.robinhood.com/accounts/915060792/',
+    'account': 'https://api.robinhood.com/accounts/<IRA_ACCOUNT_NUMBER>/',
     'instrument': instrument_url,
     'symbol': 'AAPL',
     'type': 'limit',
@@ -126,7 +126,7 @@ Standard `/options/orders/` endpoint works with the IRA account URL:
 
 ```python
 payload = {
-    'account': 'https://api.robinhood.com/accounts/915060792/',
+    'account': 'https://api.robinhood.com/accounts/<IRA_ACCOUNT_NUMBER>/',
     'direction': 'debit',  # REQUIRED for options (not 'side')
     'legs': [{
         'position_effect': 'open',
@@ -157,7 +157,7 @@ r = session.post('https://api.robinhood.com/options/orders/', json=payload,
 - Use `direction` instead of `side` (unlike stock orders)
   - `"debit"` for buy orders
   - `"credit"` for sell orders (covered calls, CSPs)
-- The `account` field is the full URL: `https://api.robinhood.com/accounts/915060792/`
+- The `account` field is the full URL: `https://api.robinhood.com/accounts/<IRA_ACCOUNT_NUMBER>/`
 
 ---
 
@@ -165,27 +165,27 @@ r = session.post('https://api.robinhood.com/options/orders/', json=payload,
 
 ### Positions
 ```
-GET https://api.robinhood.com/positions/?account_number=915060792
+GET https://api.robinhood.com/positions/?account_number=<IRA_ACCOUNT_NUMBER>
 ```
 
 ### Option Positions
 ```
-GET https://api.robinhood.com/options/aggregate_positions/?account_numbers=915060792
+GET https://api.robinhood.com/options/aggregate_positions/?account_numbers=<IRA_ACCOUNT_NUMBER>
 ```
 
 ### Option Orders
 ```
-GET https://api.robinhood.com/options/orders/?account_numbers=915060792
+GET https://api.robinhood.com/options/orders/?account_numbers=<IRA_ACCOUNT_NUMBER>
 ```
 
 ### Portfolio
 ```
-GET https://api.robinhood.com/portfolios/915060792/
+GET https://api.robinhood.com/portfolios/<IRA_ACCOUNT_NUMBER>/
 ```
 
 All standard endpoints work with the IRA account number as a filter parameter.
 
-**Note:** `GET /accounts/915060792/positions/` returns 404. Use the query param approach.
+**Note:** `GET /accounts/<IRA_ACCOUNT_NUMBER>/positions/` returns 404. Use the query param approach.
 
 ---
 
@@ -194,14 +194,14 @@ All standard endpoints work with the IRA account number as a filter parameter.
 | Purpose | Endpoint | Method |
 |---------|----------|--------|
 | **Discover all accounts** | `GET bonfire.robinhood.com/accounts/unified/` | GET |
-| **IRA account details** | `GET api.robinhood.com/accounts/915060792/` | GET |
-| **Enable options** | `PATCH api.robinhood.com/accounts/915060792/` | PATCH |
-| **IRA portfolio** | `GET api.robinhood.com/portfolios/915060792/` | GET |
-| **IRA positions** | `GET api.robinhood.com/positions/?account_number=915060792` | GET |
-| **IRA option positions** | `GET api.robinhood.com/options/aggregate_positions/?account_numbers=915060792` | GET |
+| **IRA account details** | `GET api.robinhood.com/accounts/<IRA_ACCOUNT_NUMBER>/` | GET |
+| **Enable options** | `PATCH api.robinhood.com/accounts/<IRA_ACCOUNT_NUMBER>/` | PATCH |
+| **IRA portfolio** | `GET api.robinhood.com/portfolios/<IRA_ACCOUNT_NUMBER>/` | GET |
+| **IRA positions** | `GET api.robinhood.com/positions/?account_number=<IRA_ACCOUNT_NUMBER>` | GET |
+| **IRA option positions** | `GET api.robinhood.com/options/aggregate_positions/?account_numbers=<IRA_ACCOUNT_NUMBER>` | GET |
 | **Place stock order** | `POST api.robinhood.com/orders/` | POST (with account URL in body) |
 | **Place option order** | `POST api.robinhood.com/options/orders/` | POST (with account URL in body) |
-| **IRA option orders** | `GET api.robinhood.com/options/orders/?account_numbers=915060792` | GET |
+| **IRA option orders** | `GET api.robinhood.com/options/orders/?account_numbers=<IRA_ACCOUNT_NUMBER>` | GET |
 
 ---
 

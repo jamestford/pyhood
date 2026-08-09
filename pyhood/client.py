@@ -1111,7 +1111,7 @@ class PyhoodClient:
         in the legs data. Also fetches current market data for P&L and greeks.
 
         Args:
-            account_number: Filter to specific account (e.g. '915060792' for IRA).
+            account_number: Filter to a specific account, e.g. an IRA account number.
             nonzero: Only return positions with quantity > 0.
         """
         params: dict[str, str] = {}

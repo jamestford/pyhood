@@ -3,16 +3,20 @@
 ## Overview
 Modern Robinhood API client library. Public package on PyPI replacing abandoned robin_stocks.
 
+> **Note:** This file is public. Do not record account numbers, balances, tokens,
+> or any other account-identifying detail here.
+
 ## Repository & Distribution
 - **Repo:** github.com/jamestford/pyhood (public)
 - **PyPI:** pyhood package
-- **Local:** ~/Projects/pyhood
-- **Venv:** .venv (Python 3.14)
+- **Docs:** https://jamestford.github.io/pyhood
+- **Supported Python:** 3.10–3.13 (CI matrix); `requires-python = ">=3.10"`
 
 ## Authentication & Session
-- **Token Storage:** ~/.pyhood/session.json
+- **Token Storage:** `~/.pyhood/session.json` (override with `token_path`)
 - **Session Fields:** access_token, token_type, refresh_token, device_token, saved_at
-- **Account:** ~$16K balance, authenticated and working
+- **Session is per-process:** `get_session()` reads a module global, so a fresh
+  process must call `login()` or `refresh()` before constructing a client
 
 ## Key Features
 
@@ -22,6 +26,8 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - **Token Lifetime:** ~5-8 days (not 24h as commonly assumed)
 - **Auto-Recovery:** `login()` tries refresh first, falls back to full re-login
 - **Rate Limit Protection:** Aggressive safeguards against Robinhood's auth rate limits
+- **Cross-platform:** login timeout alarm is best-effort — skipped on Windows and
+  off the main thread, where `signal.SIGALRM` is unavailable
 
 ### Trading Features
 - Stocks/options quotes with Greeks
@@ -32,11 +38,13 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - Buying power and positions
 - Account information
 - Futures trading (contracts, quotes, orders, P&L)
+- Order history accepts `start_date` to avoid paging a full history
 
 ### Banking & Account Features
 - ACH bank account listing and management
 - ACH transfer history (deposits/withdrawals)
 - Initiate and cancel transfers
+- Debit card (Cash Management) transactions
 - Dividend history with symbol filtering
 - Watchlist management (list, add, remove)
 - Markets and trading hours lookup
@@ -61,7 +69,7 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - **Keys stored separately:** Crypto keys in pyhood config
 
 ## Testing & Quality
-- **Test Coverage:** ~79% (212 tests passing)
+- **Tests:** 235 passing
 - **CI Pipeline:** GitHub Actions on Python 3.10-3.13
 - **Linting:** ruff for code style
 - **HTTP Mocking:** responses library for reliable tests
@@ -72,15 +80,21 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - **Headers Matter:** Must use robin_stocks style headers (`Accept: */*`, `User-Agent: *`)
 - **NEVER retry without human confirmation** of device approval
 - **Refresh tokens work!** — Key differentiator from robin_stocks
+- **Tokens rotate on refresh:** refreshing invalidates the previous pair, so a
+  session copied to another machine is killed the next time either side refreshes
 
 ## IRA Support (v0.3.0)
-- **Roth IRA Account:** 915060792 (ira_roth, cash account, option_level_2)
-- **Individual Account:** 946351343 (margin)
 - **Discovery:** `get_all_accounts()` via bonfire `/accounts/unified/`
 - **IRA Positions:** Use `account_number` param for stocks, `account_numbers` (plural) for options
 - **IRA Orders:** Standard endpoints work with IRA account URL in payload
 - **Docs:** `docs/ira-api-notes.md` — full reverse-engineering notes
 - **Key gotcha:** `/accounts/` never shows IRA — must use bonfire or direct URL
+
+## API Quirks Worth Remembering
+- **Unknown query params are silently ignored**, not rejected — a filter the
+  endpoint does not support returns unfiltered data rather than an error
+- **News `related_instruments` are bare instrument IDs**, not symbols or dicts;
+  resolve via `/instruments/{id}/`
 
 ## Current Projects
 
@@ -91,7 +105,7 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 
 ## API Architecture
 - `pyhood/auth.py` — Login, refresh, device approval
-- `pyhood/client.py` — Main HoodClient class
+- `pyhood/client.py` — Main `PyhoodClient` class
 - `pyhood/http.py` — Rate-limited HTTP with retries
 - `pyhood/models.py` — Typed dataclasses for all responses
 - `pyhood/exceptions.py` — Complete exception hierarchy
@@ -104,7 +118,3 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - Tokens rotate on refresh (old ones invalidated)
 - This enables automated systems to self-heal
 - robin_stocks never implemented this critical feature
-
-## Recent Fixes
-- **Linting:** All ruff failures resolved
-- **CI status:** All tests passing across Python 3.10-3.13
