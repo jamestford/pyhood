@@ -1125,22 +1125,29 @@ class PyhoodClient:
             qty = float(item.get("quantity", 0))
             if qty == 0 and nonzero:
                 continue
-            avg_cost = float(item.get("average_buy_price", 0))
+            # average_buy_price is 0 on positions the clearing system has
+            # settled; clearing_average_cost carries the real figure and is
+            # what the app displays.
+            avg_cost = float(item.get("average_buy_price", 0) or 0)
+            if not avg_cost:
+                avg_cost = float(item.get("clearing_average_cost", 0) or 0)
 
-            # Get current price from the instrument
-            instrument_url = item.get("instrument", "")
+            # The payload carries the symbol, so no instrument lookup is needed.
+            symbol = item.get("symbol", "")
             current_price = 0.0
-            if instrument_url:
-                try:
-                    inst_data = self._session.get(instrument_url)
-                    symbol = inst_data.get("symbol", "")
-                    quote = self.get_quote(symbol)
-                    current_price = quote.price
-                except Exception:
-                    symbol = ""
+            instrument_url = item.get("instrument", "")
+            try:
+                if not symbol and instrument_url:
+                    symbol = self._session.get(instrument_url).get("symbol", "")
+                if symbol:
+                    current_price = self.get_quote(symbol).price
+            except Exception:
+                pass
 
             equity = qty * current_price
-            cost_basis = qty * avg_cost
+            # Prefer the broker's own cost basis; it accounts for lots and
+            # corporate actions that quantity x average price does not.
+            cost_basis = float(item.get("clearing_cost_basis", 0) or 0) or qty * avg_cost
             unrealized_pl = equity - cost_basis
             unrealized_pl_pct = (unrealized_pl / cost_basis * 100) if cost_basis > 0 else 0.0
 

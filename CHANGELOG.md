@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Position P&L was wrong, reporting gains on losing positions** — `get_positions()` read `average_buy_price`, which Robinhood returns as `0` for settled positions. Cost basis therefore came out as zero and `unrealized_pl` degenerated to equity. It now falls back to `clearing_average_cost` and prefers the broker's own `clearing_cost_basis`, matching what the app displays. Caught by comparing pyhood's output against the Robinhood web UI for the same position.
+- `get_positions()` no longer fetches each instrument to resolve a symbol — the positions payload already carries it, saving a request per position.
+
+### Fixed
 - **Market orders, fractional orders and trailing stops were all rejected** — Robinhood refuses orders that omit `order_form_version`, responding "Your app version is missing important stock trading updates". Despite the wording this is the *order form* version, not a client version. pyhood now sends `7`. Any value from 2 upward is accepted; `1` and omission are refused. robin_stocks sends `4` on ordinary stock orders, which works — but omits it on `order_trailing_stop`, so trailing stops fail there.
 - **Rejected orders were reported as successful** — `order_stock()` and `order_option()` only treated a response as an error when it carried a `detail` or `error` key, but Robinhood returns field-level validation errors (`{"field": ["message"]}`) that have neither. Any such rejection returned an `Order` with a blank id and no exception, so callers believed the order was placed. Both now raise when the response has no `id`.
 - Trailing stop rejections now raise a specific `OrderError` explaining that Robinhood gates the feature to its own app versions, rather than surfacing the raw server text.
