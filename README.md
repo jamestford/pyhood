@@ -19,6 +19,34 @@ A modern, reliable Python client for the Robinhood API.
 
 Built for automated trading — with auth that doesn't break, proper error handling, and sane defaults.
 
+## How pyhood compares
+
+Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and its actively maintained fork [robin_stocks_v2](https://github.com/DhruvaBansal00/robin_stocks_v2):
+
+| | pyhood | robin_stocks | robin_stocks_v2 |
+|---|:---:|:---:|:---:|
+| **Silent session refresh** — renew a session with no credentials and no device approval | ✅ | ❌ | ❌ |
+| **IRA / retirement accounts** — trade stocks and options in Traditional and Roth IRAs | ✅ | ❌ | ❌ |
+| **Official Crypto Trading API** — Ed25519 key auth, not the unofficial endpoints | ✅ | ❌ | ❌ |
+| **Futures positions** | ✅ | ❌ | stub, returns `None` |
+| **Futures contracts & quotes** | ✅ | ❌ | ✅ |
+| **IPO Access** | ✅ | ❌ | ✅ |
+| **Typed responses** — dataclasses with full annotations, not raw dicts | ✅ | ❌ | partial |
+| **Index options** (SPX, NDX, VIX, RUT, XSP) | ✅ | partial | ✅ |
+| **Session storage** | JSON | `pickle` | JSON |
+| **Order history date filter** | ✅ | ✅ | ✅ |
+| **Minimum Python** | 3.10 | 3.9 | 3.10 |
+
+**If your automation keeps dying because a session expired and nobody was around to approve a device prompt, that is the row that matters.** Silent refresh, retirement accounts, and the official crypto API are pyhood-only.
+
+**On futures positions:** the endpoint lives at `ceres/v1/accounts/{id}/positions/`. It was previously undiscovered — the fork ships a placeholder that prints "endpoint not yet discovered" and returns `None`.
+
+**On `pickle`:** robin_stocks stores sessions with `pickle`, which deserializes arbitrary objects ([CWE-502](https://cwe.mitre.org/data/definitions/502.html)); a fix has been [open since March 2026](https://github.com/jmfernandes/robin_stocks/pull/1646). pyhood has always used JSON; the fork has since switched.
+
+robin_stocks is the original and by far the most widely used — it earned that. But its last merge was February 2026, and its own issue tracker now [points newcomers to the fork](https://github.com/jmfernandes/robin_stocks/issues/1650). If you are migrating, pyhood is worth a look.
+
+*Verified against both repositories on 2026-08-09 by reading their source, not their docs. Corrections welcome — open an issue if anything here is out of date.*
+
 ## Why pyhood?
 
 - 🪙 **Dual API support** — The only Python library that wraps both Robinhood's unofficial stocks/options API and their official Crypto Trading API. One library, full coverage.
@@ -28,40 +56,14 @@ Built for automated trading — with auth that doesn't break, proper error handl
 - 🏷️ **Type hints everywhere** — Full type annotations, dataclass responses, IDE-friendly. No more guessing what's in a dict.
 - 🛡️ **Built-in rate limiting** — Automatic request throttling and retry logic so you don't get locked out.
 - 📊 **Options-first** — Deep options chain support with Greeks, volume/OI analysis, and earnings integration. Supports both equity and index options (SPX, NDX, VIX, RUT).
-- 📈 **Futures trading** — Contract details, real-time quotes, order history, and P&L calculation for Robinhood futures.
+- 📈 **Futures trading** — Contract details, real-time quotes, open positions, order history, and P&L calculation for Robinhood futures.
+- 🎯 **IPO Access** — Read Robinhood's retail IPO allocation program: available offerings, eligibility, allocation results, and your IPO orders.
 - 🏦 **IRA/Retirement accounts** — Trade stocks and options in Traditional and Roth IRAs. The only Python Robinhood library with retirement account support.
 - 💰 **Banking & dividends** — Query ACH transfers, linked bank accounts, debit card transactions, and dividend history.
 - 📋 **Watchlists** — Create, manage, and modify your Robinhood watchlists programmatically.
 - 🔍 **Research & discovery** — Analyst ratings, news feed, S&P 500 movers, trending stocks, instrument popularity, and stock splits.
 - 📑 **Portfolio & documents** — Portfolio historicals, option historicals, account statements, and trade confirmations.
-- 🧪 **Tested and maintained** — 235 tests, CI across Python 3.10-3.13, linted with ruff. If it breaks, we know immediately.
-
-## Comparison
-
-Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and its actively maintained fork [robin_stocks_v2](https://github.com/DhruvaBansal00/robin_stocks_v2):
-
-| | pyhood | robin_stocks | robin_stocks_v2 |
-|---|:---:|:---:|:---:|
-| **Silent token refresh** — renew a session with no credentials and no device approval | ✅ | ❌ | ❌ |
-| **IRA / retirement accounts** — trade stocks and options in Traditional and Roth IRAs | ✅ | ❌ | ❌ |
-| **Official Crypto Trading API** — Ed25519 key auth, not the unofficial endpoints | ✅ | ❌ | ❌ |
-| **Typed responses** — dataclasses with full annotations rather than raw dicts | ✅ | ❌ | partial |
-| **Session storage** | JSON | pickle | JSON |
-| **Index options** (SPX, NDX, VIX, RUT, XSP) | ✅ | partial | ✅ |
-| **Futures trading** | ✅ | ❌ | ✅ more complete |
-| **IPO Access** | ❌ | ❌ | ✅ |
-| **Order history date filter** | ✅ | ✅ | ✅ |
-| **Minimum Python** | 3.10 | 3.9 | 3.10 |
-
-**Where pyhood is the only option:** session refresh, retirement accounts, and the official crypto API. If your automation keeps dying because a Robinhood session expired and nobody was around to approve a device prompt, that is the difference that matters.
-
-**Where the fork is ahead:** futures coverage is more extensive, and it has IPO Access support that pyhood lacks.
-
-**On `pickle`:** robin_stocks stores sessions with `pickle`, which deserializes arbitrary objects ([CWE-502](https://cwe.mitre.org/data/definitions/502.html)) — a fix has been [open since March 2026](https://github.com/jmfernandes/robin_stocks/pull/1646). pyhood has always used JSON; the fork has since switched.
-
-robin_stocks is the original and by far the most widely used — it earned that. But its last merge was February 2026, and its own issue tracker now [points newcomers to the fork](https://github.com/jmfernandes/robin_stocks/issues/1650). If you are migrating, pyhood is worth a look.
-
-*Verified against both repositories on 2026-08-09. Corrections welcome — open an issue if something here is out of date.*
+- 🧪 **Tested and maintained** — 259 tests, CI across Python 3.10-3.13, linted with ruff. If it breaks, we know immediately.
 
 ## Quick Start
 
