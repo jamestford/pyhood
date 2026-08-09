@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Crypto quotes always returned 0.0** — `get_best_bid_ask()` read `bid_price`/`ask_price`; the API returns `bid`/`ask`.
+- **Crypto market-data calls failed authentication** — the signature covers the path *including* its query string, but pyhood signed the bare path and let `requests` append the query separately. Every parameterised crypto endpoint returned "Authentication failed".
+- **`get_best_bid_ask()` sent the wrong parameter** — `symbols=` comma-joined, where the API wants `symbol=` repeated; it rejected the former as "Malformed symbol parameter".
+- **`get_estimated_price()` returned zeros** — the estimate is wrapped in a `results` list, and the fee is `est_fee`.
+
+### Removed
+- **`CryptoClient.get_historicals()`** now raises `APIError` — the Crypto Trading API has no historicals endpoint. Every candidate path returns 404 and it is absent from Robinhood's published spec. Its tests mocked an endpoint that does not exist.
+
 ### Security
 - **Session tokens were written world-readable** — `~/.pyhood/session.json` holds live access and refresh tokens but was created with the process umask, producing `-rw-r--r--` on a default macOS setup. Any user or process on the machine could read it and act on the account. Credential files are now created `0600` inside a `0700` directory, the mode is applied at creation so contents are never briefly exposed, and loading an over-permissive file logs a warning with the `chmod` to run.
 

@@ -9,7 +9,7 @@ import json
 import logging
 import time
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 import requests
 
@@ -29,7 +29,6 @@ from pyhood.crypto.urls import (
     CRYPTO_BASE,
     CRYPTO_BEST_BID_ASK,
     CRYPTO_ESTIMATED_PRICE,
-    CRYPTO_HISTORICALS,
     CRYPTO_HOLDINGS,
     CRYPTO_ORDERS,
     CRYPTO_TRADING_PAIRS,
@@ -146,16 +145,28 @@ class CryptoClient:
             else:
                 raise RateLimitError(f"Rate limited, retry after {wait_time:.1f}s", wait_time)
 
+        # The signature covers the path *including* the query string, so the
+        # query is folded in here rather than passed to requests separately —
+        # signing the bare path while sending one with a query produced an
+        # authentication failure on every parameterised endpoint.
+        signed_path = path
+        if params:
+            query = urlencode(params, doseq=True)
+            if query:
+                separator = "&" if "?" in signed_path else "?"
+                signed_path = f"{signed_path}{separator}{query}"
+            params = None
+
         # Sign request
         try:
             api_key_header, signature, timestamp = sign_request(
-                self.api_key, self.private_key_base64, method.upper(), path, body
+                self.api_key, self.private_key_base64, method.upper(), signed_path, body
             )
         except ValueError as e:
             raise AuthError(f"Failed to sign request: {e}") from e
 
         # Prepare request
-        url = self.base_url.rstrip('/') + '/' + path.lstrip('/')
+        url = self.base_url.rstrip('/') + '/' + signed_path.lstrip('/')
         headers = {
             'x-api-key': api_key_header,
             'x-signature': signature,
@@ -321,9 +332,11 @@ class CryptoClient:
             List of CryptoQuote objects
         """
         path = CRYPTO_BEST_BID_ASK.replace(CRYPTO_BASE, '')
-        params = {}
+        # The endpoint takes `symbol` repeated, not a comma-joined `symbols`:
+        # sending `symbols=` is rejected with "Malformed symbol parameter".
+        params: dict[str, Any] = {}
         if symbols:
-            params['symbols'] = ','.join(symbols)
+            params['symbol'] = list(symbols)
 
         items = self._paginate(path, params)
 
@@ -334,8 +347,8 @@ class CryptoClient:
 
             quotes.append(CryptoQuote(
                 symbol=item.get('symbol', ''),
-                bid=float(item.get('bid_price', 0)),
-                ask=float(item.get('ask_price', 0)),
+                bid=float(item.get('bid', 0) or 0),
+                ask=float(item.get('ask', 0) or 0),
                 timestamp=timestamp,
             ))
 
@@ -359,15 +372,21 @@ class CryptoClient:
             'quantity': str(quantity),
         }
 
-        data = self.make_request('GET', path, params=params)
+        response = self.make_request('GET', path, params=params)
+        # The estimate is wrapped in a results list, as with the other
+        # marketdata endpoints.
+        results = response.get('results') if isinstance(response, dict) else None
+        data = results[0] if isinstance(results, list) and results else response
 
         return EstimatedPrice(
             symbol=data.get('symbol', symbol),
             side=data.get('side', side),
             quantity=float(data.get('quantity', quantity)),
-            bid_price=float(data.get('bid_price', 0)),
-            ask_price=float(data.get('ask_price', 0)),
-            fee=float(data.get('fee', 0)),
+            # The endpoint returns whichever side was asked for, as `bid` or
+            # `ask`, and names the fee `est_fee`.
+            bid_price=float(data.get('bid', data.get('bid_price', 0)) or 0),
+            ask_price=float(data.get('ask', data.get('ask_price', 0)) or 0),
+            fee=float(data.get('est_fee', data.get('fee', 0)) or 0),
         )
 
     # ── Historicals ──────────────────────────────────────────────────────
@@ -378,52 +397,24 @@ class CryptoClient:
         interval: str = "hour",
         span: str = "week",
     ) -> list[CryptoCandle]:
-        """Get historical OHLCV data for a crypto asset.
+        """Deprecated — the Crypto Trading API has no historicals endpoint.
 
-        Args:
-            symbol: Crypto symbol (e.g., 'BTC-USD').
-            interval: Candle interval. One of '15second', 'minute',
-                '5minute', '10minute', 'hour', 'day', 'week'. Default: 'hour'.
-            span: Time range. One of 'hour', 'day', 'week', 'month',
-                '3month', 'year', '5year'. Default: 'week'.
+        Raises:
+            APIError: Always.
 
-        Returns:
-            List of CryptoCandle dataclasses with OHLCV data.
+        Verified 2026-08-09: every candidate path returns 404
+        (`marketdata/historicals/`, `marketdata/candles/`,
+        `trading/historicals/`, on both `/api/v1/` and `/api/v2/`), and the
+        endpoint is absent from Robinhood's published OpenAPI spec.
+
+        For crypto price history, use the unofficial endpoints via
+        `PyhoodClient` rather than the official Crypto Trading API.
         """
-        valid_intervals = ("15second", "minute", "5minute", "10minute", "hour", "day", "week")
-        valid_spans = ("hour", "day", "week", "month", "3month", "year", "5year")
-
-        if interval not in valid_intervals:
-            raise ValueError(
-                f"interval must be one of {valid_intervals}, got '{interval}'"
-            )
-        if span not in valid_spans:
-            raise ValueError(
-                f"span must be one of {valid_spans}, got '{span}'"
-            )
-
-        path = f"{CRYPTO_HISTORICALS}{symbol}/".replace(CRYPTO_BASE, '')
-        data = self.make_request('GET', path, params={
-            "interval": interval,
-            "span": span,
-            "bounds": "24_7",
-        })
-
-        candles = []
-        for h in data.get("data_points", []):
-            candles.append(CryptoCandle(
-                symbol=symbol,
-                begins_at=h.get("begins_at", ""),
-                open_price=float(h.get("open_price", 0)),
-                close_price=float(h.get("close_price", 0)),
-                high_price=float(h.get("high_price", 0)),
-                low_price=float(h.get("low_price", 0)),
-                volume=float(h.get("volume", 0)),
-            ))
-
-        return candles
-
-    # ── Holdings ─────────────────────────────────────────────────────────
+        raise APIError(
+            "The Crypto Trading API has no historicals endpoint — every "
+            "candidate path returns 404 and it is absent from Robinhood's "
+            "published spec. Use the unofficial API for crypto price history."
+        )
 
     def get_holdings(self, account_number: str, *asset_codes: str) -> list[CryptoHolding]:
         """Get crypto holdings for account.
