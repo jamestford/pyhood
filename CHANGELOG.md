@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Futures contracts and quotes never worked** — `get_futures_contract()` raised `SymbolNotFound` for every valid symbol, and `get_futures_quote()` failed with it
+  - The contract endpoint wraps its body in a `result` envelope with camelCase keys; the parser expected a flat snake_case object
+  - The quotes endpoint returns `data[0].data`; the parser read a non-existent `results` list
+  - Field mapping corrected: `description` (not `simple_name`), `expiration` (not `expiration_date`); `/ESZ26:XCME` is normalized to `ESZ26` and `FUTURES_STATE_ACTIVE` to `active`
+  - `tick_size`, `underlying` and `asset_class` are not returned by the endpoint and now default rather than being read from absent keys
+  - Existing tests used a fabricated response shape, so the whole futures surface failed in practice while CI stayed green
+  - Verified live against ES, NQ and MES contracts
+
+### Added
+- `get_futures_quote_by_id(contract_id)` — quote a contract directly, skipping the symbol lookup
+- `get_futures_order_info(order_id)` — fetch a single futures order by ID
+
 ## [0.9.0] - 2026-08-09
 
 ### Added

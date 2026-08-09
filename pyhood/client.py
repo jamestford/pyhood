@@ -2043,20 +2043,36 @@ class PyhoodClient:
         """
         self._set_futures_header()
         data = self._session.get(urls.futures_contract_url(symbol.upper()))
-        if not data or "id" not in data:
+        # The arsenal endpoint wraps the contract in a "result" envelope and
+        # uses camelCase keys; accept an unwrapped body too in case it changes.
+        item = data.get("result", data) if isinstance(data, dict) else {}
+        if not item or "id" not in item:
             raise SymbolNotFound(f"No futures contract for {symbol}")
 
         return FuturesContract(
-            symbol=data.get("symbol", symbol.upper()),
-            name=data.get("simple_name", "") or data.get("name", ""),
-            contract_id=data.get("id", ""),
-            expiration=data.get("expiration_date", ""),
-            tick_size=float(data.get("tick_size", 0) or 0),
-            multiplier=float(data.get("multiplier", 0) or 0),
-            status=data.get("state", "active"),
-            underlying=data.get("underlying_symbol", ""),
-            asset_class=data.get("asset_class", ""),
+            symbol=self._clean_futures_symbol(item, symbol),
+            name=item.get("description", "") or item.get("simple_name", ""),
+            contract_id=item.get("id", ""),
+            expiration=item.get("expiration", "") or item.get("expiration_date", ""),
+            tick_size=float(item.get("tick_size", 0) or 0),
+            multiplier=float(item.get("multiplier", 0) or 0),
+            status=self._clean_futures_state(item.get("state", "")),
+            underlying=item.get("underlying_symbol", ""),
+            asset_class=item.get("asset_class", ""),
         )
+
+    @staticmethod
+    def _clean_futures_symbol(item: dict, fallback: str) -> str:
+        """Normalize '/ESZ26:XCME' or '/ESZ26' to 'ESZ26'."""
+        raw = item.get("displaySymbol") or item.get("symbol") or fallback
+        return raw.lstrip("/").split(":")[0].upper()
+
+    @staticmethod
+    def _clean_futures_state(state: str) -> str:
+        """Normalize 'FUTURES_STATE_ACTIVE' to 'active'."""
+        if not state:
+            return "active"
+        return state.removeprefix("FUTURES_STATE_").lower()
 
     def get_futures_contracts(self, symbols: list[str]) -> dict[str, FuturesContract]:
         """Get futures contract details for multiple symbols.
@@ -2087,19 +2103,35 @@ class PyhoodClient:
         Raises:
             SymbolNotFound: If symbol not recognized.
         """
-        self._set_futures_header()
-        # Resolve symbol to contract ID first
         contract = self.get_futures_contract(symbol)
-        data = self._session.get(
-            urls.FUTURES_QUOTES, params={"ids": contract.contract_id}
-        )
-        results = data.get("results", [])
-        if not results:
-            raise SymbolNotFound(f"No futures quote for {symbol}")
+        return self.get_futures_quote_by_id(contract.contract_id, symbol=contract.symbol)
 
-        q = results[0]
+    def get_futures_quote_by_id(
+        self, contract_id: str, symbol: str = "",
+    ) -> FuturesQuote:
+        """Get a real-time futures quote by contract ID.
+
+        Avoids the contract lookup that `get_futures_quote` performs when the
+        contract ID is already known.
+
+        Args:
+            contract_id: Futures contract instrument ID.
+            symbol: Optional symbol to label the quote with.
+
+        Returns:
+            FuturesQuote with bid/ask/last price.
+
+        Raises:
+            SymbolNotFound: If no quote is returned for the contract.
+        """
+        self._set_futures_header()
+        data = self._session.get(urls.FUTURES_QUOTES, params={"ids": contract_id})
+        q = self._unwrap_futures_quote(data)
+        if not q:
+            raise SymbolNotFound(f"No futures quote for {symbol or contract_id}")
+
         return FuturesQuote(
-            symbol=symbol.upper(),
+            symbol=self._clean_futures_symbol(q, symbol or contract_id),
             last_price=float(q.get("last_trade_price", 0) or 0),
             bid=float(q.get("bid_price", 0) or 0),
             ask=float(q.get("ask_price", 0) or 0),
@@ -2108,8 +2140,30 @@ class PyhoodClient:
             prev_close=float(q.get("previous_close", 0) or 0),
             volume=int(float(q.get("volume", 0) or 0)),
             open_interest=int(float(q.get("open_interest", 0) or 0)),
-            contract_id=contract.contract_id,
+            contract_id=q.get("instrument_id", "") or contract_id,
         )
+
+    @staticmethod
+    def _unwrap_futures_quote(data: Any) -> dict:
+        """Pull the quote body out of the futures marketdata envelope.
+
+        The endpoint returns {"status": ..., "data": [{"status": ..., "data": {...}}]}.
+        A flat "results" list is also accepted in case the shape changes.
+        """
+        if not isinstance(data, dict):
+            return {}
+        entries = data.get("data")
+        if isinstance(entries, list) and entries:
+            inner = entries[0]
+            if isinstance(inner, dict):
+                body = inner.get("data")
+                if isinstance(body, dict):
+                    return body
+                return inner
+        results = data.get("results")
+        if isinstance(results, list) and results and isinstance(results[0], dict):
+            return results[0]
+        return {}
 
     def get_futures_quotes(self, symbols: list[str]) -> dict[str, FuturesQuote]:
         """Get real-time futures quotes for multiple symbols.
@@ -2182,6 +2236,26 @@ class PyhoodClient:
             url = data.get("next")
 
         return orders
+
+    def get_futures_order_info(
+        self, order_id: str, account_id: str | None = None,
+    ) -> FuturesOrder | None:
+        """Get a single futures order by ID.
+
+        The futures service has no single-order endpoint, so this scans the
+        order history client-side.
+
+        Args:
+            order_id: Futures order ID.
+            account_id: Futures account ID. Auto-discovered if None.
+
+        Returns:
+            The matching FuturesOrder, or None if not found.
+        """
+        for order in self.get_futures_orders(account_id=account_id):
+            if order.order_id == order_id:
+                return order
+        return None
 
     def get_filled_futures_orders(
         self, account_id: str | None = None,
