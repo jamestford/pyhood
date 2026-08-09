@@ -112,7 +112,9 @@ Your app version is missing important stock trading updates.
 You can still place orders on the web.
 ```
 
-This reads like a client-version block but is not — it means the *order form* version. pyhood sends the current value (`7`, captured from the web client). robin_stocks does not send this field at all, so its market orders, fractional orders and trailing stops are subject to this rejection.
+This reads like a client-version block but is not — it means the *order form* version. pyhood sends `7`, captured from the web client. Tested against the live API, any value from `2` upward is accepted; `1` and omitting the field are refused.
+
+robin_stocks sends `4` on ordinary stock orders, so those are unaffected. It omits the field on `order_trailing_stop`, so trailing stops fail there with this error. Option orders do not require the field at all.
 
 If that message reappears, Robinhood has moved to a newer form version: raise `ORDER_FORM_VERSION` in `pyhood/client.py`. pyhood's error message says so explicitly rather than failing opaquely.
 
