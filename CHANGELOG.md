@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Passing both a `price` and a trail is rejected up front — Robinhood does not support trailing stop limit orders.
 
 ### Added
+- **Extended and 24-hour trading sessions** — `market_hours` on `buy_stock()`, `sell_stock()` and `order_stock()`, accepting `regular_hours`, `extended_hours` or `all_day_hours`. `extended_hours` is derived from it, since Robinhood rejects orders where the two disagree.
 - **Interest, fees and transfers** — `get_interest_payments()`, `get_margin_interest()`, `get_subscription_fees()`, `get_unified_transfers()`. All verified against live data except margin interest, where the endpoint is confirmed but the account has no charges to observe.
 - **Trailing stop orders** — `buy_stock(..., trail_amount=)` / `trail_percent=`, and the same on `sell_stock()` and `order_stock()`. Posted as JSON, since the nested `trailing_peg` cannot survive form encoding. **Robinhood currently rejects these from third-party clients** — see Fixed below.
 - **Fractional orders by dollar amount** — `buy_stock_by_price()` and `sell_stock_by_price()`.

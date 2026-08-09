@@ -119,7 +119,7 @@ Your app version is missing important stock trading updates.
 You can still place orders on the web.
 ```
 
-Robinhood gates them to its own current app versions. Only `1.431.4` is a recognised value and it is too old; any other value returns `412 Precondition Failed`; omitting the header, sending web-client headers, and varying `time_in_force` all fail identically. robin_stocks sends the same `1.431.4`.
+This is **not** a version-header problem. The web app sends the same `X-Robinhood-API-Version: 1.431.4` that pyhood does, and adding its other headers (`X-TimeZone-Id`, `X-Hyper-Ex`, `Rh-Contract-Protected`) changes nothing. Every consistent `market_hours` / `extended_hours` combination is refused for market orders, while the same combination on a **limit** order reaches business-logic validation. The gate is on market orders specifically.
 
 Consequences:
 
@@ -164,6 +164,19 @@ client.order_option_spread("AAPL", 1, 1.50, direction="debit", legs=[
      "side": "sell", "effect": "open"},
 ])
 ```
+
+## Extended and 24-hour sessions
+
+pyhood accepts a `market_hours` argument on stock orders, which robin_stocks exposes the same way:
+
+| robin_stocks | pyhood |
+| --- | --- |
+| `order(..., market_hours='extended_hours')` | `client.buy_stock(..., market_hours="extended_hours")` |
+| `order(..., market_hours='all_day_hours')` | `client.buy_stock(..., market_hours="all_day_hours")` |
+
+Valid values are `regular_hours`, `extended_hours` and `all_day_hours`. Robinhood rejects an order whose session disagrees with its `extended_hours` flag, so pyhood derives the flag from the session rather than letting the two drift apart.
+
+Omitting the argument sends no field and preserves the previous behaviour.
 
 ## Options chains and contracts
 

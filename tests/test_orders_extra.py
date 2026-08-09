@@ -325,3 +325,56 @@ class TestServerSideOrderConstraints:
         assert "bid_price=200.0" in body
         # The collar is a protocol detail, not a limit the caller set
         assert order.price is None
+
+
+class TestMarketHoursSession:
+    """Extended / 24-hour session support, confirmed live 2026-08-09.
+
+    A limit order with market_hours=all_day_hours and extended_hours=True
+    reached business-logic validation ("Not enough shares to sell"), meaning
+    it passed every structural check.
+    """
+
+    def _mock_prereqs(self):
+        _mock_account()
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            json={"results": [{"url": f"{BASE}/instruments/abc/", "symbol": "AAPL"}]},
+            status=200,
+        )
+        responses.add(
+            responses.POST, urls.ORDERS,
+            json={"id": "mh-1", "state": "queued"}, status=201,
+        )
+
+    @responses.activate
+    def test_all_day_hours_sets_extended_flag(self, client):
+        self._mock_prereqs()
+
+        client.buy_stock("AAPL", 1, price=100.0, market_hours="all_day_hours")
+
+        body = str(responses.calls[-1].request.body)
+        assert "market_hours=all_day_hours" in body
+        assert "extended_hours=True" in body
+
+    @responses.activate
+    def test_regular_hours_clears_extended_flag(self, client):
+        self._mock_prereqs()
+
+        client.buy_stock("AAPL", 1, price=100.0, market_hours="regular_hours",
+                         extended_hours=True)
+
+        body = str(responses.calls[-1].request.body)
+        assert "extended_hours=False" in body
+
+    @responses.activate
+    def test_omitted_session_sends_no_field(self, client):
+        self._mock_prereqs()
+
+        client.buy_stock("AAPL", 1, price=100.0)
+
+        assert "market_hours" not in str(responses.calls[-1].request.body)
+
+    def test_invalid_session_rejected(self, client):
+        with pytest.raises(OrderError, match="market_hours must be one of"):
+            client.buy_stock("AAPL", 1, price=100.0, market_hours="overnight")

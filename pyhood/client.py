@@ -1358,6 +1358,7 @@ class PyhoodClient:
         extended_hours: bool = False,
         trail_amount: float | None = None,
         trail_percent: float | None = None,
+        market_hours: str | None = None,
         account_number: str | None = None,
     ) -> Order:
         """Buy stock shares.
@@ -1385,6 +1386,7 @@ class PyhoodClient:
             account_number=account_number,
             trail_amount=trail_amount,
             trail_percent=trail_percent,
+            market_hours=market_hours,
         )
 
     def sell_stock(
@@ -1397,6 +1399,7 @@ class PyhoodClient:
         extended_hours: bool = False,
         trail_amount: float | None = None,
         trail_percent: float | None = None,
+        market_hours: str | None = None,
         account_number: str | None = None,
     ) -> Order:
         """Sell stock shares.
@@ -1424,6 +1427,7 @@ class PyhoodClient:
             account_number=account_number,
             trail_amount=trail_amount,
             trail_percent=trail_percent,
+            market_hours=market_hours,
         )
 
     def order_stock(
@@ -1438,6 +1442,7 @@ class PyhoodClient:
         account_number: str | None = None,
         trail_amount: float | None = None,
         trail_percent: float | None = None,
+        market_hours: str | None = None,
     ) -> Order:
         """Place a stock order (core method).
 
@@ -1452,6 +1457,12 @@ class PyhoodClient:
             account_number: Specific account (e.g. IRA). None = default.
             trail_amount: Trail by a dollar amount, for a trailing stop.
             trail_percent: Trail by a percentage, for a trailing stop.
+                Note that Robinhood currently blocks trailing stops for
+                third-party clients — see the module docs.
+            market_hours: Trading session — 'regular_hours', 'extended_hours'
+                or 'all_day_hours'. Defaults to regular hours. Anything other
+                than regular hours sets extended_hours automatically; the two
+                must agree or Robinhood rejects the order.
 
         Returns:
             Order object with details.
@@ -1461,6 +1472,15 @@ class PyhoodClient:
         """
         if trail_amount is not None and trail_percent is not None:
             raise OrderError("Pass trail_amount or trail_percent, not both")
+
+        valid_sessions = ("regular_hours", "extended_hours", "all_day_hours")
+        if market_hours is not None and market_hours not in valid_sessions:
+            raise OrderError(f"market_hours must be one of {valid_sessions}")
+
+        if market_hours is not None:
+            # Robinhood rejects a session that disagrees with extended_hours
+            # ("Extended hours and market hours mismatch"), so derive it.
+            extended_hours = market_hours != "regular_hours"
 
         if (trail_amount is not None or trail_percent is not None) and price is not None:
             # Confirmed against the live API: "Trailing stop limit orders not
@@ -1542,6 +1562,9 @@ class PyhoodClient:
 
         if trailing_peg is not None:
             payload["trailing_peg"] = trailing_peg
+
+        if market_hours is not None:
+            payload["market_hours"] = market_hours
 
         # The app sends the quote alongside a market order; include it so the
         # collar price can be validated server-side.
