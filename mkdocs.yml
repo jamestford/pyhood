@@ -37,6 +37,7 @@ theme:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Migrating from robin_stocks: migrating-from-robin-stocks.md
   - Authentication: authentication.md
   - Usage:
     - Stock Quotes: quotes.md

@@ -43,6 +43,8 @@ Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and its acti
 
 **On `pickle`:** robin_stocks stores sessions with `pickle`, which deserializes arbitrary objects ([CWE-502](https://cwe.mitre.org/data/definitions/502.html)); a fix has been [open since March 2026](https://github.com/jmfernandes/robin_stocks/pull/1646). pyhood has always used JSON; the fork has since switched.
 
+**Migrating?** See the [robin_stocks → pyhood migration guide](docs/migrating-from-robin-stocks.md) for a function-by-function map.
+
 robin_stocks is the original and by far the most widely used — it earned that. But its last merge was February 2026, and its own issue tracker now [points newcomers to the fork](https://github.com/jmfernandes/robin_stocks/issues/1650). If you are migrating, pyhood is worth a look.
 
 **Also considered:** [pyrh](https://github.com/robinhood-unofficial/pyrh) (1.8k stars) — last release March 2023, last commit March 2024; [fast_arrow](https://github.com/westonplatter/fast_arrow) — options-focused, last commit 2021; [friartuck](https://github.com/codesociety/friartuck) — a backtesting framework rather than an API client, last commit 2023. The comparison above is limited to libraries under active development.
