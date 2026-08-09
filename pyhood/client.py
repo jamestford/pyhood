@@ -2002,6 +2002,110 @@ class PyhoodClient:
 
         return results
 
+    # ── IPO Access ───────────────────────────────────────────────────────
+
+    def get_ipo_access_list(self) -> dict:
+        """Get the IPO Access list — offerings currently available to you.
+
+        When Robinhood has no offerings, the response carries an `empty_state`
+        section instead of any offering.
+
+        Returns:
+            The raw list view model. These are UI view models with deeply
+            nested, offering-dependent structure, so they are returned as-is
+            rather than mapped onto a dataclass.
+        """
+        return self._session.get(urls.IPO_ACCESS_LIST)
+
+    def has_ipo_offerings(self) -> bool:
+        """Whether any IPO Access offerings are currently available."""
+        data = self.get_ipo_access_list()
+        return bool(data) and "empty_state" not in data
+
+    def get_ipo_access_cards(self, instrument_ids: str | list[str]) -> list[dict]:
+        """Get IPO Access cards for one or more instruments.
+
+        Args:
+            instrument_ids: An instrument ID, or a list of them.
+
+        Returns:
+            List of card dicts (`instrument_id`, `name`, `title`, `action`).
+        """
+        data = self._session.get(urls.ipo_access_cards_url(instrument_ids))
+        return data.get("results", []) if isinstance(data, dict) else []
+
+    def get_ipo_access_summary(self, instrument_id: str) -> dict:
+        """Get an IPO's summary view model — company, dates and price range.
+
+        Note:
+            Only exists while an offering is live; returns 404 otherwise. This
+            response shape has not been observed against a real offering.
+        """
+        return self._session.get(urls.ipo_access_summary_url(instrument_id))
+
+    def get_ipo_access_order_entry(
+        self, instrument_id: str, account_number: str | None = None,
+    ) -> dict:
+        """Get an IPO's order-entry view model — eligibility and price range.
+
+        The `context` section carries eligibility, enrolment, the cut-off
+        deadline and your buying power.
+
+        Note:
+            Only exists while an offering is live; returns 404 otherwise. This
+            response shape has not been observed against a real offering.
+        """
+        return self._session.get(
+            urls.ipo_access_order_entry_url(instrument_id, account_number)
+        )
+
+    def get_ipo_access_allocation_results(self, instrument_id: str) -> dict:
+        """Get how many shares you were allocated in an IPO you requested.
+
+        Note:
+            This response shape has not been observed against a real offering.
+        """
+        return self._session.get(urls.ipo_access_allocation_results_url(instrument_id))
+
+    def get_ipo_access_trade_receipt(self, order_id: str) -> dict:
+        """Get the trade receipt for a filled IPO Access order.
+
+        Note:
+            This response shape has not been observed against a real offering.
+        """
+        return self._session.get(urls.ipo_access_trade_receipt_url(order_id))
+
+    def get_ipo_access_orders(
+        self, start_date: str | datetime | None = None,
+    ) -> list[Order]:
+        """Get stock orders placed through IPO Access.
+
+        IPO Access orders are ordinary equity orders flagged with
+        `is_ipo_access_order`, so this filters the stock order history.
+
+        Args:
+            start_date: Only return orders created on or after this point.
+                See `get_stock_orders` for accepted formats.
+
+        Returns:
+            List of Order objects for IPO Access orders.
+        """
+        cutoff = self._parse_start_date(start_date)
+        data = self._session.get_paginated(
+            urls.ORDERS, params=self._start_date_params(cutoff),
+        )
+        ipo_ids = {
+            item.get("id")
+            for item in data
+            if item.get("is_ipo_access_order")
+        }
+        if not ipo_ids:
+            return []
+        return [
+            o for o in self.get_stock_orders(start_date=start_date)
+            if o.order_id in ipo_ids
+        ]
+
     # ── Futures ──────────────────────────────────────────────────────────
 
     def _set_futures_header(self) -> None:

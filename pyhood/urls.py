@@ -102,3 +102,40 @@ def futures_contract_url(symbol: str) -> str:
 def futures_orders_url(account_id: str) -> str:
     """URL for futures orders on a specific account."""
     return f"{FUTURES_ACCOUNTS}{account_id}/orders/"
+
+
+# ── IPO Access ───────────────────────────────────────────────────────
+# Undocumented bonfire view models backing Robinhood's retail IPO
+# allocation program.
+
+BONFIRE = "https://bonfire.robinhood.com"
+IPO_ACCESS_LIST = f"{BONFIRE}/lists/ipo_access/view_model/"
+IPO_ACCESS_VIEWMODELS = f"{BONFIRE}/equity_trading/ipo_access/viewmodels"
+
+
+def ipo_access_cards_url(instrument_ids: str | list[str]) -> str:
+    """URL for IPO Access cards for one or more instruments."""
+    if isinstance(instrument_ids, str):
+        instrument_ids = [instrument_ids]
+    return f"{BONFIRE}/lists/ipo_access/cards/?ids={','.join(instrument_ids)}"
+
+
+def ipo_access_summary_url(instrument_id: str) -> str:
+    """URL for an IPO's summary view model."""
+    return f"{IPO_ACCESS_VIEWMODELS}/summary/{instrument_id}/"
+
+
+def ipo_access_order_entry_url(instrument_id: str, account_number: str | None = None) -> str:
+    """URL for an IPO's order-entry view model (eligibility, price range)."""
+    url = f"{IPO_ACCESS_VIEWMODELS}/web_order_entry/{instrument_id}/"
+    return f"{url}?account_number={account_number}" if account_number else url
+
+
+def ipo_access_allocation_results_url(instrument_id: str) -> str:
+    """URL for allocation results after an IPO you requested shares in."""
+    return f"{IPO_ACCESS_VIEWMODELS}/allocation_results/{instrument_id}/"
+
+
+def ipo_access_trade_receipt_url(order_id: str) -> str:
+    """URL for the trade receipt of a filled IPO Access order."""
+    return f"{IPO_ACCESS_VIEWMODELS}/trade_receipt/{order_id}/"
