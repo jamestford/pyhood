@@ -3,7 +3,7 @@
 <div align="center">
 <img src="assets/logo-tight.png" alt="pyhood logo" width="200">
 
-**A modern, reliable Python client for the Robinhood API.**
+**A modern Python client for the Robinhood API, built for scripts that need to stay authenticated.**
 </div>
 
 [![CI](https://github.com/jamestford/pyhood/actions/workflows/ci.yml/badge.svg)](https://github.com/jamestford/pyhood/actions/workflows/ci.yml)
@@ -11,164 +11,12 @@
 [![Docs](https://img.shields.io/badge/docs-jamestford.github.io%2Fpyhood-blue)](https://jamestford.github.io/pyhood)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Coverage](https://img.shields.io/badge/coverage-79%25-yellow.svg)](#)
 [![Security](https://github.com/jamestford/pyhood/actions/workflows/security.yml/badge.svg)](https://github.com/jamestford/pyhood/actions/workflows/security.yml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-A modern, reliable Python client for the Robinhood API. Built for automated trading with auth that doesn't break, proper error handling, and sane defaults. Key features include silent refresh of credentials, retirement accounts, and the official crypto API are pyhood-only.
+pyhood is a modern, typed, maintained Python client for Robinhood. It supports stocks, options, retirement accounts, futures, banking, documents, research endpoints, and Robinhood's official Crypto Trading API. It is built for automation: authenticate once, persist a session safely, and renew it later without a password, device approval prompt, or human in the loop.
 
-## How pyhood compares
-
-Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and its actively maintained fork [robin_stocks_v2](https://github.com/DhruvaBansal00/robin_stocks_v2):
-
-| | pyhood | robin_stocks | robin_stocks_v2 |
-|---|:---:|:---:|:---:|
-| **Silent session refresh** — renew a session with no credentials and no device approval | ✅ | ❌ | ❌ |
-| **IRA / retirement accounts** — trade stocks and options in Traditional and Roth IRAs | ✅ | ❌ | ❌ |
-| **Official Crypto Trading API** — Ed25519 key auth, not the unofficial endpoints | ✅ | ❌ | ❌ |
-| **Futures positions** | ✅ | ❌ | stub, returns `None` |
-| **Futures contracts & quotes** | ✅ | ❌ | ✅ |
-| **IPO Access** | ✅ | ❌ | ✅ |
-| **Typed responses** — dataclasses with full annotations, not raw dicts | ✅ | ❌ | partial |
-| **Index options** (SPX, NDX, VIX, RUT, XSP) | ✅ | partial | ✅ |
-| **Session storage** | JSON | `pickle` | JSON |
-| **Order history date filter** | ✅ | ✅ | ✅ |
-| **Minimum Python** | 3.10 | 3.9 | 3.10 |
-
-**Migrating from robin_stocks?** See the [migration guide](docs/migrating-from-robin-stocks.md) for a function-by-function map.
-
-## Why pyhood?
-
-- 🪙 **Dual API support** — The only Python library that wraps both Robinhood's unofficial stocks/options API and their official Crypto Trading API. One library, full coverage.
-- 🔐 **Auth that just works** — Login with timeouts, automatic token refresh, and session persistence. Authenticate once, stay connected for days. No more scripts that hang forever waiting for device approval.
-- 🔄 **Automatic token refresh** — pyhood uses OAuth refresh tokens to renew your session silently — no credentials, no device approval, no human in the loop. Built for unattended automation.
-- 🏷️ **Type hints everywhere** — Full type annotations, dataclass responses, IDE-friendly. No more guessing what's in a dict.
-- 🛡️ **Built-in rate limiting** — Automatic request throttling and retry logic so you don't get locked out.
-- 📊 **Options-first** — Deep options chain support with Greeks, volume/OI analysis, and earnings integration. Supports both equity and index options (SPX, NDX, VIX, RUT).
-- 📈 **Futures trading** — Contract details, real-time quotes, open positions, order history, and P&L calculation for Robinhood futures.
-- 🎯 **IPO Access** — Read Robinhood's retail IPO allocation program: available offerings, eligibility, allocation results, and your IPO orders.
-- 🏦 **IRA/Retirement accounts** — Trade stocks and options in Traditional and Roth IRAs. The only Python Robinhood library with retirement account support.
-- 💰 **Banking & dividends** — Query ACH transfers, linked bank accounts, debit card transactions, and dividend history.
-- 📋 **Watchlists** — Create, manage, and modify your Robinhood watchlists programmatically.
-- 🔍 **Research & discovery** — Analyst ratings, news feed, S&P 500 movers, trending stocks, instrument popularity, and stock splits.
-- 📑 **Portfolio & documents** — Portfolio historicals, option historicals, account statements, and trade confirmations.
-- 🧪 **Tested and maintained** — 259 tests, CI across Python 3.10-3.13, linted with ruff. If it breaks, we know immediately.
-
-## Quick Start
-
-```python
-import pyhood
-from pyhood.client import PyhoodClient
-
-# Login (with timeout — never hangs)
-session = pyhood.login(username="you@email.com", password="...", timeout=90)
-client = PyhoodClient(session)
-
-# Stock data
-quote = client.get_quote("AAPL")
-print(f"AAPL: ${quote.price:.2f} ({quote.change_pct:+.1f}%)")
-
-# Options chains (works for equities and indexes)
-chain = client.get_options_chain("SPX", expiration="2026-04-17")
-for option in chain.calls:
-    print(f"  {option.strike} call | IV: {option.iv:.0%} | Delta: {option.delta:.2f}")
-
-# Account
-positions = client.get_positions()
-balance = client.get_buying_power()
-```
-
-## IRA Trading
-
-pyhood can discover and trade in IRA/retirement accounts — something no other Python Robinhood library supports.
-
-```python
-# Discover all accounts (including IRA)
-accounts = client.get_all_accounts()
-
-# Check IRA buying power
-bp = client.get_buying_power(account_number="YOUR_IRA_ACCOUNT")
-
-# Buy options in your Roth IRA
-order = client.buy_option(
-    symbol="NKE", strike=55.0, expiration="2026-04-02",
-    option_type="call", quantity=3, price=1.60,
-    account_number="YOUR_IRA_ACCOUNT",
-)
-```
-
-See the [Account documentation](https://jamestford.github.io/pyhood/account/) for details on IRA account discovery and limitations.
-
-## Authentication
-
-Robinhood requires **device approval** on first login. After that, pyhood keeps your session alive automatically.
-
-### First Login
-
-1. Have the **Robinhood mobile app** open on your phone
-2. Call `pyhood.login()` — it will trigger a device approval request
-3. Tap **"Yes, it's me"** in the Robinhood app when prompted
-4. pyhood saves the session token to `~/.pyhood/session.json` for reuse
-
-```python
-import pyhood
-
-# First login — will wait up to 90s for you to approve on phone
-session = pyhood.login(
-    username="you@email.com",
-    password="your_password",
-    timeout=90,  # seconds to wait for device approval
-)
-```
-
-### Staying Authenticated
-
-Once you've approved the device, pyhood handles the rest:
-
-```python
-# Reuses cached session — no approval needed
-session = pyhood.login(username="you@email.com", password="your_password")
-
-# Or refresh explicitly — no credentials needed at all
-session = pyhood.refresh()
-```
-
-Sessions last several days (observed 5-8 days). When the access token expires, pyhood automatically refreshes it using the stored refresh token — **no device approval, no credentials, no human interaction**. This is what makes pyhood safe for automated scripts and cron jobs.
-
-Device approval is only needed again if the refresh token itself expires (typically much longer than the access token).
-
-### Error Handling
-
-pyhood raises specific exceptions so you know exactly what went wrong:
-
-```python
-from pyhood.exceptions import (
-    LoginTimeoutError,            # Timed out waiting for device approval
-    DeviceApprovalRequiredError,  # Approval prompt sent but not completed
-    MFARequiredError,             # SMS/email code needed — pass mfa_code parameter
-    TokenExpiredError,            # Refresh token expired — full re-login needed
-    AuthError,                    # Generic auth failure
-)
-
-try:
-    session = pyhood.login(username="...", password="...", timeout=90)
-except LoginTimeoutError:
-    print("Open Robinhood app and approve the device, then try again")
-except MFARequiredError:
-    code = input("Enter the code from SMS/email: ")
-    session = pyhood.login(username="...", password="...", mfa_code=code)
-except AuthError as e:
-    print(f"Login failed: {e}")
-```
-
-### ⚠️ Rate Limits
-
-Robinhood aggressively rate-limits authentication. If login fails:
-
-- **Do NOT retry immediately** — wait at least 5 minutes
-- 2-3 failed attempts will lock out your account's API access for 5-10 minutes
-- Each login attempt generates a new device approval — old approvals don't carry over
-- See the [Rate Limits](https://jamestford.github.io/pyhood/rate-limits/) documentation for details
+> pyhood is an unofficial client and is not affiliated with Robinhood. Use responsibly. This project is not financial advice.
 
 ## Install
 
@@ -176,30 +24,201 @@ Robinhood aggressively rate-limits authentication. If login fails:
 pip install pyhood
 ```
 
-## Crypto Trading (Official API)
+## Quick Start
 
-pyhood also supports Robinhood's **official** Crypto Trading API — no device approval needed, just API keys.
+```python
+import pyhood
+from pyhood.client import PyhoodClient
+
+# First login may require device approval in the Robinhood mobile app.
+session = pyhood.login(
+    username="you@email.com",
+    password="your_password",
+    timeout=90,
+)
+
+client = PyhoodClient(session)
+
+quote = client.get_quote("AAPL")
+print(f"AAPL: ${quote.price:.2f} ({quote.change_pct:+.1f}%)")
+
+positions = client.get_positions()
+buying_power = client.get_buying_power()
+```
+
+After the first approved login, pyhood can refresh the session without credentials:
+
+```python
+import pyhood
+
+session = pyhood.refresh()
+client = PyhoodClient(session)
+```
+
+## Why pyhood exists
+
+pyhood began with a specific problem: unattended Robinhood scripts should not die just because a session expired.
+
+The original Python Robinhood client, [robin_stocks](https://github.com/jmfernandes/robin_stocks), made Robinhood automation accessible to a large community and remains the best-known library in this space. But Robinhood's authentication flow has changed over time, and many users now run into the same failure mode: a script works for a few days, the session expires, and the next login waits for a device approval no one is there to tap. pyhood fixes that workflow. After the first approved login, pyhood stores refresh-token session data as JSON and can renew the session with:
+
+```python
+session = pyhood.refresh()
+```
+
+No username. No password. No device approval prompt.
+
+That makes pyhood a better fit for cron jobs, scheduled portfolio scripts, dashboards, and automated trading systems that need to keep running without a human nearby.
+
+## Why use pyhood?
+
+- **Silent session refresh** - renew Robinhood sessions without credentials or device approval after the first login.
+- **Typed responses** - dataclass responses and type hints instead of guessing through raw dictionaries.
+- **Retirement accounts** - discover and trade in Traditional and Roth IRA accounts.
+- **Official crypto API** - use Robinhood's official Crypto Trading API with API keys.
+- **Futures support** - futures contracts, quotes, orders, positions, and P&L helpers.
+- **Options-first coverage** - equity and index options, chains, Greeks, volume, open interest, and order helpers.
+- **Safer session storage** - JSON session persistence instead of `pickle`.
+- **Rate limiting and retries** - request throttling and retry behavior built in.
+- **Clear auth errors** - explicit exceptions for timeouts, MFA, expired tokens, and device approval failures.
+- **Maintained test suite** - CI across Python 3.10 through 3.13.
+
+## How pyhood compares
+
+Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and the actively maintained fork [robin_stocks_v2](https://github.com/DhruvaBansal00/robin_stocks_v2):
+
+| Capability | pyhood | robin_stocks | robin_stocks_v2 |
+|---|---:|---:|---:|
+| Silent session refresh without credentials | Yes | No | No |
+| JSON session storage | Yes | No, uses pickle | Yes |
+| IRA / retirement accounts | Yes | No | No |
+| Official Crypto Trading API | Yes | No | No |
+| Futures contracts and quotes | Yes | No | Yes |
+| Futures positions | Yes | No | Stubbed |
+| IPO access | Yes | No | Yes |
+| Typed dataclass responses | Yes | No | Partial |
+| Index options: SPX, NDX, VIX, RUT, XSP | Yes | Partial | Yes |
+| Order history date filtering | Yes | Yes | Yes |
+| Minimum Python version | 3.10 | 3.9 | 3.10 |
+
+Migrating from `robin_stocks`? See the [migration guide](docs/migrating-from-robin-stocks.md) for a function-by-function map.
+
+## Authentication
+
+Robinhood requires device approval on first login. After that, pyhood keeps the session alive automatically.
+
+### First Login
+
+1. Open the Robinhood mobile app.
+2. Call `pyhood.login()`.
+3. Approve the device prompt in the app.
+4. pyhood saves the session to `~/.pyhood/session.json`.
+
+```python
+import pyhood
+
+session = pyhood.login(
+    username="you@email.com",
+    password="your_password",
+    timeout=90,
+)
+```
+
+### Staying Authenticated
+
+```python
+# Reuses cached session data.
+session = pyhood.login(username="you@email.com", password="your_password")
+
+# Or refresh explicitly with no credentials.
+session = pyhood.refresh()
+```
+
+Access sessions have been observed to last several days. When the access token expires, pyhood refreshes it using the stored refresh token.
+
+Device approval is only needed again if the refresh token itself expires or Robinhood invalidates the session.
+
+### Error Handling
+
+```python
+from pyhood.exceptions import (
+    AuthError,
+    DeviceApprovalRequiredError,
+    LoginTimeoutError,
+    MFARequiredError,
+    TokenExpiredError,
+)
+
+try:
+    session = pyhood.login(username="...", password="...", timeout=90)
+except LoginTimeoutError:
+    print("Open Robinhood and approve the device, then try again.")
+except MFARequiredError:
+    code = input("Enter the code from SMS/email: ")
+    session = pyhood.login(username="...", password="...", mfa_code=code)
+except AuthError as e:
+    print(f"Login failed: {e}")
+```
+
+### Rate Limits
+
+Robinhood aggressively rate-limits authentication attempts.
+
+If login fails:
+
+- Do not retry immediately.
+- Wait at least 5 minutes.
+- Multiple failed attempts can temporarily lock API access.
+- Each new login attempt may generate a new device approval request.
+
+See the [rate limits documentation](https://jamestford.github.io/pyhood/rate-limits/) for details.
+
+## Common Examples
+
+### Options Chain
+
+```python
+chain = client.get_options_chain("SPX", expiration="2026-04-17")
+
+for option in chain.calls:
+    print(
+        option.strike,
+        option.implied_volatility,
+        option.delta,
+        option.open_interest,
+    )
+```
+
+### IRA Trading
+
+```python
+accounts = client.get_all_accounts()
+
+order = client.buy_option(
+    symbol="NKE",
+    strike=55.0,
+    expiration="2026-04-02",
+    option_type="call",
+    quantity=3,
+    price=1.60,
+    account_number="YOUR_IRA_ACCOUNT",
+)
+```
+
+See the [account documentation](https://jamestford.github.io/pyhood/account/) for IRA account discovery and limitations.
+
+### Crypto Trading
 
 ```python
 from pyhood.crypto import CryptoClient
 
-# API key auth — generate keys at robinhood.com/account/crypto
-crypto = CryptoClient(api_key="rh-api-...", private_key_base64="...")
+crypto = CryptoClient(
+    api_key="rh-api-...",
+    private_key_base64="...",
+)
 
-# Market data
 quotes = crypto.get_best_bid_ask("BTC-USD", "ETH-USD")
-price = crypto.get_estimated_price("BTC-USD", "buy", 0.001)
-
-# Historical OHLCV data
-candles = crypto.get_historicals("BTC-USD", interval="hour", span="week")
-for c in candles:
-    print(f"{c.begins_at}  O:{c.open_price}  H:{c.high_price}  L:{c.low_price}  C:{c.close_price}")
-
-# Account & holdings
 account = crypto.get_account()
-holdings = crypto.get_holdings(account.account_number, "BTC")
 
-# Place an order
 order = crypto.place_order(
     account_number=account.account_number,
     side="buy",
@@ -209,132 +228,81 @@ order = crypto.place_order(
 )
 ```
 
-Generate your API keys at [robinhood.com/account/crypto](https://robinhood.com/account/crypto). See the [Crypto documentation](https://jamestford.github.io/pyhood/crypto/) for full details.
+Generate API keys at [robinhood.com/account/crypto](https://robinhood.com/account/crypto). See the [crypto documentation](https://jamestford.github.io/pyhood/crypto/) for details.
 
-## Futures Trading
-
-pyhood supports Robinhood's futures API — contracts, quotes, orders, and P&L tracking.
+### Futures
 
 ```python
-client = PyhoodClient(session)
-
-# Contract details
 contract = client.get_futures_contract("ESH26")
-print(f"{contract.name} — multiplier: {contract.multiplier}")
-
-# Real-time quote
 quote = client.get_futures_quote("ESH26")
-print(f"Last: {quote.last_price}  Bid: {quote.bid}  Ask: {quote.ask}")
-
-# P&L across all closed futures trades
 pnl = client.calculate_futures_pnl()
-print(f"Realized P&L: ${pnl:.2f}")
+
+print(contract.name, quote.last_price, pnl)
 ```
 
-See the [Futures documentation](https://jamestford.github.io/pyhood/futures/) for full details.
+See the [futures documentation](https://jamestford.github.io/pyhood/futures/) for details.
 
-## Banking & Dividends
-
-```python
-# Check linked bank accounts
-accounts = client.get_bank_accounts()
-
-# View transfer history
-transfers = client.get_transfers()
-
-# Initiate a deposit
-transfer = client.initiate_transfer(
-    amount=500.00,
-    direction="deposit",
-    ach_relationship_url=accounts[0].url,
-)
-
-# Debit card transactions (Cash Management)
-txns = client.get_card_transactions()
-pending = client.get_card_transactions(card_type="pending")
-
-# Dividend history
-dividends = client.get_dividends()
-aapl_divs = client.get_dividends_by_symbol("AAPL")
-```
-
-## Watchlists
+### Portfolio and Documents
 
 ```python
-# Get all watchlists
-watchlists = client.get_watchlists()
-
-# Get a specific watchlist
-default = client.get_watchlist("Default")
-print(default.symbols)  # ['AAPL', 'MSFT', ...]
-
-# Add / remove symbols
-client.add_to_watchlist(["NVDA", "TSLA"])
-client.remove_from_watchlist(["TSLA"])
-```
-
-## Markets & Trading Hours
-
-```python
-# List available exchanges
-markets = client.get_markets()
-
-# Check if NYSE is open on a specific date
-hours = client.get_market_hours("XNYS", "2026-03-30")
-print(f"Open: {hours.is_open}, {hours.opens_at} — {hours.closes_at}")
-```
-
-## Research & Discovery
-
-```python
-# Analyst ratings
-rating = client.get_ratings("AAPL")
-print(f"Buy: {rating.num_buy}, Hold: {rating.num_hold}, Sell: {rating.num_sell}")
-
-# News articles
-articles = client.get_news("AAPL")
-for a in articles:
-    print(f"{a.source}: {a.title}")
-
-# S&P 500 movers
-movers = client.get_movers("up")
-
-# Trending stocks (100 most popular on Robinhood)
-popular = client.get_tags("100-most-popular")
-
-# How many RH users hold a stock
-count = client.get_popularity("AAPL")
-
-# Stock split history
-splits = client.get_splits("AAPL")
-```
-
-## Portfolio & Option Historicals
-
-```python
-# Portfolio value over time
 history = client.get_portfolio_historicals(
-    account_number="123456", interval="day", span="year",
+    account_number="123456",
+    interval="day",
+    span="year",
 )
-for candle in history:
-    print(f"{candle.begins_at}: ${candle.adjusted_close_equity:.2f}")
 
-# Historical option pricing
-candles = client.get_option_historicals("option-id-here", interval="day", span="month")
-
-# Account documents (statements, trade confirms, tax docs)
 docs = client.get_documents(doc_type="account_statement")
 ```
 
+## Feature Status
+
+| Area | Status |
+|---|---|
+| Stocks and options market data | Functional |
+| Equity and index options | Functional |
+| Stock and option order management | Functional |
+| Authentication with automatic refresh | Functional |
+| Official crypto trading API | Functional |
+| Futures contracts, quotes, orders, and P&L | Functional |
+| IRA / retirement accounts | Functional |
+| Banking, ACH transfers, and dividends | Functional |
+| Watchlists | Functional |
+| Markets and trading hours | Functional |
+| Research, news, ratings, movers, and popularity | Functional |
+| Portfolio and option historicals | Functional |
+| Documents and statements | Functional |
+| Day trades, margin calls, and deposit schedules | Functional |
+
+## Documentation
+
+- [Full documentation](https://jamestford.github.io/pyhood)
+- [Migration guide](docs/migrating-from-robin-stocks.md)
+- [Account documentation](https://jamestford.github.io/pyhood/account/)
+- [Crypto documentation](https://jamestford.github.io/pyhood/crypto/)
+- [Futures documentation](https://jamestford.github.io/pyhood/futures/)
+- [Rate limits](https://jamestford.github.io/pyhood/rate-limits/)
+
+## Contributing
+
+Contributions are welcome, especially:
+
+- endpoint coverage
+- typed response models
+- migration examples from `robin_stocks`
+- documentation improvements
+- tests for live-verified behavior
+
+Please avoid opening pull requests that place real trades in tests.
+
 ## Acknowledgments
 
-pyhood stands on the shoulders of the community that figured out Robinhood's unofficial API:
+pyhood stands on the shoulders of the community that mapped Robinhood's unofficial API:
 
-- [**robin_stocks**](https://github.com/jmfernandes/robin_stocks) by [Josh Fernandes](https://github.com/jmfernandes) — The most widely used Python library for Robinhood. Its auth flow, endpoint mapping, and API patterns laid the groundwork that pyhood builds from.
-- [**pyrh**](https://github.com/robinhood-unofficial/pyrh) by [Robinhood Unofficial](https://github.com/robinhood-unofficial) — An early Python client that pioneered OAuth token refresh and session management patterns for the Robinhood API.
-- [**Robinhood**](https://github.com/sanko/Robinhood) by [Sanko](https://github.com/sanko) — The original unofficial API documentation that mapped out Robinhood's endpoints and made all of these libraries possible.
+- [robin_stocks](https://github.com/jmfernandes/robin_stocks) by [Josh Fernandes](https://github.com/jmfernandes), the most widely used Python Robinhood library.
+- [pyrh](https://github.com/robinhood-unofficial/pyrh), an early client that helped establish OAuth token refresh patterns.
+- [Robinhood](https://github.com/sanko/Robinhood) by [Sanko](https://github.com/sanko), early unofficial endpoint documentation.
 
-These projects made Robinhood accessible to developers. pyhood continues that mission with a focus on reliability and automation.
+Those projects made Robinhood accessible to Python developers. pyhood continues that work with a focus on reliability, typed interfaces, and unattended automation.
 
 ## License
 
