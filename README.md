@@ -29,12 +29,6 @@ python -m pip install --upgrade pip
 python -m pip install pyhood
 ```
 
-<div align="center">
-<img src="assets/install.gif" alt="Installing pyhood into a virtual environment" width="900">
-</div>
-
-<sup>The recording adds <code>-q</code> to the install, purely so pip's dependency resolution does not scroll the commands off screen. Leave it off — seeing what pip is doing is useful.</sup>
-
 Substitute whichever interpreter you have — `python3.12`, `python3.13`, `python3.14` are all tested. On Windows the activate line is `pyhood-env\Scripts\activate`.
 
 **Name the version explicitly.** A virtual environment inherits the version of the interpreter that creates it, and `python3` on macOS is still 3.9. Using bare `python3` there produces a 3.9 environment where the install fails with `no matching distribution found` — which reads like the package doesn't exist rather than a version problem. If you need a newer Python: `brew install python@3.14`.
@@ -56,12 +50,6 @@ python examples/verify_stocks.py   # confirm it works
 
 [`examples/verify_stocks.py`](examples/verify_stocks.py) is a read-only check: if it prints prices, you are authenticated and working.
 
-<div align="center">
-<img src="assets/setup-stocks.gif" alt="Storing a Robinhood session and verifying it works" width="900">
-</div>
-
-<sup>The login half runs against a throwaway home directory and stops at the password prompt, which is where device approval takes over — no credential is entered. The verification half runs against a real session and reads only public market data.</sup>
-
 ## Set Up Crypto
 
 ```bash
@@ -72,12 +60,6 @@ python examples/verify_crypto.py   # confirm it works
 Robinhood does not issue you a key pair for the Crypto Trading API — you generate one and register the public half. `setup crypto` runs that exchange, writes both parts to `~/.pyhood/crypto.env` at mode `0600`, and then makes one signed read-only call to confirm Robinhood accepts them. The private key goes straight from generation to disk and is never displayed.
 
 [`examples/verify_crypto.py`](examples/verify_crypto.py) re-runs that check any time, and reports which source your credentials resolve from — useful when a stale `export` is shadowing the file.
-
-<div align="center">
-<img src="assets/setup-crypto.gif" alt="Generating Crypto API keys and verifying them" width="900">
-</div>
-
-<sup>The setup half uses a throwaway home directory and a fabricated API key. Because that key is never registered, `--no-verify` skips the live check; the verification half then runs against real registered credentials.</sup>
 
 Run `pyhood setup` at any time to see what is configured. See [Setup](#setup) for the full walkthrough.
 
@@ -106,8 +88,6 @@ buying_power = client.get_buying_power()
 ```python
 session = pyhood.refresh()
 ```
-
-All three recordings above are reproducible from the [VHS tapes](assets/demo) rather than re-shot by hand.
 
 ## Why pyhood exists
 
