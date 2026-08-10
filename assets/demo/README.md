@@ -1,6 +1,8 @@
 # Demo recordings
 
-The GIFs in the README are recorded with [VHS](https://github.com/charmbracelet/vhs) from the tapes here, so they can be regenerated when output changes rather than being re-shot by hand.
+**Not currently used.** The README embedded three terminal recordings for a while and they were removed — they did not read well on the page. The tapes are kept because regenerating a recording is one command, so bringing them back later costs nothing.
+
+They are recorded with [VHS](https://github.com/charmbracelet/vhs) from the tapes here, so they can be regenerated when output changes rather than being re-shot by hand.
 
 ```bash
 brew install vhs
