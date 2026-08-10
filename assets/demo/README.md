@@ -32,8 +32,6 @@ Both verification scripts are restricted to data that is safe to publish — quo
 
 `install.tape` adds `-q` to the install — visibly, on screen. Unfiltered pip output is roughly 25 lines of dependency resolution that scrolls the commands away and multiplies the file size; the README documents the command without `-q`, because a real user wants to see what pip is doing.
 
-It also ends with `python -c 'import pyhood; …'` rather than `python -m pyhood --version`, because the released version on PyPI predates the `setup` command. Switch that line once a release including `python -m pyhood` is out.
-
 ## Optimising
 
 VHS output is not optimised. Run gifsicle over anything with a lot of scrolling output:
