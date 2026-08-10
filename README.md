@@ -20,7 +20,7 @@ pyhood is a modern, typed, maintained Python client for Robinhood. It supports s
 
 ## Install
 
-pyhood needs **Python 3.10 or newer**. Install it into a virtual environment rather than your system Python:
+pyhood needs **Python 3.10 or newer**. We recommend installing it into a virtual environment rather than your system Python:
 
 ```bash
 python3.14 -m venv pyhood-env
@@ -28,12 +28,9 @@ source pyhood-env/bin/activate
 python -m pip install --upgrade pip
 python -m pip install pyhood
 ```
-
 Substitute whichever interpreter you have — `python3.12`, `python3.13`, `python3.14` are all tested. On Windows the activate line is `pyhood-env\Scripts\activate`.
 
-**Name the version explicitly.** A virtual environment inherits the version of the interpreter that creates it, and `python3` on macOS is still 3.9. Using bare `python3` there produces a 3.9 environment where the install fails with `no matching distribution found` — which reads like the package doesn't exist rather than a version problem. If you need a newer Python: `brew install python@3.14`.
-
-**The virtual environment is not optional.** Homebrew and Debian-based distributions mark their Python as [externally managed](https://peps.python.org/pep-0668/), so installing into it is refused outright. Overriding that with `--break-system-packages` can break the OS tooling that depends on it.
+**Name the version explicitly.** A virtual environment inherits the version of the interpreter that creates it, and `python3` on macOS is still 3.9. Using bare `python3` there produces a 3.9 environment where the install fails with `no matching distribution found` — which reads like the package doesn't exist rather than a version problem. 
 
 ## Set Up Stocks, Options and Futures
 
@@ -41,10 +38,6 @@ Substitute whichever interpreter you have — `python3.12`, `python3.13`, `pytho
 pyhood setup login                 # store a session
 python examples/verify_stocks.py   # confirm it works
 ```
-
-> The `pyhood` command needs **pyhood 0.12.0 or newer** — earlier releases have no command line at all, and `python -m pyhood` fails there with `No module named pyhood.__main__`. Check with `pyhood version`, or `python -c "import pyhood; print(pyhood.__version__)"` on an older install. Everything is also available from code: see [Authentication](#authentication).
->
-> `pyhood ...` and `python -m pyhood ...` are equivalent — use whichever you prefer.
 
 `setup login` prompts for your username and password, then waits for you to approve the device in the Robinhood mobile app. The password is read without echoing and is never stored — only the resulting tokens are saved, to `~/.pyhood/session.json`, readable only by you.
 
