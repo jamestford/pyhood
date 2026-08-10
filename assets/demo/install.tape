@@ -67,7 +67,7 @@ Sleep 700ms
 Enter
 Sleep 12s
 
-Type "python -c 'import pyhood; print(pyhood.__version__)'"
+Type "pyhood version"
 Sleep 700ms
 Enter
 Sleep 4s
