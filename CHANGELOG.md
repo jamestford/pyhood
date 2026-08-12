@@ -5,7 +5,9 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.12.1] - 2026-08-12
+
+A documentation release. No behaviour changes — cut so the corrected README reaches PyPI, which renders the description baked into the uploaded distribution rather than the one on `main`.
 
 ### Changed
 - **IPO Access verified against a live offering.** Four of these endpoints had never been seen with real data, because they 404 when no offering exists. RVII (Robinhood Ventures Fund II) was in its order book on 2026-08-12 at `ipo_access_status` `price_finalized`, listing the next day.
@@ -15,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **`has_ipo_offerings()` reports False during a live offering** once its order book closes — it reflects offerings still open for requests, not whether an IPO exists. Documented, along with the reliable signal: instruments of `type` `pre_ipo` carrying an `ipo_access_status`. Cards and order entry still resolve by instrument ID at that point, so the two must not be chained.
 
 ### Fixed
-- **The logo was a broken image on PyPI.** The README referenced it with a repo-relative path, which PyPI does not resolve — it renders the README but has no access to repository assets. It now uses an absolute raw URL. Takes effect with the next release.
+- **The logo was a broken image on PyPI.** The README referenced it with a repo-relative path, which PyPI does not resolve — it renders the README but has no access to repository assets. It now uses an absolute raw URL, which is what this release exists to publish.
 
 ### Removed
 - The three terminal recordings embedded in the README. They did not read well on the page. The VHS tapes that produce them are kept under `assets/demo/`, so restoring them later is one command per recording rather than a re-shoot.
