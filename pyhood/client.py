@@ -2561,7 +2561,17 @@ class PyhoodClient:
         return self._session.get(urls.IPO_ACCESS_LIST)
 
     def has_ipo_offerings(self) -> bool:
-        """Whether any IPO Access offerings are currently available."""
+        """Whether any IPO Access offering is open for share requests.
+
+        Note:
+            This is narrower than "an IPO exists". The list only carries
+            offerings whose order book is still open, so an upcoming IPO
+            reports False once its book closes. Verified against RVII on
+            2026-08-12: the instrument was live at `ipo_access_status`
+            `price_finalized` and listing the next day, while this returned
+            False. To detect an offering regardless of stage, look for
+            instruments with `type` `pre_ipo` and an `ipo_access_status`.
+        """
         data = self.get_ipo_access_list()
         return bool(data) and "empty_state" not in data
 
@@ -2572,7 +2582,14 @@ class PyhoodClient:
             instrument_ids: An instrument ID, or a list of them.
 
         Returns:
-            List of card dicts (`instrument_id`, `name`, `title`, `action`).
+            List of card dicts. Shape verified against a live offering
+            (RVII, 2026-08-12): `instrument_id`, `name`, `title` (the
+            ticker), `subtitle` (the price, e.g. `'$25.00'`), `accent_color`,
+            `action` (a deeplink) and `logo_images`.
+
+        Note:
+            Cards resolve by instrument ID at any stage, including after the
+            order book has closed and `has_ipo_offerings()` reports False.
         """
         data = self._session.get(urls.ipo_access_cards_url(instrument_ids))
         return data.get("results", []) if isinstance(data, dict) else []
@@ -2580,9 +2597,14 @@ class PyhoodClient:
     def get_ipo_access_summary(self, instrument_id: str) -> dict:
         """Get an IPO's summary view model — company, dates and price range.
 
-        Note:
-            Only exists while an offering is live; returns 404 otherwise. This
-            response shape has not been observed against a real offering.
+        Warning:
+            Unconfirmed. This returned 404 against a live offering (RVII,
+            2026-08-12, phase `price_finalized`), as did seven other spellings
+            of the path on the same base that serves `web_order_entry`
+            successfully. Either the route is stage-specific — reachable only
+            while the order book is open — or this path is wrong. Prefer
+            `get_ipo_access_order_entry()`, whose `context` carries the
+            symbol, phase, cut-off deadline and enrolment state.
         """
         return self._session.get(urls.ipo_access_summary_url(instrument_id))
 
@@ -2591,12 +2613,26 @@ class PyhoodClient:
     ) -> dict:
         """Get an IPO's order-entry view model — eligibility and price range.
 
-        The `context` section carries eligibility, enrolment, the cut-off
-        deadline and your buying power.
+        Returns:
+            The raw view model. Shape verified against a live offering (RVII,
+            2026-08-12): `account_number`, `instrument_id`, `context`,
+            `form_state`, `order_entry_view_model`, `trade_receipt_view_model`,
+            `action_required_view_model` and `ipoa_new_orders_blocked_details`.
+
+            `context` is the useful part: `phase` (e.g. `'price_finalized'`),
+            `instrument_symbol`, `instrument_url`, `ipo_access_quote`,
+            `ipo_access_cob_deadline`, `has_cob_deadline_passed`,
+            `user_is_enrolled`, `account_type`, `existing_order` and
+            `available_buying_power`.
+
+            `trade_receipt_view_model` is None until an order exists.
 
         Note:
-            Only exists while an offering is live; returns 404 otherwise. This
-            response shape has not been observed against a real offering.
+            This is the most informative of the IPO endpoints and the one to
+            reach for — it resolves after the order book closes, when
+            `get_ipo_access_list()` has already reverted to its empty state.
+            Requesting shares is not wrapped; an IPO Access order is an
+            ordinary equity order.
         """
         return self._session.get(
             urls.ipo_access_order_entry_url(instrument_id, account_number)
@@ -2606,7 +2642,11 @@ class PyhoodClient:
         """Get how many shares you were allocated in an IPO you requested.
 
         Note:
-            This response shape has not been observed against a real offering.
+            Returns 404 before allocations are decided — confirmed against a
+            live offering the day before it listed (RVII, 2026-08-12). That is
+            the endpoint behaving correctly rather than a fault: there is no
+            allocation to report until after pricing. The populated shape
+            remains unobserved, since it needs a filled request.
         """
         return self._session.get(urls.ipo_access_allocation_results_url(instrument_id))
 

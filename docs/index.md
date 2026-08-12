@@ -13,7 +13,7 @@ Built for automated trading — with auth that doesn't break, proper error handl
 - 📊 **Options-first** — Deep options chain support with Greeks, volume/OI analysis, and earnings integration.
 - 📈 **Futures trading** — Contract details, real-time quotes, order history, and P&L calculation for futures.
 - 🪙 **Dual API support** — Wraps both Robinhood's unofficial stocks/options API and their official Crypto Trading API.
-- 🧪 **Tested and maintained** — 170+ tests, CI across Python 3.10-3.13, linted with ruff.
+- 🧪 **Tested and maintained** — 360 tests, CI across Python 3.10-3.14, linted with ruff.
 
 ## Quick Example
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **IPO Access verified against a live offering.** Four of these endpoints had never been seen with real data, because they 404 when no offering exists. RVII (Robinhood Ventures Fund II) was in its order book on 2026-08-12 at `ipo_access_status` `price_finalized`, listing the next day.
+  - `get_ipo_access_cards()` and `get_ipo_access_order_entry()` return populated data; both shapes are now asserted in tests rather than guessed. The card carries the ticker in `title` and the offer price in `subtitle`; `order_entry.context` carries `phase`, `instrument_symbol`, `ipo_access_cob_deadline`, `has_cob_deadline_passed`, `user_is_enrolled` and `available_buying_power`.
+  - `get_ipo_access_summary()` is now marked unconfirmed. It 404s against a live offering, as do seven other spellings of the path on the same base that serves `web_order_entry` successfully. Either the route is stage-specific or the path is wrong.
+  - `get_ipo_access_allocation_results()` 404s before allocations are decided, which is correct behaviour rather than a fault.
+  - **`has_ipo_offerings()` reports False during a live offering** once its order book closes — it reflects offerings still open for requests, not whether an IPO exists. Documented, along with the reliable signal: instruments of `type` `pre_ipo` carrying an `ipo_access_status`. Cards and order entry still resolve by instrument ID at that point, so the two must not be chained.
+
+### Fixed
+- **The logo was a broken image on PyPI.** The README referenced it with a repo-relative path, which PyPI does not resolve — it renders the README but has no access to repository assets. It now uses an absolute raw URL. Takes effect with the next release.
+
 ### Removed
 - The three terminal recordings embedded in the README. They did not read well on the page. The VHS tapes that produce them are kept under `assets/demo/`, so restoring them later is one command per recording rather than a re-shoot.
 
