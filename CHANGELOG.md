@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `get_ipo_access_allocation_results()` 404s before allocations are decided, which is correct behaviour rather than a fault.
   - **`has_ipo_offerings()` reports False during a live offering** once its order book closes — it reflects offerings still open for requests, not whether an IPO exists. Documented, along with the reliable signal: instruments of `type` `pre_ipo` carrying an `ipo_access_status`. Cards and order entry still resolve by instrument ID at that point, so the two must not be chained.
 
+### Fixed
+- **The logo was a broken image on PyPI.** The README referenced it with a repo-relative path, which PyPI does not resolve — it renders the README but has no access to repository assets. It now uses an absolute raw URL. Takes effect with the next release.
+
 ### Removed
 - The three terminal recordings embedded in the README. They did not read well on the page. The VHS tapes that produce them are kept under `assets/demo/`, so restoring them later is one command per recording rather than a re-shoot.
 

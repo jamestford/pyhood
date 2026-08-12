@@ -1,7 +1,7 @@
 # pyhood
 
 <div align="center">
-<img src="assets/logo-tight.png" alt="pyhood logo" width="200">
+<img src="https://raw.githubusercontent.com/jamestford/pyhood/main/assets/logo-tight.png" alt="pyhood logo" width="200">
 
 **A modern Python client for the Robinhood API, built for scripts that need to stay authenticated.**
 </div>
