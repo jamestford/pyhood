@@ -195,3 +195,118 @@ class TestIpoAccessOrders:
 
         client.get_ipo_access_orders(start_date="2026-01-01")
         assert "created_at%5Bgte%5D" in responses.calls[0].request.url
+
+
+class TestLiveOfferingShapes:
+    """Shapes captured from a live offering — RVII on 2026-08-12.
+
+    Before this, four of the IPO endpoints had never been seen against a real
+    offering, because they 404 when none exists. RVII was in its order book
+    with `ipo_access_status` `price_finalized`, listing the next day. Account
+    identifiers and balances are replaced with placeholders.
+    """
+
+    INSTRUMENT_ID = "e958d09f-0a47-4468-b1e4-e66b6c3598fa"
+
+    CARD = {
+        "instrument_id": INSTRUMENT_ID,
+        "name": "Robinhood Ventures Fund II",
+        "title": "RVII",
+        "subtitle": "$25.00",
+        "accent_color": {"light": "fg", "dark": "fg"},
+        "action": {
+            "action_type": "deeplink",
+            "action_data": {"uri": f"robinhood://instrument?id={INSTRUMENT_ID}"},
+        },
+        "logo_images": {
+            "dark": {"@1x": "https://cdn.robinhood.com/app_assets/ipoa/x/night.png"},
+            "light": {"@1x": "https://cdn.robinhood.com/app_assets/ipoa/x/day.png"},
+        },
+    }
+
+    ORDER_ENTRY = {
+        "account_number": "ACCOUNT_NUMBER",
+        "instrument_id": INSTRUMENT_ID,
+        "context": {
+            "phase": "price_finalized",
+            "instrument_symbol": "RVII",
+            "instrument_url": "https://api.robinhood.com/instruments/x/",
+            "ipo_access_quote": {"price": "25.00"},
+            "ipo_access_cob_deadline": "2026-08-12T23:00:00Z",
+            "has_cob_deadline_passed": True,
+            "user_is_enrolled": False,
+            "account_type": "individual",
+            "existing_order": None,
+            "available_buying_power": {"currency_code": "USD", "amount": "0.00"},
+        },
+        "form_state": {
+            "form_state_id": "price_finalized2525",
+            "form_invalid_alert": {"title": "Price update"},
+        },
+        "order_entry_view_model": {
+            "title": "Request shares",
+            "rows": [],
+            "limit_options": [],
+            "order_summary": {},
+            "buying_power_description": "",
+            "disclaimer": "",
+        },
+        "trade_receipt_view_model": None,
+        "action_required_view_model": None,
+        "ipoa_new_orders_blocked_details": "",
+    }
+
+    @responses.activate
+    def test_card_carries_ticker_and_price(self, client):
+        """`title` is the ticker and `subtitle` the offer price."""
+        responses.add(
+            responses.GET,
+            urls.ipo_access_cards_url(self.INSTRUMENT_ID),
+            json={"results": [self.CARD]},
+            status=200,
+        )
+
+        cards = client.get_ipo_access_cards(self.INSTRUMENT_ID)
+
+        assert len(cards) == 1
+        assert cards[0]["title"] == "RVII"
+        assert cards[0]["subtitle"] == "$25.00"
+        assert cards[0]["instrument_id"] == self.INSTRUMENT_ID
+
+    @responses.activate
+    def test_order_entry_context_is_the_useful_part(self, client):
+        responses.add(
+            responses.GET,
+            urls.ipo_access_order_entry_url(self.INSTRUMENT_ID),
+            json=self.ORDER_ENTRY,
+            status=200,
+        )
+
+        vm = client.get_ipo_access_order_entry(self.INSTRUMENT_ID)
+        context = vm["context"]
+
+        assert context["phase"] == "price_finalized"
+        assert context["instrument_symbol"] == "RVII"
+        assert context["has_cob_deadline_passed"] is True
+        assert context["user_is_enrolled"] is False
+        # No order placed, so there is no receipt yet.
+        assert vm["trade_receipt_view_model"] is None
+
+    @responses.activate
+    def test_cards_resolve_after_the_book_closes(self, client):
+        """The list reverts to its empty state; cards still resolve by ID.
+
+        Both were observed on the same offering minutes apart, which is why
+        `has_ipo_offerings()` cannot be used to decide whether to fetch a card.
+        """
+        responses.add(
+            responses.GET, urls.IPO_ACCESS_LIST,
+            json={"empty_state": {"title": "No new IPOs available"}}, status=200,
+        )
+        responses.add(
+            responses.GET, urls.ipo_access_cards_url(self.INSTRUMENT_ID),
+            json={"results": [self.CARD]}, status=200,
+        )
+
+        assert client.has_ipo_offerings() is False
+        assert client.get_ipo_access_cards(self.INSTRUMENT_ID)[0]["title"] == "RVII"
