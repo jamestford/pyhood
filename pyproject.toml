@@ -21,7 +21,7 @@ include = [
 
 [project]
 name = "pyhood"
-version = "0.12.0"
+version = "0.12.1"
 description = "A modern, reliable Python client for the Robinhood API"
 readme = "README.md"
 license = "MIT"
