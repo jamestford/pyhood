@@ -114,7 +114,7 @@ That makes pyhood a better fit for cron jobs, scheduled portfolio scripts, dashb
 - **Safer session storage** - JSON session persistence instead of `pickle`.
 - **Rate limiting and retries** - request throttling and retry behavior built in.
 - **Clear auth errors** - explicit exceptions for timeouts, MFA, expired tokens, and device approval failures.
-- **Maintained test suite** - CI across Python 3.10 through 3.13.
+- **Maintained test suite** - 360 tests, CI across Python 3.10 through 3.14.
 
 ## How pyhood compares
 
