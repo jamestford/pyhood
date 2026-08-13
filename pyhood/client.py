@@ -2013,11 +2013,16 @@ class PyhoodClient:
             OrderError: If the amount is below $1 or the quote is unusable.
 
         Note:
-            Verified 2026-08-09: Robinhood currently blocks this for
-            third-party clients. Fractional quantities require a market order
-            ("Limit order quantity cannot include fractional shares"), and
-            market orders are gated to Robinhood's own app versions. The call
-            is left in place so it works unchanged if that gate is lifted.
+            Fractional quantities require a market order — Robinhood rejects
+            a fractional limit order with "Limit order quantity cannot include
+            fractional shares". Market orders were themselves being rejected
+            until `ORDER_FORM_VERSION` was found and sent, which is fixed.
+
+            End to end this is unverified. A fractional order is a market
+            order, so it executes immediately and cannot be exercised with a
+            resting non-marketable limit the way the other order paths were.
+            The payload and the rounding are covered by tests; the fill is
+            not.
         """
         return self._order_stock_by_price(
             symbol, amount_in_dollars, "buy", account_number, time_in_force,
