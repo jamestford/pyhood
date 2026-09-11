@@ -39,6 +39,7 @@ nav:
   - Getting Started: getting-started.md
   - Setup: setup.md
   - Migrating from robin_stocks: migrating-from-robin-stocks.md
+  - Migrating from pyrh: migrating-from-pyrh.md
   - Authentication: authentication.md
   - Usage:
     - Stock Quotes: quotes.md
