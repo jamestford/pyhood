@@ -8,7 +8,7 @@ Three differences shape everything below.
 
 **One quote object instead of thirty accessors.** pyrh exposes a method per field: `ask_price()`, `bid_price()`, `last_trade_price()`, `previous_close()`, each making its own request. pyhood fetches a `Quote` once and you read attributes off it.
 
-**Six order methods instead of twelve.** pyrh has `place_market_buy_order`, `place_limit_buy_order`, `place_stop_loss_buy_order`, `place_stop_limit_buy_order` and the four selling equivalents. pyhood has `buy_stock()`, `sell_stock()` and `order_stock()`; the order type follows from which arguments you pass.
+**Three order methods instead of thirteen.** pyrh has `place_market_buy_order`, `place_limit_buy_order`, `place_stop_loss_buy_order`, `place_stop_limit_buy_order` and the four selling equivalents. pyhood has `buy_stock()`, `sell_stock()` and `order_stock()`; the order type follows from which arguments you pass.
 
 **Sessions renew without you.** pyrh re-authenticates with stored credentials. pyhood persists the refresh token, so `pyhood.refresh()` needs no password and triggers no device approval prompt.
 
