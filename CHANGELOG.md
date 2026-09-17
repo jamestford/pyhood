@@ -5,6 +5,16 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.2] - 2026-09-17
+
+A documentation release. No behaviour changes — cut so the new migration guide and the corrected docstring reach PyPI, which renders the README baked into the uploaded distribution rather than the one on `main`.
+
+### Added
+- **Migration guide from [pyrh](https://github.com/robinhood-unofficial/pyrh)**, mapping all 54 public methods on its `Robinhood` class. pyrh has not been committed to since August 2024, and `pyrh` was already a PyPI keyword here with nothing behind it. Three shape differences drive most of the mapping: pyrh exposes a method per quote field where pyhood returns one `Quote`; its twelve order methods collapse into `buy_stock()`, `sell_stock()` and `order_stock()`; and it re-authenticates with stored credentials where pyhood refreshes from a stored token. Every pyhood method and model attribute referenced is verified to exist, including the four `Quote` fields the guide states are *not* carried over.
+
+### Fixed
+- **The note on `buy_stock_by_price()` was stale and wrong.** It said market orders are gated to Robinhood's own app versions, so fractional orders could not work. That recorded the state before `ORDER_FORM_VERSION` was found; the 0.11.0 changelog, dated the same day, records the fix. The docstring now states what is actually known: the gate was the missing `order_form_version` and it is now sent, while the fill itself remains unverified, because a fractional order is a market order and executes immediately.
+
 ## [0.12.1] - 2026-08-12
 
 A documentation release. No behaviour changes — cut so the corrected README reaches PyPI, which renders the description baked into the uploaded distribution rather than the one on `main`.
