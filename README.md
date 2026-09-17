@@ -10,7 +10,7 @@
 [![PyPI](https://img.shields.io/pypi/v/pyhood.svg)](https://pypi.org/project/pyhood/)
 [![Docs](https://img.shields.io/badge/docs-jamestford.github.io%2Fpyhood-blue)](https://jamestford.github.io/pyhood)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/jamestford/pyhood/blob/main/LICENSE)
 [![Security](https://github.com/jamestford/pyhood/actions/workflows/security.yml/badge.svg)](https://github.com/jamestford/pyhood/actions/workflows/security.yml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
@@ -41,7 +41,7 @@ python examples/verify_stocks.py   # confirm it works
 
 `setup login` prompts for your username and password, then waits for you to approve the device in the Robinhood mobile app. The password is read without echoing and is never stored — only the resulting tokens are saved, to `~/.pyhood/session.json`, readable only by you.
 
-[`examples/verify_stocks.py`](examples/verify_stocks.py) is a read-only check: if it prints prices, you are authenticated and working.
+[`examples/verify_stocks.py`](https://github.com/jamestford/pyhood/blob/main/examples/verify_stocks.py) is a read-only check: if it prints prices, you are authenticated and working.
 
 ## Set Up Crypto
 
@@ -52,7 +52,7 @@ python examples/verify_crypto.py   # confirm it works
 
 Robinhood does not issue you a key pair for the Crypto Trading API — you generate one and register the public half. `setup crypto` runs that exchange, writes both parts to `~/.pyhood/crypto.env` at mode `0600`, and then makes one signed read-only call to confirm Robinhood accepts them. The private key goes straight from generation to disk and is never displayed.
 
-[`examples/verify_crypto.py`](examples/verify_crypto.py) re-runs that check any time, and reports which source your credentials resolve from — useful when a stale `export` is shadowing the file.
+[`examples/verify_crypto.py`](https://github.com/jamestford/pyhood/blob/main/examples/verify_crypto.py) re-runs that check any time, and reports which source your credentials resolve from — useful when a stale `export` is shadowing the file.
 
 Run `pyhood setup` at any time to see what is configured. See [Setup](#setup) for the full walkthrough.
 
@@ -127,7 +127,7 @@ Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and the acti
 | Order history date filtering | Yes | Yes | Yes |
 | Minimum Python version | 3.10 | 3.9 | 3.10 |
 
-Migrating from `robin_stocks`? See the [migration guide](docs/migrating-from-robin-stocks.md) for a function-by-function map. Coming from [pyrh](https://github.com/robinhood-unofficial/pyrh), which has not been updated since August 2024? There is a [pyrh guide](docs/migrating-from-pyrh.md) too.
+Migrating from `robin_stocks`? See the [migration guide](https://github.com/jamestford/pyhood/blob/main/docs/migrating-from-robin-stocks.md) for a function-by-function map. Coming from [pyrh](https://github.com/robinhood-unofficial/pyrh), which has not been updated since August 2024? There is a [pyrh guide](https://github.com/jamestford/pyhood/blob/main/docs/migrating-from-pyrh.md) too.
 
 ## Setup
 
@@ -351,8 +351,8 @@ docs = client.get_documents(doc_type="account_statement")
 ## Documentation
 
 - [Full documentation](https://jamestford.github.io/pyhood)
-- [Migration guide: robin_stocks](docs/migrating-from-robin-stocks.md)
-- [Migration guide: pyrh](docs/migrating-from-pyrh.md)
+- [Migration guide: robin_stocks](https://github.com/jamestford/pyhood/blob/main/docs/migrating-from-robin-stocks.md)
+- [Migration guide: pyrh](https://github.com/jamestford/pyhood/blob/main/docs/migrating-from-pyrh.md)
 - [Account documentation](https://jamestford.github.io/pyhood/account/)
 - [Crypto documentation](https://jamestford.github.io/pyhood/crypto/)
 - [Futures documentation](https://jamestford.github.io/pyhood/futures/)

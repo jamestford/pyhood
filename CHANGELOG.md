@@ -5,6 +5,15 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.3] - 2026-09-17
+
+### Fixed
+- **Every link in the README was broken on PyPI.** The README doubles as the PyPI project description, which is rendered without repository context, so a repo-relative path resolves against `pypi.org/project/pyhood/`. That path serves the project page for any sub-path, so the link returns HTTP 200 and looks healthy to a link checker while sending the reader nowhere. Both migration guides, both verification examples and the licence badge were affected; the guide links have been dead since they were added. All are now absolute URLs.
+
+  This is the same defect as the broken logo fixed in 0.12.1. That fix corrected the `<img>` tag and left the anchors, and 0.12.2 was then verified by grepping the built sdist for the guide filename, which proved the text shipped rather than that the link worked.
+
+- `tests/test_readme_links.py` now fails on any repo-relative link or image in the README, so this cannot recur silently.
+
 ## [0.12.2] - 2026-09-17
 
 A documentation release. No behaviour changes — cut so the new migration guide and the corrected docstring reach PyPI, which renders the README baked into the uploaded distribution rather than the one on `main`.
