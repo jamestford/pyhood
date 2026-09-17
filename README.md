@@ -127,7 +127,7 @@ Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and the acti
 | Order history date filtering | Yes | Yes | Yes |
 | Minimum Python version | 3.10 | 3.9 | 3.10 |
 
-Migrating from `robin_stocks`? See the [migration guide](docs/migrating-from-robin-stocks.md) for a function-by-function map.
+Migrating from `robin_stocks`? See the [migration guide](docs/migrating-from-robin-stocks.md) for a function-by-function map. Coming from [pyrh](https://github.com/robinhood-unofficial/pyrh), which has not been updated since August 2024? There is a [pyrh guide](docs/migrating-from-pyrh.md) too.
 
 ## Setup
 
@@ -351,7 +351,8 @@ docs = client.get_documents(doc_type="account_statement")
 ## Documentation
 
 - [Full documentation](https://jamestford.github.io/pyhood)
-- [Migration guide](docs/migrating-from-robin-stocks.md)
+- [Migration guide: robin_stocks](docs/migrating-from-robin-stocks.md)
+- [Migration guide: pyrh](docs/migrating-from-pyrh.md)
 - [Account documentation](https://jamestford.github.io/pyhood/account/)
 - [Crypto documentation](https://jamestford.github.io/pyhood/crypto/)
 - [Futures documentation](https://jamestford.github.io/pyhood/futures/)
