@@ -1,0 +1,38 @@
+name: Dependabot auto-merge
+
+# Queues dependabot's patch and minor bumps for GitHub auto-merge. Nothing
+# merges here: GitHub merges once every required check on main passes, and
+# a failing check leaves the PR open. Major bumps are left for review.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    # Only PRs dependabot opened against this repository, never a fork's.
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.repository == 'jamestford/pyhood'
+    steps:
+      - name: Read the update type
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # An allowlist, not "anything but major": update-type is empty when
+      # dependabot can't tell, and an unknown bump should wait for review.
+      - name: Queue patch and minor bumps
+        if: >-
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
