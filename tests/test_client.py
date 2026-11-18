@@ -238,6 +238,144 @@ class TestGetOptionsChain:
         assert put.strike == 190.0
         assert put.option_type == "put"
 
+    @responses.activate
+    def test_unpublished_greeks_are_none_not_zero(self, client):
+        """On expiration day Robinhood sends null for every greek.
+
+        Shape captured from a live AAPL contract on 2026-11-18, its expiry
+        date: prices present, greeks null. A null must not become 0.0,
+        because 0.0 is a real delta for a far out-of-the-money contract.
+        """
+        responses.add(
+            responses.GET,
+            urls.OPTIONS_INSTRUMENTS,
+            json={
+                "results": [
+                    {"id": "opt-1", "type": "call", "strike_price": "352.50",
+                     "url": f"{urls.OPTIONS_INSTRUMENTS}opt-1/",
+                     "expiration_date": "2026-11-18"},
+                    {"id": "opt-2", "type": "call", "strike_price": "600.00",
+                     "url": f"{urls.OPTIONS_INSTRUMENTS}opt-2/",
+                     "expiration_date": "2026-11-20"},
+                ],
+                "next": None,
+            },
+            status=200,
+        )
+        responses.add(
+            responses.GET,
+            urls.OPTIONS_MARKET_DATA,
+            json={
+                "results": [
+                    {
+                        "instrument_id": "opt-1",
+                        "adjusted_mark_price": "0.210000",
+                        "bid_price": "0.130000",
+                        "ask_price": "0.290000",
+                        "implied_volatility": None,
+                        "delta": None,
+                        "gamma": None,
+                        "theta": None,
+                        "vega": None,
+                        "volume": 38492,
+                        "open_interest": 4133,
+                    },
+                    {
+                        "instrument_id": "opt-2",
+                        "adjusted_mark_price": "0.010000",
+                        "implied_volatility": "0.850000",
+                        "delta": "0.000000",
+                        "gamma": "0.000000",
+                        "theta": "-0.000100",
+                        "vega": "0.000000",
+                    },
+                ]
+            },
+            status=200,
+        )
+
+        chain = client.get_options_chain("AAPL", expiration="2026-11-18")
+        expiring, far_otm = sorted(chain.calls, key=lambda c: c.strike)
+
+        assert expiring.mark == 0.21
+        for greek in ("iv", "delta", "gamma", "theta", "vega"):
+            assert getattr(expiring, greek) is None, greek
+
+        assert far_otm.delta == 0.0
+        assert far_otm.delta is not None
+        assert far_otm.iv == 0.85
+
+
+class TestGetOptionPositions:
+    POSITION = {
+        "symbol": "AAPL",
+        "quantity": "1.0000",
+        "average_open_price": "300.0000",
+        "strategy": "long_call",
+        "legs": [{
+            "strike_price": "352.5000",
+            "expiration_date": "2026-11-18",
+            "option_type": "call",
+            "option_id": "opt-1",
+            "clearing_cost_basis_in_strategy": "300.00",
+        }],
+    }
+
+    def _add_position(self):
+        responses.add(
+            responses.GET,
+            urls.OPTIONS_POSITIONS,
+            json={"results": [self.POSITION], "next": None},
+            status=200,
+        )
+
+    @responses.activate
+    def test_unpublished_greeks_are_none(self, client):
+        self._add_position()
+        responses.add(
+            responses.GET,
+            f"{urls.OPTIONS_MARKET_DATA}opt-1/",
+            json={"mark_price": "0.210000", "delta": None,
+                  "implied_volatility": None, "theta": None},
+            status=200,
+        )
+
+        (position,) = client.get_option_positions()
+        assert position.current_mark == 0.21
+        assert position.delta is None
+        assert position.iv is None
+        assert position.theta is None
+
+    @responses.activate
+    def test_greeks_parse_when_published(self, client):
+        self._add_position()
+        responses.add(
+            responses.GET,
+            f"{urls.OPTIONS_MARKET_DATA}opt-1/",
+            json={"mark_price": "3.175000", "delta": "0.491698",
+                  "implied_volatility": "0.319108", "theta": "-0.850314"},
+            status=200,
+        )
+
+        (position,) = client.get_option_positions()
+        assert position.delta == 0.491698
+        assert position.iv == 0.319108
+        assert position.theta == -0.850314
+
+    @responses.activate
+    def test_failed_market_data_lookup_leaves_greeks_none(self, client):
+        self._add_position()
+        responses.add(
+            responses.GET,
+            f"{urls.OPTIONS_MARKET_DATA}opt-1/",
+            json={"detail": "Server error"},
+            status=500,
+        )
+
+        (position,) = client.get_option_positions()
+        assert position.delta is None
+        assert position.iv is None
+
 
 class TestIndexOptions:
     """Tests for index options (SPX, NDX, etc.) support."""

@@ -101,7 +101,7 @@ for call in chain.calls[:5]:
     print(call.strike, call.mark, call.delta, call.iv)
 ```
 
-Each `OptionContract` carries `strike`, `mark`, `bid`, `ask`, `iv`, `delta`, `gamma`, `theta`, `vega`, `volume` and `open_interest`. Index options work the same way.
+Each `OptionContract` carries `strike`, `mark`, `bid`, `ask`, `iv`, `delta`, `gamma`, `theta`, `vega`, `volume` and `open_interest`. The greeks are `None` on a contract's expiration day, when Robinhood stops publishing them. Index options work the same way.
 
 ## Orders
 

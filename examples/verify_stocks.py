@@ -12,6 +12,7 @@ Set up a session first with:
 """
 
 import sys
+from datetime import datetime
 
 import pyhood
 from pyhood.client import PyhoodClient
@@ -36,12 +37,22 @@ def main() -> int:
         print(f"    {q.symbol:5} ${q.price:>8,.2f} {q.change_pct:+6.2f}%"
               f"   bid ${q.bid:,.2f} / ask ${q.ask:,.2f}")
 
-    expiration = client.get_options_expirations("AAPL")[0]
+    # Robinhood stops publishing greeks once a contract reaches its
+    # expiration date, so skip today's, and pick the strike nearest the
+    # money rather than whichever one sits in the middle of the chain.
+    today = datetime.now().strftime("%Y-%m-%d")
+    expirations = [e for e in client.get_options_expirations("AAPL") if e > today]
+    expiration = expirations[0]
     chain = client.get_options_chain("AAPL", expiration)
-    call = chain.calls[len(chain.calls) // 2]
+    spot = client.get_quote("AAPL").price
+    call = min(chain.calls, key=lambda c: abs(c.strike - spot))
+    if call.delta is None:
+        greeks = "greeks not published"
+    else:
+        greeks = f"delta {call.delta:+.3f}   IV {call.iv:.1%}"
     print("\nOptions")
     print(f"    AAPL {call.expiration} ${call.strike:g}C   mark ${call.mark:.2f}"
-          f"   delta {call.delta:+.3f}   IV {call.iv:.1%}")
+          f"   {greeks}")
 
     print(f"\nMarket open: {client.is_market_open()}")
     print("\nSession works.")

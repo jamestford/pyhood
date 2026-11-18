@@ -360,11 +360,13 @@ class PyhoodClient:
                     mark=float(md.get("adjusted_mark_price", 0) or 0),
                     bid=float(md.get("bid_price", 0) or 0),
                     ask=float(md.get("ask_price", 0) or 0),
-                    iv=float(md.get("implied_volatility", 0) or 0),
-                    delta=float(md.get("delta", 0) or 0),
-                    gamma=float(md.get("gamma", 0) or 0),
-                    theta=float(md.get("theta", 0) or 0),
-                    vega=float(md.get("vega", 0) or 0),
+                    # Robinhood sends null greeks on a contract's expiration
+                    # day; keep them None so they can't pass for a real zero.
+                    iv=_safe_float(md.get("implied_volatility")),
+                    delta=_safe_float(md.get("delta")),
+                    gamma=_safe_float(md.get("gamma")),
+                    theta=_safe_float(md.get("theta")),
+                    vega=_safe_float(md.get("vega")),
                     volume=int(md.get("volume", 0) or 0),
                     open_interest=int(md.get("open_interest", 0) or 0),
                     option_id=inst_id,
@@ -1224,18 +1226,18 @@ class PyhoodClient:
 
             # Fetch current market data
             current_mark = 0.0
-            delta = 0.0
-            iv = 0.0
-            theta = 0.0
+            delta: float | None = None
+            iv: float | None = None
+            theta: float | None = None
             if option_id:
                 try:
                     md = self._session.get(
                         f"https://api.robinhood.com/marketdata/options/{option_id}/"
                     )
                     current_mark = float(md.get("mark_price", 0))
-                    delta = float(md.get("delta", 0) or 0)
-                    iv = float(md.get("implied_volatility", 0) or 0)
-                    theta = float(md.get("theta", 0) or 0)
+                    delta = _safe_float(md.get("delta"))
+                    iv = _safe_float(md.get("implied_volatility"))
+                    theta = _safe_float(md.get("theta"))
                 except Exception:
                     pass
 
