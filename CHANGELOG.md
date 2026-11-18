@@ -5,6 +5,15 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Breaking: option greeks are `None` when Robinhood publishes none, instead of `0.0`.** This affects `iv`, `delta`, `gamma`, `theta` and `vega` on `OptionContract`, and `delta`, `iv` and `theta` on `OptionPosition`, which are now `float | None`. On a contract's expiration day Robinhood keeps publishing prices but sends `null` for every greek, and the parser turned each `null` into `0.0`. That made a contract with no data indistinguishable from one with a real zero delta, which is what a far out-of-the-money contract has. Code that does arithmetic or format specs on these fields must check for `None` first. A failed market data lookup in `get_option_positions()` also leaves the greeks `None` now, where it left them `0.0`.
+
+### Fixed
+- **`examples/verify_stocks.py` printed `delta +0.000 IV 0.0%` on any expiration day.** It took the nearest expiration, which on an expiration day is today's and has no greeks, and the middle strike of the chain rather than the one nearest the money. It now skips today's expiration and picks the at-the-money strike, so a new user's first check of pyhood no longer looks broken.
+- The README options example read `option.implied_volatility`, which does not exist and raised `AttributeError`. The field is `iv`.
+
 ## [0.12.3] - 2026-09-17
 
 ### Fixed

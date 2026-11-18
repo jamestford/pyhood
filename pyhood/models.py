@@ -33,11 +33,13 @@ class OptionContract:
     mark: float
     bid: float = 0.0
     ask: float = 0.0
-    iv: float = 0.0
-    delta: float = 0.0
-    gamma: float = 0.0
-    theta: float = 0.0
-    vega: float = 0.0
+    # Greeks are None when Robinhood publishes none, as it does on a
+    # contract's expiration day. 0.0 is a real value, not a placeholder.
+    iv: float | None = None
+    delta: float | None = None
+    gamma: float | None = None
+    theta: float | None = None
+    vega: float | None = None
     volume: int = 0
     open_interest: int = 0
     option_id: str = ""
@@ -124,10 +126,10 @@ class OptionPosition:
     strategy: str  # e.g. 'long_call'
     option_id: str = ""
     account_number: str = ""
-    # Greeks (from market data)
-    delta: float = 0.0
-    iv: float = 0.0
-    theta: float = 0.0
+    # Greeks (from market data); None when unpublished or the lookup failed
+    delta: float | None = None
+    iv: float | None = None
+    theta: float | None = None
 
 
 @dataclass(frozen=True)

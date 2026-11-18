@@ -242,7 +242,7 @@ chain = client.get_options_chain("SPX", expiration="2026-04-17")
 for option in chain.calls:
     print(
         option.strike,
-        option.implied_volatility,
+        option.iv,
         option.delta,
         option.open_interest,
     )

@@ -17,6 +17,8 @@ Each contract is an `OptionContract` dataclass with full Greeks:
 
 ```python
 for call in chain.calls:
+    if call.delta is None:
+        continue  # no greeks published, see below
     print(
         f"  {call.strike:>8.2f} call | "
         f"Mark: ${call.mark:.2f} | "
@@ -26,6 +28,8 @@ for call in chain.calls:
         f"OI: {call.open_interest:,}"
     )
 ```
+
+The greeks are `None` when Robinhood publishes none, which it does for every contract on its expiration day: prices keep updating, greeks go null. `None` is kept distinct from `0.0`, because zero is a real delta for a far out-of-the-money contract. Check for `None` before doing arithmetic or formatting.
 
 ### Available Fields
 
@@ -37,11 +41,11 @@ for call in chain.calls:
 | `expiration` | `str` | Expiration date (YYYY-MM-DD) |
 | `mark` | `float` | Mid-market price |
 | `bid` / `ask` | `float` | Bid and ask prices |
-| `iv` | `float` | Implied volatility (decimal, e.g., 0.35 = 35%) |
-| `delta` | `float` | Delta |
-| `gamma` | `float` | Gamma |
-| `theta` | `float` | Theta (daily decay) |
-| `vega` | `float` | Vega |
+| `iv` | `float \| None` | Implied volatility (decimal, e.g., 0.35 = 35%) |
+| `delta` | `float \| None` | Delta |
+| `gamma` | `float \| None` | Gamma |
+| `theta` | `float \| None` | Theta (daily decay) |
+| `vega` | `float \| None` | Vega |
 | `volume` | `int` | Day's trading volume |
 | `open_interest` | `int` | Open interest |
 
@@ -67,7 +71,7 @@ You don't need to worry about any of this — just pass the base symbol:
 # Index options work exactly like equity options
 chain = client.get_options_chain("SPX", expiration="2026-04-17")
 for call in chain.calls:
-    print(f"  {call.strike} call | IV: {call.iv:.0%} | Delta: {call.delta:.2f}")
+    print(f"  {call.strike} call | IV: {call.iv} | Delta: {call.delta}")
 
 # Expirations
 expirations = client.get_options_expirations("SPX")
@@ -135,7 +139,7 @@ for p in positions:
         f"cost: ${p.cost_basis:.0f} | "
         f"value: ${p.current_value:.0f} | "
         f"P&L: ${p.unrealized_pl:.2f} ({p.unrealized_pl_pct:+.1f}%) | "
-        f"delta: {p.delta:.3f} | IV: {p.iv:.1%}"
+        f"delta: {p.delta} | IV: {p.iv}"
     )
 ```
 
@@ -161,9 +165,11 @@ positions = client.get_option_positions(account_number="YOUR_IRA_ACCOUNT")
 | `unrealized_pl` | `float` | Unrealized P&L in dollars |
 | `unrealized_pl_pct` | `float` | Unrealized P&L as percentage |
 | `strategy` | `str` | Strategy type (e.g. `"long_call"`) |
-| `delta` | `float` | Position delta |
-| `iv` | `float` | Implied volatility (decimal) |
-| `theta` | `float` | Theta (daily decay) |
+| `delta` | `float \| None` | Position delta |
+| `iv` | `float \| None` | Implied volatility (decimal) |
+| `theta` | `float \| None` | Theta (daily decay) |
+
+The greeks are `None` on a contract's expiration day, when Robinhood publishes none, and when the market data lookup for that position fails.
 
 ## Example: Find High Vol/OI Calls
 
