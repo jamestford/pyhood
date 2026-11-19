@@ -5,7 +5,7 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.14.0] - 2026-11-19
 
 ### Added
 - `get_quote()` and `get_quotes()` take `include_fundamentals=True` to fill `volume`, `pe_ratio`, `market_cap`, `high_52w` and `low_52w` on `Quote`. Robinhood's quote has none of them, so this makes one more request to the fundamentals endpoint (one per 100 symbols for `get_quotes()`).
@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **`FuturesQuote.high`, `low`, `prev_close` and `volume`.** See Added and Changed.
   - **`Order.fees` was always `None` on option orders.** They have no `fees` field. It is now the sum of `contract_fees`, `regulatory_fees` and `pro_trader_fees`.
 - Futures tests that mocked a flat, snake_case contract and quote now use the shapes the API sends.
+- **Docstrings gave the good-for-day time in force as `'gtd'`.** It is `'gfd'`, and Robinhood rejects `'gtd'`. Seven order docstrings and a comment on `Order.time_in_force` are corrected. pyhood passes `time_in_force` through unchecked, so an order placed with the documented value was rejected.
 - The robin_stocks migration guide sent `get_historical_portfolio()` to `get_portfolio_historicals()`, which raises. It now points to `get_portfolio_performance()`.
 - `docs/quotes.md` said quotes are batched 25 to a request. They are batched 1,000 to a request.
 - **Watchlists did not work at all.** `get_watchlists()` requested `/midlands/lists/`, which Robinhood rejects with 400 unless an `owner_type` is given, and it expected each list to carry its items, which no list record does. `get_watchlist()`, `add_to_watchlist()` and `remove_from_watchlist()` all start by reading the lists, so they failed the same way.
