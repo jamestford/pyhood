@@ -38,7 +38,9 @@ Auto-discovers the futures account ID by filtering Ceres accounts for
 
 ### `get_futures_contract(symbol)`
 
-Get contract details for a single futures symbol.
+Get contract details for a single futures symbol. Makes two requests: one for
+the contract and one for the product it belongs to (`/ES` for `/ESH26`), which
+is where the tick size, underlying and asset class are kept.
 
 **Parameters:**
 
@@ -52,11 +54,14 @@ Get contract details for a single futures symbol.
 | `name` | str | Human-readable name |
 | `contract_id` | str | Robinhood internal ID |
 | `expiration` | str | Expiration date (YYYY-MM-DD) |
-| `tick_size` | float | Minimum price increment |
+| `tick_size` | float \| None | Minimum price increment |
 | `multiplier` | float | Contract multiplier |
 | `status` | str | Contract state (e.g. 'active') |
-| `underlying` | str | Underlying symbol (e.g. 'ES') |
-| `asset_class` | str | Asset class (e.g. 'equity_index') |
+| `underlying` | str | Product symbol (e.g. 'ES') |
+| `asset_class` | str | Product group (e.g. 'stock_index', 'energy', 'metals') |
+
+If the product lookup fails, the contract is still returned, with `tick_size`
+set to `None` and `underlying` and `asset_class` empty.
 
 ### `get_futures_contracts(symbols)`
 
@@ -68,7 +73,7 @@ Batch version — fetches contracts for multiple symbols. Skips failures silentl
 
 **Returns:** `dict[str, FuturesContract]` mapping symbol to contract.
 
-### `get_futures_quote(symbol)`
+### `get_futures_quote(symbol, include_fundamentals=False)`
 
 Get a real-time quote for a futures symbol. Resolves the symbol to a contract ID
 internally.
@@ -76,6 +81,9 @@ internally.
 **Parameters:**
 
 - `symbol` (str): Futures symbol.
+- `include_fundamentals` (bool): Also fetch the session's high, low, previous
+  close and volume. Robinhood's futures quote does not include them, so they
+  are `None` without this. Costs one more request.
 
 **Returns:** `FuturesQuote` with fields:
 
@@ -85,14 +93,15 @@ internally.
 | `last_price` | float | Last trade price |
 | `bid` | float | Current bid |
 | `ask` | float | Current ask |
-| `high` | float | Session high |
-| `low` | float | Session low |
-| `prev_close` | float | Previous close |
-| `volume` | int | Trading volume |
-| `open_interest` | int | Open interest |
+| `high` | float \| None | Session high, with `include_fundamentals=True` |
+| `low` | float \| None | Session low, with `include_fundamentals=True` |
+| `prev_close` | float \| None | Previous close, with `include_fundamentals=True` |
+| `volume` | int \| None | Trading volume, with `include_fundamentals=True` |
 | `contract_id` | str | Robinhood contract ID |
 
-### `get_futures_quotes(symbols)`
+Robinhood does not publish open interest for futures.
+
+### `get_futures_quotes(symbols, include_fundamentals=False)`
 
 Batch version — fetches quotes for multiple symbols. Skips failures silently.
 

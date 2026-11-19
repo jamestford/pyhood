@@ -65,7 +65,7 @@ quote = client.get_quote("AAPL")
 | `get_stock_marketdata(...)` | `client.get_quotes(symbols)` |
 | `print_quote(symbol)` / `print_quotes(symbols)` | no equivalent, print the fields you want |
 
-`Quote` also carries `change_pct`, `volume`, `pe_ratio`, `market_cap`, `high_52w` and `low_52w`.
+`Quote` also carries `change_pct`. It has `volume`, `pe_ratio`, `market_cap`, `high_52w` and `low_52w` too, but Robinhood's quote does not include those, so they are `None` unless you pass `include_fundamentals=True` to `get_quote()` or `get_quotes()`.
 
 Not carried over: `ask_size`, `bid_size`, `adjusted_previous_close` and `previous_close_date` have no field on `Quote`. Reach for the raw endpoint through the session if you need them.
 
@@ -75,8 +75,8 @@ Not carried over: `ask_size`, `bid_size`, `adjusted_previous_close` and `previou
 | --- | --- |
 | `fundamentals(symbol)` / `get_fundamentals(symbol)` | `client.get_fundamentals(symbol)` |
 | `get_news(symbol)` | `client.get_news(symbol)` |
-| `get_popularity(symbol)` | `client.get_popularity(symbol)` |
-| `get_tickers_by_tag(tag)` | `client.get_tags(tag)` |
+| `get_popularity(symbol)` | retired by Robinhood, see [Things to know](#things-to-know) |
+| `get_tickers_by_tag(tag)` | retired by Robinhood, see [Things to know](#things-to-know) |
 
 `get_news()` returns typed `NewsArticle` objects, and resolves the instrument IDs in `related_instruments` to ticker symbols. Pass `resolve_symbols=False` to skip the lookup.
 
@@ -166,6 +166,8 @@ None of these exist in pyrh:
 **Sessions are stored as JSON**, owner-only at `~/.pyhood/session.json`, created `0600` inside a `0700` directory.
 
 **`get_portfolio_historicals()` raises `APIError`.** Robinhood retired `/portfolios/historicals/` and it now returns 404 for every parameter combination. `get_portfolio_performance()` calls the endpoint that replaced it, returning the chart view model unmapped, because its y values are returns rather than equity.
+
+**`get_tags()`, `get_popularity()` and the notification settings methods raise `APIError` too.** Robinhood retired `/midlands/tags/tag/`, `/instruments/<id>/popularity/` and `/settings/notifications/`, and all three return 404. The methods stay so that a call fails with an explanation. There is no replacement for popularity or notification settings. For tags, the Robinhood lists you follow in the app, such as its most popular list, come back from `get_watchlists()`.
 
 **Fractional orders are unverified end to end.** The payload and the rounding are covered by tests, but a fractional order is a market order and executes immediately, so the fill has never been exercised.
 

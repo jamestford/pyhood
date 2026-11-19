@@ -90,33 +90,39 @@ class PyhoodClient:
 
     # ── Stocks ──────────────────────────────────────────────────────────
 
-    def get_quote(self, symbol: str) -> Quote:
-        """Get a stock quote."""
+    def get_quote(self, symbol: str, include_fundamentals: bool = False) -> Quote:
+        """Get a stock quote.
+
+        Args:
+            symbol: Stock ticker.
+            include_fundamentals: Also fetch the symbol's fundamentals, to
+                fill `volume`, `pe_ratio`, `market_cap`, `high_52w` and
+                `low_52w`. Robinhood's quote does not carry them, so they
+                are None without this. Costs one more request.
+        """
         data = self._session.get(f"{urls.QUOTES}{symbol.upper()}/")
         if not data or "last_trade_price" not in data:
             raise SymbolNotFound(f"No quote data for {symbol}")
+        fundamentals = self.get_fundamentals(symbol) if include_fundamentals else None
+        return _quote(data, symbol.upper(), fundamentals)
 
-        price = float(data.get("last_trade_price", 0))
-        prev_close = float(data.get("previous_close", 0))
-        change_pct = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0.0
-
-        return Quote(
-            symbol=symbol.upper(),
-            price=price,
-            prev_close=prev_close,
-            change_pct=round(change_pct, 2),
-            bid=float(data.get("bid_price", 0) or 0),
-            ask=float(data.get("ask_price", 0) or 0),
-            volume=int(float(data.get("last_trade_volume", 0) or 0)),
-        )
-
-    def get_quotes(self, symbols: list[str]) -> dict[str, Quote]:
+    def get_quotes(
+        self, symbols: list[str], include_fundamentals: bool = False,
+    ) -> dict[str, Quote]:
         """Get quotes for multiple symbols (batched).
 
         Robinhood's quotes endpoint supports up to ~1,000 symbols per
         request (limited by URL length ~5,700 chars). We use 1,000 as
         a safe batch size.
+
+        Args:
+            symbols: Stock tickers.
+            include_fundamentals: Also fetch fundamentals, to fill `volume`,
+                `pe_ratio`, `market_cap`, `high_52w` and `low_52w`, which
+                are None without this. Fundamentals come 100 symbols to a
+                request, so this adds one request per 100 symbols.
         """
+        fundamentals = self.get_fundamentals_batch(symbols) if include_fundamentals else {}
         results: dict[str, Quote] = {}
         batch_size = 1000
         for i in range(0, len(symbols), batch_size):
@@ -128,18 +134,7 @@ class PyhoodClient:
                 if not item or "symbol" not in item:
                     continue
                 sym = item["symbol"]
-                price = float(item.get("last_trade_price", 0))
-                prev_close = float(item.get("previous_close", 0))
-                change_pct = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0.0
-                results[sym] = Quote(
-                    symbol=sym,
-                    price=price,
-                    prev_close=prev_close,
-                    change_pct=round(change_pct, 2),
-                    bid=float(item.get("bid_price", 0) or 0),
-                    ask=float(item.get("ask_price", 0) or 0),
-                    volume=int(float(item.get("last_trade_volume", 0) or 0)),
-                )
+                results[sym] = _quote(item, sym, fundamentals.get(sym.upper()))
         return results
 
     def get_fundamentals(self, symbol: str) -> dict[str, Any]:
@@ -614,39 +609,38 @@ class PyhoodClient:
         return movers
 
     def get_tags(self, tag: str) -> list[str]:
-        """Get stock symbols for a discovery tag.
+        """Deprecated — Robinhood retired this endpoint.
 
-        Args:
-            tag: Tag name (e.g. '100-most-popular', 'top-movers', 'etf',
-                 '10-most-popular', 'technology', 'healthcare').
+        Raises:
+            APIError: Always. `/midlands/tags/tag/<tag>/` returns 404 for
+                every tag as of 2026-11-19.
+
+        The Robinhood lists you follow in the app, such as its most popular
+        list, come back from `get_watchlists()` with their symbols.
         """
-        data = self._session.get(f"{urls.TAGS}{tag}/")
-        instruments = data.get("instruments", []) if isinstance(data, dict) else []
-        symbols: list[str] = []
-        for instrument_url in instruments:
-            try:
-                inst = self._session.get(instrument_url)
-                symbol = inst.get("symbol", "")
-                if symbol:
-                    symbols.append(symbol)
-            except Exception:
-                pass
-        return symbols
+        from pyhood.exceptions import APIError
+
+        raise APIError(
+            "get_tags() is no longer available: Robinhood retired "
+            "/midlands/tags/tag/ and it returns 404 for every tag. The "
+            "Robinhood lists you follow in the app are returned by "
+            "get_watchlists()."
+        )
 
     def get_popularity(self, symbol: str) -> int:
-        """Get how many Robinhood users hold a stock.
+        """Deprecated — Robinhood retired this endpoint.
 
-        Args:
-            symbol: Stock ticker.
-
-        Returns:
-            Number of open positions (popularity count).
+        Raises:
+            APIError: Always. `/instruments/<id>/popularity/` returns 404 as
+                of 2026-11-19, and pyhood knows of no replacement.
         """
-        instrument = self._get_instrument_url(symbol)
-        instrument_id = instrument.rstrip("/").split("/")[-1]
-        url = urls.POPULARITY.format(instrument_id=instrument_id)
-        data = self._session.get(url)
-        return int(data.get("num_open_positions", 0))
+        from pyhood.exceptions import APIError
+
+        raise APIError(
+            "get_popularity() is no longer available: Robinhood retired "
+            "/instruments/<id>/popularity/ and it returns 404. There is no "
+            "replacement."
+        )
 
     def get_splits(self, symbol: str) -> list[StockSplit]:
         """Get stock split history for a symbol."""
@@ -821,18 +815,34 @@ class PyhoodClient:
         )
 
     def get_notification_settings(self) -> NotificationSettings:
-        """Get current notification preferences."""
-        data = self._session.get(urls.NOTIFICATION_SETTINGS)
-        return NotificationSettings(settings=data)
+        """Deprecated — Robinhood retired this endpoint.
+
+        Raises:
+            APIError: Always. `/settings/notifications/` returns 404 as of
+                2026-11-19, and pyhood knows of no replacement.
+        """
+        from pyhood.exceptions import APIError
+
+        raise APIError(
+            "get_notification_settings() is no longer available: Robinhood "
+            "retired /settings/notifications/ and it returns 404. There is "
+            "no replacement."
+        )
 
     def update_notification_settings(self, **kwargs: bool) -> NotificationSettings:
-        """Update notification preferences.
+        """Deprecated — Robinhood retired this endpoint.
 
-        Pass notification keys as keyword arguments, e.g.:
-            client.update_notification_settings(market_open=False, dividends=True)
+        Raises:
+            APIError: Always, before anything is sent. See
+                `get_notification_settings()`.
         """
-        data = self._session.post(urls.NOTIFICATION_SETTINGS, data=kwargs)
-        return NotificationSettings(settings=data)
+        from pyhood.exceptions import APIError
+
+        raise APIError(
+            "update_notification_settings() is no longer available: "
+            "Robinhood retired /settings/notifications/ and it returns 404. "
+            "There is no replacement."
+        )
 
     # ── Banking / ACH ─────────────────────────────────────────────────
 
@@ -842,7 +852,7 @@ class PyhoodClient:
         return [
             BankAccount(
                 id=item.get("id", ""),
-                bank_name=item.get("bank_account_holder_name", item.get("bank_name", "")),
+                holder_name=item.get("bank_account_holder_name", ""),
                 account_type=item.get("bank_account_type", ""),
                 account_nickname=item.get("bank_account_nickname", ""),
                 state=item.get("state", ""),
@@ -932,69 +942,106 @@ class PyhoodClient:
     # ── Watchlists ────────────────────────────────────────────────────
 
     def get_watchlists(self) -> list[Watchlist]:
-        """Get all user watchlists with their symbols."""
-        data = self._session.get_paginated(urls.WATCHLISTS_V2)
-        watchlists: list[Watchlist] = []
-        for item in data:
-            symbols = [
-                entry.get("symbol", "")
-                for entry in item.get("items", [])
-                if entry.get("symbol")
-            ]
-            watchlists.append(Watchlist(
-                name=item.get("display_name", item.get("name", "")),
-                symbols=symbols,
-                url=item.get("url", ""),
-            ))
-        return watchlists
+        """Get your watchlists with their symbols.
 
-    def get_watchlist(self, name: str = "Default") -> Watchlist:
+        Returns the lists the app shows: the ones you created and the
+        Robinhood lists you follow. Makes one request for the lists and one
+        more for each list that has anything in it.
+        """
+        return [self._watchlist(record) for record in self._watchlist_records()]
+
+    def get_watchlist(self, name: str = "My First List") -> Watchlist:
         """Get a single watchlist by name.
 
         Args:
-            name: Watchlist name (default: 'Default', Robinhood's main watchlist).
-        """
-        watchlists = self.get_watchlists()
-        for wl in watchlists:
-            if wl.name.lower() == name.lower():
-                return wl
-        raise SymbolNotFound(f"Watchlist not found: {name}")
+            name: Watchlist name, matched without regard to case. Defaults
+                to 'My First List', the list every account starts with.
 
-    def add_to_watchlist(self, symbols: list[str], name: str = "Default") -> list[dict]:
-        """Add symbols to a watchlist (max 32 at a time).
+        Raises:
+            SymbolNotFound: If you have no list by that name.
+        """
+        return self._watchlist(self._find_watchlist(name))
+
+    def add_to_watchlist(self, symbols: list[str], name: str = "My First List") -> dict:
+        """Add stocks to a watchlist.
 
         Args:
-            symbols: List of stock symbols to add.
-            name: Watchlist name (default: 'Default').
-        """
-        watchlist = self.get_watchlist(name)
-        list_id = watchlist.url.rstrip("/").split("/")[-1] if watchlist.url else name
-        url = f"{urls.WATCHLISTS_V2}{list_id}/items/"
-        results = []
-        for symbol in symbols:
-            resp = self._session.post(url, data={"symbol": symbol.upper()})
-            results.append(resp)
-        return results
+            symbols: Stock symbols to add.
+            name: Watchlist name (default: 'My First List').
 
-    def remove_from_watchlist(self, symbols: list[str], name: str = "Default") -> None:
-        """Remove symbols from a watchlist.
+        Returns:
+            Robinhood's raw response.
+
+        Raises:
+            SymbolNotFound: If the list or any symbol is not found. Nothing
+                is added in that case.
+        """
+        return self._change_watchlist(symbols, name, "create")
+
+    def remove_from_watchlist(
+        self, symbols: list[str], name: str = "My First List",
+    ) -> dict:
+        """Remove stocks from a watchlist.
 
         Args:
-            symbols: List of stock symbols to remove.
-            name: Watchlist name (default: 'Default').
+            symbols: Stock symbols to remove.
+            name: Watchlist name (default: 'My First List').
+
+        Returns:
+            Robinhood's raw response.
+
+        Raises:
+            SymbolNotFound: If the list or any symbol is not found. Nothing
+                is removed in that case.
         """
-        watchlist = self.get_watchlist(name)
-        list_id = watchlist.url.rstrip("/").split("/")[-1] if watchlist.url else name
-        upper_symbols = {s.upper() for s in symbols}
-        # Get list items to find their IDs for deletion
-        items = self._session.get_paginated(f"{urls.WATCHLISTS_V2}{list_id}/items/")
-        for item in items:
-            if item.get("symbol", "").upper() in upper_symbols:
-                item_id = item.get("id", "")
-                if item_id:
-                    self._session.delete(
-                        f"{urls.WATCHLISTS_V2}{list_id}/items/{item_id}/"
-                    )
+        return self._change_watchlist(symbols, name, "delete")
+
+    def _watchlist_records(self) -> list[dict]:
+        """The raw list records, without their items."""
+        return self._session.get_paginated(urls.WATCHLISTS)
+
+    def _find_watchlist(self, name: str) -> dict:
+        records = self._watchlist_records()
+        for record in records:
+            if record.get("display_name", "").lower() == name.lower():
+                return record
+        names = ", ".join(repr(r.get("display_name", "")) for r in records) or "none"
+        raise SymbolNotFound(f"Watchlist not found: {name!r}. Your lists: {names}")
+
+    def _watchlist(self, record: dict) -> Watchlist:
+        """Build a Watchlist from a list record, fetching its symbols."""
+        list_id = record.get("id", "")
+        symbols: list[str] = []
+        # The list record says how many items it has, so an empty list
+        # needs no second request.
+        if list_id and record.get("item_count") != 0:
+            data = self._session.get(
+                urls.WATCHLIST_ITEMS,
+                # Without load_all_attributes=false Robinhood adds live
+                # prices to every item, and rejects the request outright
+                # for an options watchlist.
+                params={"list_id": list_id, "load_all_attributes": "false"},
+            )
+            items = data.get("results", []) if isinstance(data, dict) else []
+            symbols = [item["symbol"] for item in items if item.get("symbol")]
+        return Watchlist(name=record.get("display_name", ""), symbols=symbols, id=list_id)
+
+    def _change_watchlist(self, symbols: list[str], name: str, operation: str) -> dict:
+        """Add ('create') or remove ('delete') stocks on a watchlist."""
+        watchlist = self._find_watchlist(name)
+        # Resolve every symbol first, so a bad one raises before anything
+        # is changed.
+        changes = [
+            {
+                "object_type": "instrument",
+                "object_id": self._get_instrument_url(symbol).rstrip("/").split("/")[-1],
+                "operation": operation,
+            }
+            for symbol in symbols
+        ]
+        return self._session.post(
+            urls.WATCHLIST_ITEMS, json_data={watchlist["id"]: changes},
+        )
 
     # ── Markets ───────────────────────────────────────────────────────
 
@@ -2224,7 +2271,7 @@ class PyhoodClient:
             # single price, and the order-level premium fields are per
             # contract and signed.
             average_price=_average_execution_price(executions) if len(legs) == 1 else None,
-            fees=_safe_float(item.get("fees")),
+            fees=_option_fees(item),
             filled_quantity=filled_quantity,
         )
 
@@ -2665,6 +2712,29 @@ class PyhoodClient:
         Raises:
             SymbolNotFound: If symbol not recognized.
         """
+        item = self._futures_contract_item(symbol)
+        # Tick size, underlying and asset class belong to the product (/ES),
+        # not the contract (/ESZ26), so they take a second request.
+        product = self._futures_product(item.get("productId", ""))
+        return FuturesContract(
+            symbol=self._clean_futures_symbol(item, symbol),
+            name=item.get("description", ""),
+            contract_id=item.get("id", ""),
+            expiration=item.get("expiration", ""),
+            tick_size=_safe_float(product.get("priceIncrements")),
+            multiplier=float(item.get("multiplier", 0) or 0),
+            status=self._clean_futures_state(item.get("state", "")),
+            underlying=self._clean_futures_symbol(product, "") if product else "",
+            asset_class=product.get("rhdProductGroup", "")
+            .removeprefix("RHD_PRODUCT_GROUP_").lower(),
+        )
+
+    def _futures_contract_item(self, symbol: str) -> dict:
+        """Fetch the raw contract record for a futures symbol.
+
+        Raises:
+            SymbolNotFound: If symbol not recognized.
+        """
         self._set_futures_header()
         data = self._session.get(urls.futures_contract_url(symbol.upper()))
         # The arsenal endpoint wraps the contract in a "result" envelope and
@@ -2672,18 +2742,22 @@ class PyhoodClient:
         item = data.get("result", data) if isinstance(data, dict) else {}
         if not item or "id" not in item:
             raise SymbolNotFound(f"No futures contract for {symbol}")
+        return item
 
-        return FuturesContract(
-            symbol=self._clean_futures_symbol(item, symbol),
-            name=item.get("description", "") or item.get("simple_name", ""),
-            contract_id=item.get("id", ""),
-            expiration=item.get("expiration", "") or item.get("expiration_date", ""),
-            tick_size=float(item.get("tick_size", 0) or 0),
-            multiplier=float(item.get("multiplier", 0) or 0),
-            status=self._clean_futures_state(item.get("state", "")),
-            underlying=item.get("underlying_symbol", ""),
-            asset_class=item.get("asset_class", ""),
-        )
+    def _futures_product(self, product_id: str) -> dict:
+        """Fetch the raw product record a contract belongs to, or {}.
+
+        A failed lookup is not fatal: the contract is still usable without
+        its tick size.
+        """
+        if not product_id:
+            return {}
+        try:
+            data = self._session.get(f"{urls.FUTURES_PRODUCTS}{product_id}/")
+        except Exception:
+            logger.warning(f"Failed to fetch futures product {product_id}")
+            return {}
+        return data.get("result", data) if isinstance(data, dict) else {}
 
     @staticmethod
     def _clean_futures_symbol(item: dict, fallback: str) -> str:
@@ -2715,11 +2789,17 @@ class PyhoodClient:
                 logger.warning(f"Failed to fetch futures contract for {sym}")
         return results
 
-    def get_futures_quote(self, symbol: str) -> FuturesQuote:
+    def get_futures_quote(
+        self, symbol: str, include_fundamentals: bool = False,
+    ) -> FuturesQuote:
         """Get a real-time futures quote.
 
         Args:
             symbol: Futures symbol (e.g. 'ESH26').
+            include_fundamentals: Also fetch the session's `high`, `low`,
+                `prev_close` and `volume`. Robinhood's futures quote does
+                not carry them, so they are None without this. Costs one
+                more request.
 
         Returns:
             FuturesQuote with bid/ask/last price.
@@ -2727,11 +2807,15 @@ class PyhoodClient:
         Raises:
             SymbolNotFound: If symbol not recognized.
         """
-        contract = self.get_futures_contract(symbol)
-        return self.get_futures_quote_by_id(contract.contract_id, symbol=contract.symbol)
+        item = self._futures_contract_item(symbol)
+        return self.get_futures_quote_by_id(
+            item["id"],
+            symbol=self._clean_futures_symbol(item, symbol),
+            include_fundamentals=include_fundamentals,
+        )
 
     def get_futures_quote_by_id(
-        self, contract_id: str, symbol: str = "",
+        self, contract_id: str, symbol: str = "", include_fundamentals: bool = False,
     ) -> FuturesQuote:
         """Get a real-time futures quote by contract ID.
 
@@ -2741,6 +2825,9 @@ class PyhoodClient:
         Args:
             contract_id: Futures contract instrument ID.
             symbol: Optional symbol to label the quote with.
+            include_fundamentals: Also fetch the session's `high`, `low`,
+                `prev_close` and `volume`, which are None without this.
+                Costs one more request.
 
         Returns:
             FuturesQuote with bid/ask/last price.
@@ -2754,16 +2841,22 @@ class PyhoodClient:
         if not q:
             raise SymbolNotFound(f"No futures quote for {symbol or contract_id}")
 
+        # Same envelope as the quote. Robinhood publishes no open interest.
+        fundamentals = (
+            self._unwrap_futures_quote(
+                self._session.get(urls.FUTURES_FUNDAMENTALS, params={"ids": contract_id})
+            )
+            if include_fundamentals else {}
+        )
         return FuturesQuote(
             symbol=self._clean_futures_symbol(q, symbol or contract_id),
             last_price=float(q.get("last_trade_price", 0) or 0),
             bid=float(q.get("bid_price", 0) or 0),
             ask=float(q.get("ask_price", 0) or 0),
-            high=float(q.get("high_price", 0) or 0),
-            low=float(q.get("low_price", 0) or 0),
-            prev_close=float(q.get("previous_close", 0) or 0),
-            volume=int(float(q.get("volume", 0) or 0)),
-            open_interest=int(float(q.get("open_interest", 0) or 0)),
+            high=_safe_float(fundamentals.get("high")),
+            low=_safe_float(fundamentals.get("low")),
+            prev_close=_safe_float(fundamentals.get("previous_close_price")),
+            volume=_safe_int(fundamentals.get("volume")),
             contract_id=q.get("instrument_id", "") or contract_id,
         )
 
@@ -2789,11 +2882,16 @@ class PyhoodClient:
             return results[0]
         return {}
 
-    def get_futures_quotes(self, symbols: list[str]) -> dict[str, FuturesQuote]:
+    def get_futures_quotes(
+        self, symbols: list[str], include_fundamentals: bool = False,
+    ) -> dict[str, FuturesQuote]:
         """Get real-time futures quotes for multiple symbols.
 
         Args:
             symbols: List of futures symbols.
+            include_fundamentals: Also fetch each contract's `high`, `low`,
+                `prev_close` and `volume`, which are None without this.
+                Costs one more request per symbol.
 
         Returns:
             Dict mapping symbol to FuturesQuote.
@@ -2801,7 +2899,7 @@ class PyhoodClient:
         results: dict[str, FuturesQuote] = {}
         for sym in symbols:
             try:
-                results[sym.upper()] = self.get_futures_quote(sym)
+                results[sym.upper()] = self.get_futures_quote(sym, include_fundamentals)
             except Exception:
                 logger.warning(f"Failed to fetch futures quote for {sym}")
         return results
@@ -2983,6 +3081,52 @@ def _safe_float(val: Any) -> float | None:
         return float(val)
     except (ValueError, TypeError):
         return None
+
+
+def _safe_int(val: Any) -> int | None:
+    """Convert a number or numeric string to int, or return None."""
+    number = _safe_float(val)
+    return int(number) if number is not None else None
+
+
+def _quote(item: dict, symbol: str, fundamentals: dict | None = None) -> Quote:
+    """Build a Quote from a quote response and, optionally, fundamentals.
+
+    Volume, P/E, market cap and the 52-week range are not in the quote
+    response. They are filled from `fundamentals` when it is given.
+    """
+    price = float(item.get("last_trade_price", 0))
+    prev_close = float(item.get("previous_close", 0))
+    change_pct = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0.0
+    fundamentals = fundamentals or {}
+    return Quote(
+        symbol=symbol,
+        price=price,
+        prev_close=prev_close,
+        change_pct=round(change_pct, 2),
+        bid=float(item.get("bid_price", 0) or 0),
+        ask=float(item.get("ask_price", 0) or 0),
+        volume=_safe_int(fundamentals.get("volume")),
+        pe_ratio=_safe_float(fundamentals.get("pe_ratio")),
+        market_cap=_safe_float(fundamentals.get("market_cap")),
+        high_52w=_safe_float(fundamentals.get("high_52_weeks")),
+        low_52w=_safe_float(fundamentals.get("low_52_weeks")),
+        timestamp=_parse_time(item.get("updated_at")),
+    )
+
+
+def _option_fees(item: dict) -> float | None:
+    """Total fees on an option order, or None when it reports none.
+
+    Option orders have no `fees` field. They split fees three ways, and
+    the total is what `fees` means on a stock order.
+    """
+    parts = [
+        _safe_float(item.get(key))
+        for key in ("contract_fees", "regulatory_fees", "pro_trader_fees")
+    ]
+    present = [part for part in parts if part is not None]
+    return round(sum(present), 6) if present else None
 
 
 def _parse_time(value: Any) -> datetime | None:

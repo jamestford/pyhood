@@ -26,6 +26,28 @@ pytest --cov=pyhood --cov-report=term-missing -v
 pytest tests/test_auth.py -v
 ```
 
+## Auditing Against the Live API
+
+The tests mock Robinhood's responses. A parser that reads a field Robinhood
+does not send still passes, as long as its mock has the same made-up field.
+That has happened more than once.
+
+`scripts/field_audit.py` checks the parsers against real responses. It runs
+the read-only methods on a live account, records every field they ask for,
+and reports the ones that were never there:
+
+```bash
+python scripts/field_audit.py          # problems only
+python scripts/field_audit.py --all    # every method audited
+```
+
+It makes GET requests only, and prints field names and counts, never values,
+so its output is safe to paste into an issue. Run it before a release, and
+when you add a parser, add the method to its `audit()` function.
+
+When you write a test for a parser, build the mock from a real response
+rather than from the fields the parser reads.
+
 ## Linting
 
 ```bash
@@ -49,6 +71,8 @@ pyhood/
 │   ├── models.py        # Typed dataclasses
 │   └── urls.py          # Robinhood API endpoints
 ├── tests/               # Test suite (responses-based mocking)
+├── examples/            # Scripts that check a session against the live API
+├── scripts/             # Maintainer tools (field_audit.py)
 ├── docs/                # MkDocs documentation
 └── .github/
     └── workflows/

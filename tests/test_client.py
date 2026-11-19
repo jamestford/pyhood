@@ -20,7 +20,6 @@ from pyhood.models import (
     MarketHours,
     Mover,
     NewsArticle,
-    NotificationSettings,
     OptionContract,
     OptionsChain,
     Order,
@@ -54,7 +53,7 @@ class TestGetQuote:
                 "previous_close": "193.00",
                 "bid_price": "195.40",
                 "ask_price": "195.60",
-                "last_trade_volume": "50000000",
+                "updated_at": "2026-11-19T17:36:00Z",
             },
             status=200,
         )
@@ -67,6 +66,66 @@ class TestGetQuote:
         assert quote.change_pct == 1.30
         assert quote.bid == 195.40
         assert quote.ask == 195.60
+        assert quote.timestamp == datetime(2026, 11, 19, 17, 36, tzinfo=timezone.utc)
+
+    # A quote and its fundamentals, with the fields the live API sends. The
+    # quote has no volume: the parser used to read `last_trade_volume` from
+    # it, which does not exist, so `Quote.volume` was always 0.
+    QUOTE = {
+        "symbol": "AAPL",
+        "last_trade_price": "195.50",
+        "previous_close": "193.00",
+        "bid_price": "195.40",
+        "ask_price": "195.60",
+        "updated_at": "2026-11-19T17:36:00Z",
+    }
+    FUNDAMENTALS = {
+        "volume": "50000000.000000",
+        "pe_ratio": "29.870000",
+        "market_cap": "2950000000000.000000",
+        "high_52_weeks": "237.230000",
+        "low_52_weeks": "164.080000",
+    }
+
+    @responses.activate
+    def test_fundamentals_fields_are_none_unless_asked_for(self, client):
+        responses.add(responses.GET, f"{urls.QUOTES}AAPL/", json=self.QUOTE, status=200)
+
+        quote = client.get_quote("AAPL")
+        assert quote.volume is None  # unknown, not zero
+        assert quote.pe_ratio is None
+        assert quote.market_cap is None
+        assert quote.high_52w is None
+        assert quote.low_52w is None
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_include_fundamentals_fills_them(self, client):
+        responses.add(responses.GET, f"{urls.QUOTES}AAPL/", json=self.QUOTE, status=200)
+        responses.add(
+            responses.GET, f"{urls.FUNDAMENTALS}AAPL/", json=self.FUNDAMENTALS, status=200,
+        )
+
+        quote = client.get_quote("AAPL", include_fundamentals=True)
+        assert quote.price == 195.50
+        assert quote.volume == 50000000
+        assert quote.pe_ratio == 29.87
+        assert quote.market_cap == 2.95e12
+        assert quote.high_52w == 237.23
+        assert quote.low_52w == 164.08
+
+    @responses.activate
+    def test_null_fundamentals_stay_none(self, client):
+        """A company with no earnings has a null P/E, which is not 0."""
+        responses.add(responses.GET, f"{urls.QUOTES}AAPL/", json=self.QUOTE, status=200)
+        responses.add(
+            responses.GET, f"{urls.FUNDAMENTALS}AAPL/",
+            json={**self.FUNDAMENTALS, "pe_ratio": None}, status=200,
+        )
+
+        quote = client.get_quote("AAPL", include_fundamentals=True)
+        assert quote.pe_ratio is None
+        assert quote.volume == 50000000
 
     @responses.activate
     def test_quote_case_insensitive(self, client):
@@ -109,7 +168,6 @@ class TestGetQuotes:
                         "previous_close": "193.00",
                         "bid_price": "195.40",
                         "ask_price": "195.60",
-                        "last_trade_volume": "50000000",
                     },
                     {
                         "symbol": "MSFT",
@@ -117,7 +175,6 @@ class TestGetQuotes:
                         "previous_close": "418.00",
                         "bid_price": "419.90",
                         "ask_price": "420.10",
-                        "last_trade_volume": "30000000",
                     },
                 ]
             },
@@ -130,6 +187,42 @@ class TestGetQuotes:
         assert "MSFT" in quotes
         assert quotes["AAPL"].price == 195.50
         assert quotes["MSFT"].price == 420.00
+        assert quotes["AAPL"].volume is None
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_batch_include_fundamentals(self, client):
+        responses.add(
+            responses.GET,
+            urls.QUOTES,
+            json={
+                "results": [
+                    {"symbol": "AAPL", "last_trade_price": "195.50", "previous_close": "193.00"},
+                    {"symbol": "MSFT", "last_trade_price": "420.00", "previous_close": "418.00"},
+                ]
+            },
+            status=200,
+        )
+        # Fundamentals come back in request order, with no symbol of their own.
+        responses.add(
+            responses.GET,
+            urls.FUNDAMENTALS,
+            json={
+                "results": [
+                    {"volume": "50000000.000000", "pe_ratio": "29.870000",
+                     "high_52_weeks": "237.230000"},
+                    {"volume": "30000000.000000", "pe_ratio": "35.100000",
+                     "high_52_weeks": "468.350000"},
+                ]
+            },
+            status=200,
+        )
+
+        quotes = client.get_quotes(["aapl", "MSFT"], include_fundamentals=True)
+        assert quotes["AAPL"].volume == 50000000
+        assert quotes["AAPL"].pe_ratio == 29.87
+        assert quotes["MSFT"].volume == 30000000
+        assert quotes["MSFT"].high_52w == 468.35
 
     @responses.activate
     def test_batch_with_null_results(self, client):
@@ -1312,6 +1405,54 @@ class TestOptionOrderParsing:
         assert order.average_price == pytest.approx(1.225)
         assert order.filled_at == datetime(2026, 11, 1, 14, 2, tzinfo=timezone.utc)
 
+    def _order_with(self, **fields):
+        return {"results": [{
+            "id": "o", "chain_symbol": "SPY", "direction": "credit", "quantity": "1",
+            "processed_quantity": "1", "state": "filled",
+            "created_at": "2026-11-01T13:59:00Z",
+            "legs": [self._leg("1.00", "1")], **fields,
+        }], "next": None}
+
+    @responses.activate
+    def test_fees_are_the_sum_of_the_three_fee_fields(self, client):
+        """Option orders have no `fees` field, which is what the parser
+        read, so `Order.fees` was always None for them."""
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json=self._order_with(
+                contract_fees="0.50", regulatory_fees="0.03", pro_trader_fees="0",
+            ),
+            status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.fees == 0.53
+
+    @responses.activate
+    def test_fees_of_zero_are_zero_not_none(self, client):
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json=self._order_with(
+                contract_fees="0", regulatory_fees="0", pro_trader_fees="0",
+            ),
+            status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.fees == 0.0
+
+    @responses.activate
+    def test_fees_are_none_when_the_order_reports_none(self, client):
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS, json=self._order_with(), status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.fees is None
+
     @responses.activate
     def test_spread_has_no_single_average_price(self, client):
         responses.add(
@@ -1498,43 +1639,18 @@ class TestSettings:
         assert profile.first_name == "James"
         assert profile.last_name == "Ford"
 
+    @pytest.mark.parametrize("call", [
+        lambda c: c.get_notification_settings(),
+        lambda c: c.update_notification_settings(market_open=False),
+    ])
     @responses.activate
-    def test_get_notification_settings(self, client):
-        responses.add(
-            responses.GET,
-            urls.NOTIFICATION_SETTINGS,
-            json={
-                "market_open": True,
-                "dividends": True,
-                "transfers": False,
-                "price_movements": True,
-            },
-            status=200,
-        )
+    def test_notification_settings_are_retired(self, client, call):
+        """Robinhood returns 404 for /settings/notifications/ (2026-11-19)."""
+        from pyhood.exceptions import APIError
 
-        settings = client.get_notification_settings()
-        assert isinstance(settings, NotificationSettings)
-        assert settings.is_enabled("market_open") is True
-        assert settings.is_enabled("transfers") is False
-        assert settings.is_enabled("nonexistent") is False
-
-    @responses.activate
-    def test_update_notification_settings(self, client):
-        responses.add(
-            responses.POST,
-            urls.NOTIFICATION_SETTINGS,
-            json={
-                "market_open": False,
-                "dividends": True,
-                "transfers": False,
-                "price_movements": True,
-            },
-            status=200,
-        )
-
-        settings = client.update_notification_settings(market_open=False)
-        assert isinstance(settings, NotificationSettings)
-        assert settings.is_enabled("market_open") is False
+        with pytest.raises(APIError, match="no longer available"):
+            call(client)
+        assert len(responses.calls) == 0  # nothing is sent
 
 
 class TestBanking:
@@ -1547,7 +1663,7 @@ class TestBanking:
                 "results": [
                     {
                         "id": "bank-001",
-                        "bank_account_holder_name": "Chase",
+                        "bank_account_holder_name": "Pat Example",
                         "bank_account_type": "checking",
                         "bank_account_nickname": "My Checking",
                         "state": "approved",
@@ -1563,7 +1679,11 @@ class TestBanking:
         assert len(accounts) == 1
         assert isinstance(accounts[0], BankAccount)
         assert accounts[0].id == "bank-001"
-        assert accounts[0].bank_name == "Chase"
+        # `bank_account_holder_name` is a person, not a bank. It used to be
+        # stored as `bank_name`; the API sends no bank name at all.
+        assert accounts[0].holder_name == "Pat Example"
+        assert accounts[0].account_nickname == "My Checking"
+        assert not hasattr(accounts[0], "bank_name")
         assert accounts[0].account_type == "checking"
         assert accounts[0].state == "approved"
 
@@ -1732,144 +1852,170 @@ class TestCardTransactions:
 
 
 class TestWatchlists:
-    @responses.activate
-    def test_get_watchlists(self, client):
+    """Shapes as the lists endpoints sent them on 2026-11-19.
+
+    The earlier tests mocked `/midlands/lists/` returning lists with their
+    `items` inline. That request is rejected with 400, and no list record
+    carries its items, so every watchlist method failed in practice.
+    """
+
+    def _record(self, list_id, name, count, owner="custom", types=("instrument",)):
+        return {
+            "id": list_id,
+            "display_name": name,
+            "item_count": count,
+            "owner_type": owner,
+            "allowed_object_types": list(types),
+            "followed": True,
+            "icon_emoji": "💡",
+            "created_at": "2025-01-02T03:04:05Z",
+            "updated_at": "2026-11-18T03:04:05Z",
+        }
+
+    def _add_lists(self, *records):
         responses.add(
-            responses.GET,
-            urls.WATCHLISTS_V2,
+            responses.GET, urls.WATCHLISTS,
+            json={"id": "default", "migrated": True, "results": list(records)},
+            status=200,
+        )
+
+    def _add_items(self, list_id, name, symbols):
+        responses.add(
+            responses.GET, urls.WATCHLIST_ITEMS,
+            match=[responses.matchers.query_param_matcher(
+                {"list_id": list_id, "load_all_attributes": "false"},
+            )],
             json={
+                "display_name": name,
+                "owner_type": "custom",
+                "has_futures_contracts": False,
                 "results": [
                     {
-                        "display_name": "Default",
-                        "url": f"{BASE}/midlands/lists/abc123/",
-                        "items": [
-                            {"symbol": "AAPL"},
-                            {"symbol": "MSFT"},
-                        ],
-                    },
-                    {
-                        "display_name": "Tech Stocks",
-                        "url": f"{BASE}/midlands/lists/def456/",
-                        "items": [
-                            {"symbol": "NVDA"},
-                        ],
-                    },
+                        "id": f"item-{symbol}",
+                        "list_id": list_id,
+                        "object_id": f"instr-{symbol}",
+                        "object_type": "instrument",
+                        "symbol": symbol,
+                        "name": f"{symbol} Inc.",
+                    }
+                    for symbol in symbols
                 ],
-                "next": None,
             },
             status=200,
         )
+
+    def _add_instrument(self, symbol):
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            match=[responses.matchers.query_param_matcher({"symbol": symbol})],
+            json={"results": [{"url": f"{urls.INSTRUMENTS}instr-{symbol}/"}]},
+            status=200,
+        )
+
+    @responses.activate
+    def test_get_watchlists(self, client):
+        self._add_lists(
+            self._record("list-1", "My First List", 2),
+            self._record("list-2", "100 Most Popular", 1, owner="robinhood"),
+        )
+        self._add_items("list-1", "My First List", ["AAPL", "MSFT"])
+        self._add_items("list-2", "100 Most Popular", ["NVDA"])
 
         watchlists = client.get_watchlists()
         assert len(watchlists) == 2
         assert isinstance(watchlists[0], Watchlist)
-        assert watchlists[0].name == "Default"
+        assert watchlists[0].name == "My First List"
         assert watchlists[0].symbols == ["AAPL", "MSFT"]
-        assert watchlists[1].name == "Tech Stocks"
+        assert watchlists[0].id == "list-1"
+        assert watchlists[1].name == "100 Most Popular"
         assert watchlists[1].symbols == ["NVDA"]
 
     @responses.activate
-    def test_get_watchlist_by_name(self, client):
-        responses.add(
-            responses.GET,
-            urls.WATCHLISTS_V2,
-            json={
-                "results": [
-                    {
-                        "display_name": "Default",
-                        "url": f"{BASE}/midlands/lists/abc123/",
-                        "items": [{"symbol": "AAPL"}],
-                    },
-                ],
-                "next": None,
-            },
-            status=200,
+    def test_empty_list_needs_no_items_request(self, client):
+        """An options watchlist rejects a full items request, and the one
+        an account starts with is empty."""
+        self._add_lists(
+            self._record("list-0", "Options Watchlist", 0, types=("option_strategy",)),
         )
 
-        wl = client.get_watchlist("Default")
-        assert wl.name == "Default"
-        assert wl.symbols == ["AAPL"]
+        (watchlist,) = client.get_watchlists()
+        assert watchlist.name == "Options Watchlist"
+        assert watchlist.symbols == []
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_get_watchlist_by_name(self, client):
+        self._add_lists(
+            self._record("list-1", "My First List", 2),
+            self._record("list-2", "Tech", 1),
+        )
+        self._add_items("list-2", "Tech", ["NVDA"])
+
+        wl = client.get_watchlist("tech")  # case-insensitive
+        assert wl.name == "Tech"
+        assert wl.symbols == ["NVDA"]
+        # The lists and the one list asked for, not every list's items.
+        assert len(responses.calls) == 2
+
+    @responses.activate
+    def test_get_watchlist_defaults_to_my_first_list(self, client):
+        self._add_lists(self._record("list-1", "My First List", 1))
+        self._add_items("list-1", "My First List", ["AAPL"])
+
+        assert client.get_watchlist().symbols == ["AAPL"]
 
     @responses.activate
     def test_get_watchlist_not_found(self, client):
-        responses.add(
-            responses.GET,
-            urls.WATCHLISTS_V2,
-            json={"results": [], "next": None},
-            status=200,
-        )
+        self._add_lists(self._record("list-1", "My First List", 0))
 
-        with pytest.raises(SymbolNotFoundError):
+        with pytest.raises(SymbolNotFoundError, match="Your lists: 'My First List'"):
             client.get_watchlist("Nonexistent")
 
     @responses.activate
     def test_add_to_watchlist(self, client):
-        responses.add(
-            responses.GET,
-            urls.WATCHLISTS_V2,
-            json={
-                "results": [
-                    {
-                        "display_name": "Default",
-                        "url": f"{BASE}/midlands/lists/abc123/",
-                        "items": [{"symbol": "AAPL"}],
-                    },
-                ],
-                "next": None,
-            },
-            status=200,
-        )
-        responses.add(
-            responses.POST,
-            f"{BASE}/midlands/lists/abc123/items/",
-            json={"symbol": "TSLA"},
-            status=201,
-        )
+        self._add_lists(self._record("list-1", "My First List", 0))
+        self._add_instrument("TSLA")
+        self._add_instrument("F")
+        responses.add(responses.POST, urls.WATCHLIST_ITEMS, json={}, status=200)
 
-        results = client.add_to_watchlist(["TSLA"])
-        assert len(results) == 1
+        client.add_to_watchlist(["tsla", "F"])
+
+        post = responses.calls[-1].request
+        assert post.method == "POST"
+        assert json.loads(post.body) == {
+            "list-1": [
+                {"object_type": "instrument", "object_id": "instr-TSLA", "operation": "create"},
+                {"object_type": "instrument", "object_id": "instr-F", "operation": "create"},
+            ],
+        }
 
     @responses.activate
     def test_remove_from_watchlist(self, client):
-        responses.add(
-            responses.GET,
-            urls.WATCHLISTS_V2,
-            json={
-                "results": [
-                    {
-                        "display_name": "Default",
-                        "url": f"{BASE}/midlands/lists/abc123/",
-                        "items": [{"symbol": "AAPL"}],
-                    },
-                ],
-                "next": None,
-            },
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{BASE}/midlands/lists/abc123/items/",
-            json={
-                "results": [
-                    {"id": "item-001", "symbol": "AAPL"},
-                    {"id": "item-002", "symbol": "MSFT"},
-                ],
-                "next": None,
-            },
-            status=200,
-        )
-        responses.add(
-            responses.DELETE,
-            f"{BASE}/midlands/lists/abc123/items/item-001/",
-            body="",
-            status=200,
-        )
+        self._add_lists(self._record("list-1", "My First List", 2))
+        self._add_instrument("AAPL")
+        responses.add(responses.POST, urls.WATCHLIST_ITEMS, json={}, status=200)
 
         client.remove_from_watchlist(["AAPL"])
-        # Verify the DELETE was called
-        assert any(
-            call.request.method == "DELETE" for call in responses.calls
+
+        assert json.loads(responses.calls[-1].request.body) == {
+            "list-1": [
+                {"object_type": "instrument", "object_id": "instr-AAPL", "operation": "delete"},
+            ],
+        }
+
+    @responses.activate
+    def test_unknown_symbol_changes_nothing(self, client):
+        self._add_lists(self._record("list-1", "My First List", 0))
+        self._add_instrument("AAPL")
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            match=[responses.matchers.query_param_matcher({"symbol": "NOPE"})],
+            json={"results": []}, status=200,
         )
+
+        with pytest.raises(SymbolNotFoundError):
+            client.add_to_watchlist(["AAPL", "NOPE"])
+        assert all(call.request.method == "GET" for call in responses.calls)
 
 
 class TestGetMarkets:
@@ -2381,53 +2527,24 @@ class TestMovers:
 
 class TestTags:
     @responses.activate
-    def test_get_tags(self, client):
-        responses.add(
-            responses.GET,
-            f"{urls.TAGS}100-most-popular/",
-            json={
-                "instruments": [
-                    f"{BASE}/instruments/aaa/",
-                    f"{BASE}/instruments/bbb/",
-                ],
-            },
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{BASE}/instruments/aaa/",
-            json={"symbol": "AAPL"},
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{BASE}/instruments/bbb/",
-            json={"symbol": "MSFT"},
-            status=200,
-        )
+    def test_get_tags_is_retired(self, client):
+        """Robinhood returns 404 for /midlands/tags/tag/<tag>/ (2026-11-19)."""
+        from pyhood.exceptions import APIError
 
-        symbols = client.get_tags("100-most-popular")
-        assert symbols == ["AAPL", "MSFT"]
+        with pytest.raises(APIError, match="no longer available.*get_watchlists"):
+            client.get_tags("100-most-popular")
+        assert len(responses.calls) == 0
 
 
 class TestPopularity:
     @responses.activate
-    def test_get_popularity(self, client):
-        responses.add(
-            responses.GET,
-            urls.INSTRUMENTS,
-            json={"results": [{"url": f"{BASE}/instruments/abc123/"}]},
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{BASE}/instruments/abc123/popularity/",
-            json={"num_open_positions": 150432},
-            status=200,
-        )
+    def test_get_popularity_is_retired(self, client):
+        """Robinhood returns 404 for /instruments/<id>/popularity/ (2026-11-19)."""
+        from pyhood.exceptions import APIError
 
-        count = client.get_popularity("AAPL")
-        assert count == 150432
+        with pytest.raises(APIError, match="no longer available"):
+            client.get_popularity("AAPL")
+        assert len(responses.calls) == 0
 
 
 class TestSplits:

@@ -38,10 +38,11 @@ GET /quotes/AAPL/
 | `ask_price` | string | Current ask |
 | `bid_size` | int | Bid size |
 | `ask_size` | int | Ask size |
-| `last_trade_volume` | string | Volume of last trade |
 | `last_extended_hours_trade_price` | string | After-hours price |
 | `updated_at` | string | Timestamp |
 | `instrument` | string | Instrument URL |
+
+The quote has no volume. Today's volume is `volume` on `/fundamentals/`.
 
 ---
 
@@ -309,50 +310,13 @@ GET /midlands/movers/sp500/?direction=down
 
 ### GET /midlands/tags/tag/{tag}/
 
-Pre-built stock lists by category.
+**Retired.** Returned pre-built stock lists by category (`100-most-popular`, `technology`, `etf` and so on). It returns 404 for every tag as of 2026-11-19, so `get_tags()` raises `APIError`.
 
-```
-GET /midlands/tags/tag/upcoming-earnings/
-```
+Robinhood's curated lists now live under `/midlands/lists/`. The ones you follow in the app are returned by `/midlands/lists/default/`. See [Account](#account).
 
-**Available tags:**
+### GET /instruments/{id}/popularity/
 
-| Tag | ~Count | Description |
-|-----|--------|-------------|
-| `100-most-popular` | 100 | Top 100 stocks on Robinhood |
-| `top-movers` | 20 | Daily movers |
-| `most-popular-under-25` | 24 | Retail-popular cheap stocks |
-| `upcoming-earnings` | 70 | Earnings in next 2 weeks |
-| `new-on-robinhood` | 172 | Recently added |
-| `large-cap` | 88 | Large cap stocks |
-| `mid-cap` | 16 | Mid cap stocks |
-| `small-cap` | 104 | Small cap stocks |
-| `etf` | 500 | ETFs |
-| `technology` | 500 | Tech sector |
-| `finance` | 500 | Financial sector |
-| `energy` | 386 | Energy sector |
-| `healthcare` | 212 | Healthcare sector |
-| `real-estate` | 453 | Real estate sector |
-| `banking` | 441 | Banking sector |
-| `retail` | 500 | Retail sector |
-| `manufacturing` | 495 | Manufacturing sector |
-| `insurance` | 293 | Insurance sector |
-| `utilities` | 222 | Utilities sector |
-| `food` | 219 | Food sector |
-| `media` | 192 | Media sector |
-| `reit` | 203 | REITs |
-| `automotive` | 175 | Automotive sector |
-| `entertainment` | 138 | Entertainment sector |
-| `china` | 104 | Chinese stocks |
-| `aerospace` | 99 | Aerospace sector |
-| `gold` | 69 | Gold-related |
-| `oil` | 66 | Oil-related |
-| `e-commerce` | 53 | E-commerce |
-| `travel` | 47 | Travel sector |
-| `silver` | 34 | Silver-related |
-| `social-media` | 13 | Social media companies |
-
-**Returns:** `instruments` (list of instrument URLs), `name`, `description`
+**Retired.** Returned the number of Robinhood accounts holding a stock. It returns 404 as of 2026-11-19, so `get_popularity()` raises `APIError`.
 
 ---
 
@@ -423,7 +387,33 @@ Options order history (paginated).
 
 ### GET /midlands/lists/default/
 
-Your default watchlist.
+Your watchlists: the lists you created and the Robinhood lists you follow.
+
+**Returns:** `results`, a list of list records with `id`, `display_name`, `item_count`, `owner_type` (`custom` or `robinhood`) and `allowed_object_types`. The records do not include the lists' items.
+
+`GET /midlands/lists/` is not the same thing. It returns 400 without an `owner_type` parameter.
+
+### GET /midlands/lists/items/
+
+The items on one list.
+
+```
+GET /midlands/lists/items/?list_id={list_id}&load_all_attributes=false
+```
+
+**Returns:** `results`, one per item, with `symbol`, `name`, `object_id` and `object_type` (`instrument`, `currency_pair`, ...).
+
+Without `load_all_attributes=false` every item also carries live prices, and the request is rejected with 400 for an options watchlist.
+
+### POST /midlands/lists/items/
+
+Add or remove items. The JSON body maps a list ID to its changes:
+
+```json
+{"<list_id>": [{"object_type": "instrument", "object_id": "<instrument_id>", "operation": "create"}]}
+```
+
+`operation` is `create` to add and `delete` to remove.
 
 ### GET /dividends/
 
@@ -465,15 +455,41 @@ GET /arsenal/v1/futures/contracts/symbol/ESH26/
 
 | Field | Type | Description |
 |-------|------|-------------|
+The contract, inside a `result` envelope:
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `id` | string | Contract UUID |
-| `symbol` | string | Futures symbol (e.g. `ESH26`) |
-| `simple_name` | string | Human-readable name |
-| `expiration_date` | string | Expiration date (YYYY-MM-DD) |
-| `tick_size` | string | Minimum price increment |
+| `productId` | string | UUID of the product the contract belongs to |
+| `symbol` | string | Symbol with exchange (e.g. `/ESH26:XCME`) |
+| `displaySymbol` | string | Symbol (e.g. `/ESH26`) |
+| `description` | string | Human-readable name |
+| `expiration` | string | Expiration date (YYYY-MM-DD) |
 | `multiplier` | string | Contract multiplier |
-| `state` | string | `active`, `expired` |
-| `underlying_symbol` | string | Root symbol (e.g. `ES`) |
-| `asset_class` | string | Asset class (e.g. `equity_index`) |
+| `state` | string | e.g. `FUTURES_STATE_ACTIVE` |
+| `tradability` | string | e.g. `FUTURES_TRADABILITY_TRADABLE` |
+
+The contract has no tick size, underlying or asset class. Those are on its product.
+
+---
+
+### GET /arsenal/v1/futures/products/{product_id}/
+
+The product a contract belongs to, such as `/ES` for `/ESH26`.
+
+**Returns:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Product UUID |
+| `displaySymbol` | string | Product symbol (e.g. `/ES`) |
+| `simpleName` | string | Human-readable name |
+| `exchange` | string | Exchange MIC (e.g. `XCME`) |
+| `priceIncrements` | string | Minimum price increment (e.g. `0.25`) |
+| `rhdProductGroup` | string | e.g. `RHD_PRODUCT_GROUP_STOCK_INDEX`, `RHD_PRODUCT_GROUP_ENERGY` |
+| `underlyingAsset` | string | e.g. `PRODUCT_UNDERLYING_ASSET_INDICES` |
+| `delivery` | string | `PRODUCT_DELIVERY_CASH` or `PRODUCT_DELIVERY_PHYSICAL` |
+| `activeFuturesContractId` | string | UUID of the front contract |
 
 ---
 
@@ -495,14 +511,44 @@ GET /marketdata/futures/quotes/v1/?ids={contract_id}
 
 | Field | Type | Description |
 |-------|------|-------------|
+The quote, inside a `{"status", "data": [{"status", "data": {...}}]}` envelope:
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `last_trade_price` | string | Last trade price |
+| `last_trade_size` | int | Last trade size |
 | `bid_price` | string | Current bid |
+| `bid_size` | int | Bid size |
 | `ask_price` | string | Current ask |
-| `high_price` | string | Session high |
-| `low_price` | string | Session low |
-| `previous_close` | string | Previous close |
+| `ask_size` | int | Ask size |
+| `instrument_id` | string | Contract UUID |
+| `symbol` | string | Symbol with exchange |
+| `updated_at` | string | Timestamp |
+
+The quote has no high, low, previous close or volume. Those are on the fundamentals endpoint. Open interest is on neither.
+
+---
+
+### GET /marketdata/futures/fundamentals/v1/
+
+Session figures for futures contracts.
+
+```
+GET /marketdata/futures/fundamentals/v1/?ids={contract_id}
+```
+
+**Returns:**
+
+The same envelope as the quote, holding:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `instrument_id` | string | Contract UUID |
+| `open` | string | Session open |
+| `high` | string | Session high |
+| `low` | string | Session low |
+| `previous_close_price` | string | Previous close |
 | `volume` | string | Trading volume |
-| `open_interest` | string | Open interest |
 
 ---
 

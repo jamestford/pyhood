@@ -52,8 +52,10 @@ After the first login, pyhood reuses the cached session and refreshes it silentl
 | `get_earnings(symbol)` | `client.get_earnings(symbol)` |
 | `get_splits(symbol)` | `client.get_splits(symbol)` |
 | `get_top_movers_sp(direction)` | `client.get_movers(direction)` |
-| `get_all_stocks_from_market_tag(tag)` | `client.get_tags(tag)` |
-| `get_popularity(symbol)` | `client.get_popularity(symbol)` |
+| `get_all_stocks_from_market_tag(tag)` | retired by Robinhood, see below |
+| `get_popularity(symbol)` | retired by Robinhood, see below |
+
+Robinhood retired `/midlands/tags/tag/` and `/instruments/<id>/popularity/`, and both return 404. `client.get_tags()` and `client.get_popularity()` stay so that a call fails with an explanation: they raise `APIError`. There is no replacement for popularity. For tags, the Robinhood lists you follow in the app, such as its most popular list, come back from `client.get_watchlists()`.
 
 ## Account and positions
 
@@ -66,7 +68,7 @@ After the first login, pyhood reuses the cached session and refreshes it silentl
 | `build_holdings()` | `client.get_positions()` — returns typed `Position` objects |
 | `get_all_option_positions()` | `client.get_option_positions(nonzero=False)` |
 | `get_open_option_positions()` | `client.get_option_positions()` |
-| `get_historical_portfolio(...)` | `client.get_portfolio_historicals(...)` |
+| `get_historical_portfolio(...)` | `client.get_portfolio_performance()`. Robinhood retired the historicals endpoint; this is the chart that replaced it, and its values are returns, not equity |
 | `get_day_trades()` | `client.get_day_trades()` |
 | `get_margin_calls()` | `client.get_margin_calls()` |
 | `get_documents()` | `client.get_documents()` |

@@ -48,7 +48,7 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - Dividend history with symbol filtering
 - Watchlist management (list, add, remove)
 - Markets and trading hours lookup
-- User profile and notification settings
+- User profile
 - Documents and statements (trade confirms, tax docs)
 - Day trade history, margin calls, deposit schedules
 
@@ -56,10 +56,8 @@ Modern Robinhood API client library. Public package on PyPI replacing abandoned 
 - Analyst ratings (buy/hold/sell consensus)
 - Stock news feed
 - S&P 500 top movers
-- Trending/popular stocks via tags
-- Instrument popularity (user count)
 - Stock split history
-- Portfolio historicals (equity over time)
+- Portfolio performance chart
 - Option historicals (contract pricing over time)
 
 ### Crypto Features
