@@ -1878,144 +1878,170 @@ class TestCardTransactions:
 
 
 class TestWatchlists:
-    @responses.activate
-    def test_get_watchlists(self, client):
+    """Shapes as the lists endpoints sent them on 2026-11-19.
+
+    The earlier tests mocked `/midlands/lists/` returning lists with their
+    `items` inline. That request is rejected with 400, and no list record
+    carries its items, so every watchlist method failed in practice.
+    """
+
+    def _record(self, list_id, name, count, owner="custom", types=("instrument",)):
+        return {
+            "id": list_id,
+            "display_name": name,
+            "item_count": count,
+            "owner_type": owner,
+            "allowed_object_types": list(types),
+            "followed": True,
+            "icon_emoji": "💡",
+            "created_at": "2025-01-02T03:04:05Z",
+            "updated_at": "2026-11-18T03:04:05Z",
+        }
+
+    def _add_lists(self, *records):
         responses.add(
-            responses.GET,
-            urls.WATCHLISTS_V2,
+            responses.GET, urls.WATCHLISTS,
+            json={"id": "default", "migrated": True, "results": list(records)},
+            status=200,
+        )
+
+    def _add_items(self, list_id, name, symbols):
+        responses.add(
+            responses.GET, urls.WATCHLIST_ITEMS,
+            match=[responses.matchers.query_param_matcher(
+                {"list_id": list_id, "load_all_attributes": "false"},
+            )],
             json={
+                "display_name": name,
+                "owner_type": "custom",
+                "has_futures_contracts": False,
                 "results": [
                     {
-                        "display_name": "Default",
-                        "url": f"{BASE}/midlands/lists/abc123/",
-                        "items": [
-                            {"symbol": "AAPL"},
-                            {"symbol": "MSFT"},
-                        ],
-                    },
-                    {
-                        "display_name": "Tech Stocks",
-                        "url": f"{BASE}/midlands/lists/def456/",
-                        "items": [
-                            {"symbol": "NVDA"},
-                        ],
-                    },
+                        "id": f"item-{symbol}",
+                        "list_id": list_id,
+                        "object_id": f"instr-{symbol}",
+                        "object_type": "instrument",
+                        "symbol": symbol,
+                        "name": f"{symbol} Inc.",
+                    }
+                    for symbol in symbols
                 ],
-                "next": None,
             },
             status=200,
         )
+
+    def _add_instrument(self, symbol):
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            match=[responses.matchers.query_param_matcher({"symbol": symbol})],
+            json={"results": [{"url": f"{urls.INSTRUMENTS}instr-{symbol}/"}]},
+            status=200,
+        )
+
+    @responses.activate
+    def test_get_watchlists(self, client):
+        self._add_lists(
+            self._record("list-1", "My First List", 2),
+            self._record("list-2", "100 Most Popular", 1, owner="robinhood"),
+        )
+        self._add_items("list-1", "My First List", ["AAPL", "MSFT"])
+        self._add_items("list-2", "100 Most Popular", ["NVDA"])
 
         watchlists = client.get_watchlists()
         assert len(watchlists) == 2
         assert isinstance(watchlists[0], Watchlist)
-        assert watchlists[0].name == "Default"
+        assert watchlists[0].name == "My First List"
         assert watchlists[0].symbols == ["AAPL", "MSFT"]
-        assert watchlists[1].name == "Tech Stocks"
+        assert watchlists[0].id == "list-1"
+        assert watchlists[1].name == "100 Most Popular"
         assert watchlists[1].symbols == ["NVDA"]
 
     @responses.activate
-    def test_get_watchlist_by_name(self, client):
-        responses.add(
-            responses.GET,
-            urls.WATCHLISTS_V2,
-            json={
-                "results": [
-                    {
-                        "display_name": "Default",
-                        "url": f"{BASE}/midlands/lists/abc123/",
-                        "items": [{"symbol": "AAPL"}],
-                    },
-                ],
-                "next": None,
-            },
-            status=200,
+    def test_empty_list_needs_no_items_request(self, client):
+        """An options watchlist rejects a full items request, and the one
+        an account starts with is empty."""
+        self._add_lists(
+            self._record("list-0", "Options Watchlist", 0, types=("option_strategy",)),
         )
 
-        wl = client.get_watchlist("Default")
-        assert wl.name == "Default"
-        assert wl.symbols == ["AAPL"]
+        (watchlist,) = client.get_watchlists()
+        assert watchlist.name == "Options Watchlist"
+        assert watchlist.symbols == []
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_get_watchlist_by_name(self, client):
+        self._add_lists(
+            self._record("list-1", "My First List", 2),
+            self._record("list-2", "Tech", 1),
+        )
+        self._add_items("list-2", "Tech", ["NVDA"])
+
+        wl = client.get_watchlist("tech")  # case-insensitive
+        assert wl.name == "Tech"
+        assert wl.symbols == ["NVDA"]
+        # The lists and the one list asked for, not every list's items.
+        assert len(responses.calls) == 2
+
+    @responses.activate
+    def test_get_watchlist_defaults_to_my_first_list(self, client):
+        self._add_lists(self._record("list-1", "My First List", 1))
+        self._add_items("list-1", "My First List", ["AAPL"])
+
+        assert client.get_watchlist().symbols == ["AAPL"]
 
     @responses.activate
     def test_get_watchlist_not_found(self, client):
-        responses.add(
-            responses.GET,
-            urls.WATCHLISTS_V2,
-            json={"results": [], "next": None},
-            status=200,
-        )
+        self._add_lists(self._record("list-1", "My First List", 0))
 
-        with pytest.raises(SymbolNotFoundError):
+        with pytest.raises(SymbolNotFoundError, match="Your lists: 'My First List'"):
             client.get_watchlist("Nonexistent")
 
     @responses.activate
     def test_add_to_watchlist(self, client):
-        responses.add(
-            responses.GET,
-            urls.WATCHLISTS_V2,
-            json={
-                "results": [
-                    {
-                        "display_name": "Default",
-                        "url": f"{BASE}/midlands/lists/abc123/",
-                        "items": [{"symbol": "AAPL"}],
-                    },
-                ],
-                "next": None,
-            },
-            status=200,
-        )
-        responses.add(
-            responses.POST,
-            f"{BASE}/midlands/lists/abc123/items/",
-            json={"symbol": "TSLA"},
-            status=201,
-        )
+        self._add_lists(self._record("list-1", "My First List", 0))
+        self._add_instrument("TSLA")
+        self._add_instrument("F")
+        responses.add(responses.POST, urls.WATCHLIST_ITEMS, json={}, status=200)
 
-        results = client.add_to_watchlist(["TSLA"])
-        assert len(results) == 1
+        client.add_to_watchlist(["tsla", "F"])
+
+        post = responses.calls[-1].request
+        assert post.method == "POST"
+        assert json.loads(post.body) == {
+            "list-1": [
+                {"object_type": "instrument", "object_id": "instr-TSLA", "operation": "create"},
+                {"object_type": "instrument", "object_id": "instr-F", "operation": "create"},
+            ],
+        }
 
     @responses.activate
     def test_remove_from_watchlist(self, client):
-        responses.add(
-            responses.GET,
-            urls.WATCHLISTS_V2,
-            json={
-                "results": [
-                    {
-                        "display_name": "Default",
-                        "url": f"{BASE}/midlands/lists/abc123/",
-                        "items": [{"symbol": "AAPL"}],
-                    },
-                ],
-                "next": None,
-            },
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{BASE}/midlands/lists/abc123/items/",
-            json={
-                "results": [
-                    {"id": "item-001", "symbol": "AAPL"},
-                    {"id": "item-002", "symbol": "MSFT"},
-                ],
-                "next": None,
-            },
-            status=200,
-        )
-        responses.add(
-            responses.DELETE,
-            f"{BASE}/midlands/lists/abc123/items/item-001/",
-            body="",
-            status=200,
-        )
+        self._add_lists(self._record("list-1", "My First List", 2))
+        self._add_instrument("AAPL")
+        responses.add(responses.POST, urls.WATCHLIST_ITEMS, json={}, status=200)
 
         client.remove_from_watchlist(["AAPL"])
-        # Verify the DELETE was called
-        assert any(
-            call.request.method == "DELETE" for call in responses.calls
+
+        assert json.loads(responses.calls[-1].request.body) == {
+            "list-1": [
+                {"object_type": "instrument", "object_id": "instr-AAPL", "operation": "delete"},
+            ],
+        }
+
+    @responses.activate
+    def test_unknown_symbol_changes_nothing(self, client):
+        self._add_lists(self._record("list-1", "My First List", 0))
+        self._add_instrument("AAPL")
+        responses.add(
+            responses.GET, urls.INSTRUMENTS,
+            match=[responses.matchers.query_param_matcher({"symbol": "NOPE"})],
+            json={"results": []}, status=200,
         )
+
+        with pytest.raises(SymbolNotFoundError):
+            client.add_to_watchlist(["AAPL", "NOPE"])
+        assert all(call.request.method == "GET" for call in responses.calls)
 
 
 class TestGetMarkets:

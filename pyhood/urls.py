@@ -48,7 +48,7 @@ MARKET_HOURS = f"{BASE}/markets/{{market}}/hours/{{date}}/"
 MOVERS_SP500 = f"{BASE}/midlands/movers/sp500/"
 TAGS = f"{BASE}/midlands/tags/tag/"
 WATCHLISTS = f"{BASE}/midlands/lists/default/"
-WATCHLISTS_V2 = f"{BASE}/midlands/lists/"
+WATCHLIST_ITEMS = f"{BASE}/midlands/lists/items/"
 
 # Banking / ACH
 ACH_RELATIONSHIPS = f"{BASE}/ach/relationships/"

@@ -11,12 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `get_quote()` and `get_quotes()` take `include_fundamentals=True` to fill `volume`, `pe_ratio`, `market_cap`, `high_52w` and `low_52w` on `Quote`. Robinhood's quote has none of them, so this makes one more request to the fundamentals endpoint (one per 100 symbols for `get_quotes()`).
 - `get_futures_quote()`, `get_futures_quote_by_id()` and `get_futures_quotes()` take `include_fundamentals=True` to fill `high`, `low`, `prev_close` and `volume` on `FuturesQuote`, from the futures fundamentals endpoint.
 - `Quote.timestamp` is now set, from the quote's `updated_at`.
+- `Watchlist.id`, the list's ID.
+- `examples/verify_watchlists.py` lists your watchlists, then adds a stock to one and removes it again, asking first.
 
 ### Changed
 - **Breaking: `Quote.volume` is `None` unless the quote was fetched with `include_fundamentals=True`.** It was always `0`, because the parser read a `last_trade_volume` field that the quote does not have. It is now `int | None`.
 - **Breaking: `FuturesQuote.high`, `low`, `prev_close` and `volume` are `None` unless the quote was fetched with `include_fundamentals=True`.** They were always `0`, read from fields the futures quote does not have. `FuturesQuote.open_interest` is removed: Robinhood does not publish it, so it was always `0` too.
 - **Breaking: `BankAccount.bank_name` is renamed `holder_name`.** It held the name on the bank account, read from `bank_account_holder_name`, and was never a bank. Robinhood sends no bank name; `account_nickname` is the closest thing to one.
 - `get_futures_contract()` makes a second request, for the contract's product, and `FuturesContract.tick_size` is `float | None`. See Fixed.
+- `get_watchlist()`, `add_to_watchlist()` and `remove_from_watchlist()` default to the list named `'My First List'`, which every account starts with, where they defaulted to `'Default'`, which is not a list Robinhood creates. `add_to_watchlist()` and `remove_from_watchlist()` return Robinhood's raw response. `Watchlist.url` is removed, since lists have no URL.
 
 ### Fixed
 - **More fields read from names Robinhood never sends.** A read-only audit ran 42 methods against a live account and recorded every field the parsers asked for and whether it was there. These were never populated:
@@ -25,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **`FuturesQuote.high`, `low`, `prev_close` and `volume`.** See Added and Changed.
   - **`Order.fees` was always `None` on option orders.** They have no `fees` field. It is now the sum of `contract_fees`, `regulatory_fees` and `pro_trader_fees`.
 - Futures tests that mocked a flat, snake_case contract and quote now use the shapes the API sends.
+- **Watchlists did not work at all.** `get_watchlists()` requested `/midlands/lists/`, which Robinhood rejects with 400 unless an `owner_type` is given, and it expected each list to carry its items, which no list record does. `get_watchlist()`, `add_to_watchlist()` and `remove_from_watchlist()` all start by reading the lists, so they failed the same way.
+  - `get_watchlists()` now reads `/midlands/lists/default/`, which returns the lists you created and the Robinhood lists you follow, and fetches each non-empty list's symbols from `/midlands/lists/items/`.
+  - `get_watchlist()` fetches only the list asked for, and names your lists in the error when there is no match.
+  - `add_to_watchlist()` and `remove_from_watchlist()` send one request to `/midlands/lists/items/` for all the symbols, after checking that every symbol exists.
 
 ## [0.13.1] - 2026-11-19
 

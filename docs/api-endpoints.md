@@ -424,7 +424,33 @@ Options order history (paginated).
 
 ### GET /midlands/lists/default/
 
-Your default watchlist.
+Your watchlists: the lists you created and the Robinhood lists you follow.
+
+**Returns:** `results`, a list of list records with `id`, `display_name`, `item_count`, `owner_type` (`custom` or `robinhood`) and `allowed_object_types`. The records do not include the lists' items.
+
+`GET /midlands/lists/` is not the same thing. It returns 400 without an `owner_type` parameter.
+
+### GET /midlands/lists/items/
+
+The items on one list.
+
+```
+GET /midlands/lists/items/?list_id={list_id}&load_all_attributes=false
+```
+
+**Returns:** `results`, one per item, with `symbol`, `name`, `object_id` and `object_type` (`instrument`, `currency_pair`, ...).
+
+Without `load_all_attributes=false` every item also carries live prices, and the request is rejected with 400 for an options watchlist.
+
+### POST /midlands/lists/items/
+
+Add or remove items. The JSON body maps a list ID to its changes:
+
+```json
+{"<list_id>": [{"object_type": "instrument", "object_id": "<instrument_id>", "operation": "create"}]}
+```
+
+`operation` is `create` to add and `delete` to remove.
 
 ### GET /dividends/
 

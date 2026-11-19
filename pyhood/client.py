@@ -927,69 +927,106 @@ class PyhoodClient:
     # ── Watchlists ────────────────────────────────────────────────────
 
     def get_watchlists(self) -> list[Watchlist]:
-        """Get all user watchlists with their symbols."""
-        data = self._session.get_paginated(urls.WATCHLISTS_V2)
-        watchlists: list[Watchlist] = []
-        for item in data:
-            symbols = [
-                entry.get("symbol", "")
-                for entry in item.get("items", [])
-                if entry.get("symbol")
-            ]
-            watchlists.append(Watchlist(
-                name=item.get("display_name", item.get("name", "")),
-                symbols=symbols,
-                url=item.get("url", ""),
-            ))
-        return watchlists
+        """Get your watchlists with their symbols.
 
-    def get_watchlist(self, name: str = "Default") -> Watchlist:
+        Returns the lists the app shows: the ones you created and the
+        Robinhood lists you follow. Makes one request for the lists and one
+        more for each list that has anything in it.
+        """
+        return [self._watchlist(record) for record in self._watchlist_records()]
+
+    def get_watchlist(self, name: str = "My First List") -> Watchlist:
         """Get a single watchlist by name.
 
         Args:
-            name: Watchlist name (default: 'Default', Robinhood's main watchlist).
-        """
-        watchlists = self.get_watchlists()
-        for wl in watchlists:
-            if wl.name.lower() == name.lower():
-                return wl
-        raise SymbolNotFound(f"Watchlist not found: {name}")
+            name: Watchlist name, matched without regard to case. Defaults
+                to 'My First List', the list every account starts with.
 
-    def add_to_watchlist(self, symbols: list[str], name: str = "Default") -> list[dict]:
-        """Add symbols to a watchlist (max 32 at a time).
+        Raises:
+            SymbolNotFound: If you have no list by that name.
+        """
+        return self._watchlist(self._find_watchlist(name))
+
+    def add_to_watchlist(self, symbols: list[str], name: str = "My First List") -> dict:
+        """Add stocks to a watchlist.
 
         Args:
-            symbols: List of stock symbols to add.
-            name: Watchlist name (default: 'Default').
-        """
-        watchlist = self.get_watchlist(name)
-        list_id = watchlist.url.rstrip("/").split("/")[-1] if watchlist.url else name
-        url = f"{urls.WATCHLISTS_V2}{list_id}/items/"
-        results = []
-        for symbol in symbols:
-            resp = self._session.post(url, data={"symbol": symbol.upper()})
-            results.append(resp)
-        return results
+            symbols: Stock symbols to add.
+            name: Watchlist name (default: 'My First List').
 
-    def remove_from_watchlist(self, symbols: list[str], name: str = "Default") -> None:
-        """Remove symbols from a watchlist.
+        Returns:
+            Robinhood's raw response.
+
+        Raises:
+            SymbolNotFound: If the list or any symbol is not found. Nothing
+                is added in that case.
+        """
+        return self._change_watchlist(symbols, name, "create")
+
+    def remove_from_watchlist(
+        self, symbols: list[str], name: str = "My First List",
+    ) -> dict:
+        """Remove stocks from a watchlist.
 
         Args:
-            symbols: List of stock symbols to remove.
-            name: Watchlist name (default: 'Default').
+            symbols: Stock symbols to remove.
+            name: Watchlist name (default: 'My First List').
+
+        Returns:
+            Robinhood's raw response.
+
+        Raises:
+            SymbolNotFound: If the list or any symbol is not found. Nothing
+                is removed in that case.
         """
-        watchlist = self.get_watchlist(name)
-        list_id = watchlist.url.rstrip("/").split("/")[-1] if watchlist.url else name
-        upper_symbols = {s.upper() for s in symbols}
-        # Get list items to find their IDs for deletion
-        items = self._session.get_paginated(f"{urls.WATCHLISTS_V2}{list_id}/items/")
-        for item in items:
-            if item.get("symbol", "").upper() in upper_symbols:
-                item_id = item.get("id", "")
-                if item_id:
-                    self._session.delete(
-                        f"{urls.WATCHLISTS_V2}{list_id}/items/{item_id}/"
-                    )
+        return self._change_watchlist(symbols, name, "delete")
+
+    def _watchlist_records(self) -> list[dict]:
+        """The raw list records, without their items."""
+        return self._session.get_paginated(urls.WATCHLISTS)
+
+    def _find_watchlist(self, name: str) -> dict:
+        records = self._watchlist_records()
+        for record in records:
+            if record.get("display_name", "").lower() == name.lower():
+                return record
+        names = ", ".join(repr(r.get("display_name", "")) for r in records) or "none"
+        raise SymbolNotFound(f"Watchlist not found: {name!r}. Your lists: {names}")
+
+    def _watchlist(self, record: dict) -> Watchlist:
+        """Build a Watchlist from a list record, fetching its symbols."""
+        list_id = record.get("id", "")
+        symbols: list[str] = []
+        # The list record says how many items it has, so an empty list
+        # needs no second request.
+        if list_id and record.get("item_count") != 0:
+            data = self._session.get(
+                urls.WATCHLIST_ITEMS,
+                # Without load_all_attributes=false Robinhood adds live
+                # prices to every item, and rejects the request outright
+                # for an options watchlist.
+                params={"list_id": list_id, "load_all_attributes": "false"},
+            )
+            items = data.get("results", []) if isinstance(data, dict) else []
+            symbols = [item["symbol"] for item in items if item.get("symbol")]
+        return Watchlist(name=record.get("display_name", ""), symbols=symbols, id=list_id)
+
+    def _change_watchlist(self, symbols: list[str], name: str, operation: str) -> dict:
+        """Add ('create') or remove ('delete') stocks on a watchlist."""
+        watchlist = self._find_watchlist(name)
+        # Resolve every symbol first, so a bad one raises before anything
+        # is changed.
+        changes = [
+            {
+                "object_type": "instrument",
+                "object_id": self._get_instrument_url(symbol).rstrip("/").split("/")[-1],
+                "operation": operation,
+            }
+            for symbol in symbols
+        ]
+        return self._session.post(
+            urls.WATCHLIST_ITEMS, json_data={watchlist["id"]: changes},
+        )
 
     # ── Markets ───────────────────────────────────────────────────────
 

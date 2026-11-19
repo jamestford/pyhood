@@ -273,10 +273,10 @@ class CardTransaction:
 
 @dataclass(frozen=True)
 class Watchlist:
-    """User watchlist."""
+    """A watchlist: one you created, or a Robinhood list you follow."""
     name: str
     symbols: list[str] = field(default_factory=list)
-    url: str = ""
+    id: str = ""
 
 
 # ── Markets ──────────────────────────────────────────────────────────
