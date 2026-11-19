@@ -88,7 +88,9 @@ MARGIN_CALLS = f"{BASE}/margin/calls/"
 
 # Futures
 FUTURES_CONTRACTS = f"{BASE}/arsenal/v1/futures/contracts/"
+FUTURES_PRODUCTS = f"{BASE}/arsenal/v1/futures/products/"
 FUTURES_QUOTES = f"{BASE}/marketdata/futures/quotes/v1/"
+FUTURES_FUNDAMENTALS = f"{BASE}/marketdata/futures/fundamentals/v1/"
 FUTURES_ACCOUNTS = f"{BASE}/ceres/v1/accounts/"
 
 

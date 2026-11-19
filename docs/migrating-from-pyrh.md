@@ -65,7 +65,7 @@ quote = client.get_quote("AAPL")
 | `get_stock_marketdata(...)` | `client.get_quotes(symbols)` |
 | `print_quote(symbol)` / `print_quotes(symbols)` | no equivalent, print the fields you want |
 
-`Quote` also carries `change_pct`, `volume`, `pe_ratio`, `market_cap`, `high_52w` and `low_52w`.
+`Quote` also carries `change_pct`. It has `volume`, `pe_ratio`, `market_cap`, `high_52w` and `low_52w` too, but Robinhood's quote does not include those, so they are `None` unless you pass `include_fundamentals=True` to `get_quote()` or `get_quotes()`.
 
 Not carried over: `ask_size`, `bid_size`, `adjusted_previous_close` and `previous_close_date` have no field on `Quote`. Reach for the raw endpoint through the session if you need them.
 

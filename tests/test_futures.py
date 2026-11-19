@@ -22,52 +22,103 @@ def client():
 
 # ── Contract tests ───────────────────────────────────────────────────
 
+PRODUCT_ID = "476e059e-79c2-4bd8-810a-af471f78abed"
+
+# The product (/ES) a contract (/ESH26) belongs to, as the live API sent it
+# on 2026-11-19. Tick size, underlying and asset class live here, not on the
+# contract.
+PRODUCT_RESPONSE = {
+    "id": PRODUCT_ID,
+    "symbol": "/ES:XCME",
+    "displaySymbol": "/ES",
+    "simpleName": "E-mini S&P 500 Index Futures",
+    "exchange": "XCME",
+    "priceIncrements": "0.25",
+    "rhdProductGroup": "RHD_PRODUCT_GROUP_STOCK_INDEX",
+    "underlyingAsset": "PRODUCT_UNDERLYING_ASSET_INDICES",
+    "futureSubType": "PRODUCT_FUTURE_SUBTYPE_FINANCIAL",
+    "delivery": "PRODUCT_DELIVERY_CASH",
+}
+
+
+def contract_response(symbol: str, contract_id: str, multiplier: str = "50") -> dict:
+    """A contract in the live shape: a `result` envelope with camelCase keys."""
+    return {
+        "result": {
+            "id": contract_id,
+            "productId": PRODUCT_ID,
+            "symbol": f"/{symbol}:XCME",
+            "displaySymbol": f"/{symbol}",
+            "description": "E-mini S&P 500 Index Futures, Mar-26",
+            "multiplier": multiplier,
+            "expirationMmy": "202603",
+            "expiration": "2026-03-20",
+            "tradability": "FUTURES_TRADABILITY_TRADABLE",
+            "state": "FUTURES_STATE_ACTIVE",
+            "settlementDate": "2026-03-20",
+        },
+    }
+
+
+def add_contract(symbol: str, contract_id: str, multiplier: str = "50") -> None:
+    responses.add(
+        responses.GET, urls.futures_contract_url(symbol),
+        json=contract_response(symbol, contract_id, multiplier), status=200,
+    )
+
+
+def add_product(status: int = 200) -> None:
+    responses.add(
+        responses.GET, f"{urls.FUTURES_PRODUCTS}{PRODUCT_ID}/",
+        json=PRODUCT_RESPONSE if status == 200 else {}, status=status,
+    )
+
 
 class TestGetFuturesContract:
     @responses.activate
     def test_single_contract(self, client):
-        responses.add(
-            responses.GET,
-            urls.futures_contract_url("ESH26"),
-            json={
-                "id": "abc-123",
-                "symbol": "ESH26",
-                "simple_name": "E-mini S&P 500 March 2026",
-                "expiration_date": "2026-03-20",
-                "tick_size": "0.25",
-                "multiplier": "50",
-                "state": "active",
-                "underlying_symbol": "ES",
-                "asset_class": "equity_index",
-            },
-            status=200,
-        )
+        add_contract("ESH26", "abc-123")
+        add_product()
 
         contract = client.get_futures_contract("ESH26")
         assert isinstance(contract, FuturesContract)
         assert contract.symbol == "ESH26"
-        assert contract.name == "E-mini S&P 500 March 2026"
+        assert contract.name == "E-mini S&P 500 Index Futures, Mar-26"
         assert contract.contract_id == "abc-123"
         assert contract.expiration == "2026-03-20"
-        assert contract.tick_size == 0.25
         assert contract.multiplier == 50.0
-        assert contract.underlying == "ES"
+
+    @responses.activate
+    def test_tick_size_underlying_and_asset_class_come_from_the_product(self, client):
+        """The contract record has none of the three. The parser used to read
+        `tick_size`, `underlying_symbol` and `asset_class` from it, which the
+        API never sends, so they were always 0 and empty."""
+        add_contract("ESH26", "abc-123")
+        add_product()
+
+        contract = client.get_futures_contract("ESH26")
+        assert contract.tick_size == 0.25
+        assert contract.underlying == "ES"  # '/ES' normalized
+        assert contract.asset_class == "stock_index"  # prefix stripped
+
+    @responses.activate
+    def test_failed_product_lookup_leaves_them_unknown(self, client):
+        """The contract is still returned, with None rather than a zero tick
+        size that looks real."""
+        add_contract("ESH26", "abc-123")
+        add_product(status=404)
+
+        contract = client.get_futures_contract("ESH26")
+        assert contract.contract_id == "abc-123"
+        assert contract.tick_size is None
+        assert contract.underlying == ""
+        assert contract.asset_class == ""
 
     @responses.activate
     def test_contract_case_insensitive(self, client):
-        responses.add(
-            responses.GET,
-            urls.futures_contract_url("ESH26"),
-            json={
-                "id": "abc-123",
-                "symbol": "ESH26",
-                "simple_name": "E-mini S&P 500",
-                "expiration_date": "2026-03-20",
-                "tick_size": "0.25",
-                "multiplier": "50",
-            },
-            status=200,
-        )
+        add_contract("ESH26", "abc-123")
+        add_product()
+
         contract = client.get_futures_contract("esh26")
         assert contract.symbol == "ESH26"
 
@@ -130,6 +181,7 @@ class TestLiveApiShapes:
             responses.GET, urls.futures_contract_url("ESZ26"),
             json=self.CONTRACT_RESPONSE, status=200,
         )
+        add_product()
 
         c = client.get_futures_contract("ESZ26")
         assert c.contract_id == "ade3740f-b580-470d-87b8-6e1a350be133"
@@ -273,32 +325,9 @@ class TestGetFuturesPositions:
 class TestGetFuturesContracts:
     @responses.activate
     def test_batch_contracts(self, client):
-        responses.add(
-            responses.GET,
-            urls.futures_contract_url("ESH26"),
-            json={
-                "id": "abc-123",
-                "symbol": "ESH26",
-                "simple_name": "E-mini S&P 500",
-                "expiration_date": "2026-03-20",
-                "tick_size": "0.25",
-                "multiplier": "50",
-            },
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            urls.futures_contract_url("NQH26"),
-            json={
-                "id": "def-456",
-                "symbol": "NQH26",
-                "simple_name": "E-mini Nasdaq-100",
-                "expiration_date": "2026-03-20",
-                "tick_size": "0.25",
-                "multiplier": "20",
-            },
-            status=200,
-        )
+        add_contract("ESH26", "abc-123", multiplier="50")
+        add_contract("NQH26", "def-456", multiplier="20")
+        add_product()
 
         results = client.get_futures_contracts(["ESH26", "NQH26"])
         assert len(results) == 2
@@ -309,19 +338,8 @@ class TestGetFuturesContracts:
 
     @responses.activate
     def test_batch_partial_failure(self, client):
-        responses.add(
-            responses.GET,
-            urls.futures_contract_url("ESH26"),
-            json={
-                "id": "abc-123",
-                "symbol": "ESH26",
-                "simple_name": "E-mini S&P 500",
-                "expiration_date": "2026-03-20",
-                "tick_size": "0.25",
-                "multiplier": "50",
-            },
-            status=200,
-        )
+        add_contract("ESH26", "abc-123")
+        add_product()
         responses.add(
             responses.GET,
             urls.futures_contract_url("FAKE99"),
@@ -337,40 +355,47 @@ class TestGetFuturesContracts:
 # ── Quote tests ──────────────────────────────────────────────────────
 
 
+def quote_envelope(body: dict | None) -> dict:
+    """The futures marketdata envelope, shared by quotes and fundamentals."""
+    data = [{"status": "SUCCESS", "data": body}] if body is not None else []
+    return {"status": "SUCCESS", "data": data}
+
+
+# Quote and fundamentals bodies with the keys the live API sent on 2026-11-19.
+QUOTE_BODY = {
+    "ask_price": "5750.50",
+    "ask_size": 1,
+    "ask_venue_timestamp": "2026-03-02T15:30:00Z",
+    "bid_price": "5750.00",
+    "bid_size": 2,
+    "bid_venue_timestamp": "2026-03-02T15:30:00Z",
+    "instrument_id": "abc-123",
+    "last_trade_price": "5750.25",
+    "last_trade_size": 1,
+    "last_trade_venue_timestamp": "2026-03-02T15:30:00Z",
+    "out_of_band": False,
+    "state": "active",
+    "symbol": "/ESH26:XCME",
+    "updated_at": "2026-03-02T15:30:00Z",
+}
+
+FUNDAMENTALS_BODY = {
+    "instrument_id": "abc-123",
+    "open": "5745.00",
+    "high": "5780.00",
+    "low": "5720.00",
+    "previous_close_price": "5740.00",
+    "volume": "1500000",
+}
+
+
 class TestGetFuturesQuote:
     @responses.activate
     def test_single_quote(self, client):
-        # Mock contract lookup
+        add_contract("ESH26", "abc-123")
         responses.add(
-            responses.GET,
-            urls.futures_contract_url("ESH26"),
-            json={
-                "id": "abc-123",
-                "symbol": "ESH26",
-                "simple_name": "E-mini S&P 500",
-                "expiration_date": "2026-03-20",
-                "tick_size": "0.25",
-                "multiplier": "50",
-            },
-            status=200,
-        )
-        # Mock quote lookup
-        responses.add(
-            responses.GET,
-            urls.FUTURES_QUOTES,
-            json={
-                "results": [{
-                    "last_trade_price": "5750.25",
-                    "bid_price": "5750.00",
-                    "ask_price": "5750.50",
-                    "high_price": "5780.00",
-                    "low_price": "5720.00",
-                    "previous_close": "5740.00",
-                    "volume": "1500000",
-                    "open_interest": "2500000",
-                }],
-            },
-            status=200,
+            responses.GET, urls.FUTURES_QUOTES,
+            json=quote_envelope(QUOTE_BODY), status=200,
         )
 
         quote = client.get_futures_quote("ESH26")
@@ -379,30 +404,84 @@ class TestGetFuturesQuote:
         assert quote.last_price == 5750.25
         assert quote.bid == 5750.00
         assert quote.ask == 5750.50
-        assert quote.high == 5780.00
-        assert quote.volume == 1500000
         assert quote.contract_id == "abc-123"
+        # The contract lookup and the quote. A quote needs only the contract
+        # ID, so it does not fetch the product.
+        assert len(responses.calls) == 2
+
+    @responses.activate
+    def test_session_fields_are_none_unless_asked_for(self, client):
+        """The quote carries no high, low, previous close or volume. The
+        parser used to read `high_price`, `low_price`, `previous_close` and
+        `volume` from it, so they were always 0."""
+        add_contract("ESH26", "abc-123")
+        responses.add(
+            responses.GET, urls.FUTURES_QUOTES,
+            json=quote_envelope(QUOTE_BODY), status=200,
+        )
+
+        quote = client.get_futures_quote("ESH26")
+        assert quote.high is None
+        assert quote.low is None
+        assert quote.prev_close is None
+        assert quote.volume is None
+
+    @responses.activate
+    def test_include_fundamentals_fills_the_session_fields(self, client):
+        add_contract("ESH26", "abc-123")
+        responses.add(
+            responses.GET, urls.FUTURES_QUOTES,
+            json=quote_envelope(QUOTE_BODY), status=200,
+        )
+        responses.add(
+            responses.GET, urls.FUTURES_FUNDAMENTALS,
+            json=quote_envelope(FUNDAMENTALS_BODY), status=200,
+        )
+
+        quote = client.get_futures_quote("ESH26", include_fundamentals=True)
+        assert quote.last_price == 5750.25
+        assert quote.high == 5780.00
+        assert quote.low == 5720.00
+        assert quote.prev_close == 5740.00
+        assert quote.volume == 1500000
+        assert responses.calls[-1].request.params == {"ids": "abc-123"}
+
+    @responses.activate
+    def test_quote_by_id_takes_include_fundamentals(self, client):
+        responses.add(
+            responses.GET, urls.FUTURES_QUOTES,
+            json=quote_envelope(QUOTE_BODY), status=200,
+        )
+        responses.add(
+            responses.GET, urls.FUTURES_FUNDAMENTALS,
+            json=quote_envelope(FUNDAMENTALS_BODY), status=200,
+        )
+
+        quote = client.get_futures_quote_by_id("abc-123", include_fundamentals=True)
+        assert quote.volume == 1500000
+        assert len(responses.calls) == 2
+
+    @responses.activate
+    def test_quotes_passes_include_fundamentals_through(self, client):
+        add_contract("ESH26", "abc-123")
+        responses.add(
+            responses.GET, urls.FUTURES_QUOTES,
+            json=quote_envelope(QUOTE_BODY), status=200,
+        )
+        responses.add(
+            responses.GET, urls.FUTURES_FUNDAMENTALS,
+            json=quote_envelope(FUNDAMENTALS_BODY), status=200,
+        )
+
+        quotes = client.get_futures_quotes(["ESH26"], include_fundamentals=True)
+        assert quotes["ESH26"].high == 5780.00
 
     @responses.activate
     def test_quote_no_results(self, client):
+        add_contract("ESH26", "abc-123")
         responses.add(
-            responses.GET,
-            urls.futures_contract_url("ESH26"),
-            json={
-                "id": "abc-123",
-                "symbol": "ESH26",
-                "simple_name": "E-mini S&P 500",
-                "expiration_date": "2026-03-20",
-                "tick_size": "0.25",
-                "multiplier": "50",
-            },
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            urls.FUTURES_QUOTES,
-            json={"results": []},
-            status=200,
+            responses.GET, urls.FUTURES_QUOTES,
+            json=quote_envelope(None), status=200,
         )
 
         with pytest.raises(SymbolNotFoundError):

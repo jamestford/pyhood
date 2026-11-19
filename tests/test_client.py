@@ -54,7 +54,7 @@ class TestGetQuote:
                 "previous_close": "193.00",
                 "bid_price": "195.40",
                 "ask_price": "195.60",
-                "last_trade_volume": "50000000",
+                "updated_at": "2026-11-19T17:36:00Z",
             },
             status=200,
         )
@@ -67,6 +67,66 @@ class TestGetQuote:
         assert quote.change_pct == 1.30
         assert quote.bid == 195.40
         assert quote.ask == 195.60
+        assert quote.timestamp == datetime(2026, 11, 19, 17, 36, tzinfo=timezone.utc)
+
+    # A quote and its fundamentals, with the fields the live API sends. The
+    # quote has no volume: the parser used to read `last_trade_volume` from
+    # it, which does not exist, so `Quote.volume` was always 0.
+    QUOTE = {
+        "symbol": "AAPL",
+        "last_trade_price": "195.50",
+        "previous_close": "193.00",
+        "bid_price": "195.40",
+        "ask_price": "195.60",
+        "updated_at": "2026-11-19T17:36:00Z",
+    }
+    FUNDAMENTALS = {
+        "volume": "50000000.000000",
+        "pe_ratio": "29.870000",
+        "market_cap": "2950000000000.000000",
+        "high_52_weeks": "237.230000",
+        "low_52_weeks": "164.080000",
+    }
+
+    @responses.activate
+    def test_fundamentals_fields_are_none_unless_asked_for(self, client):
+        responses.add(responses.GET, f"{urls.QUOTES}AAPL/", json=self.QUOTE, status=200)
+
+        quote = client.get_quote("AAPL")
+        assert quote.volume is None  # unknown, not zero
+        assert quote.pe_ratio is None
+        assert quote.market_cap is None
+        assert quote.high_52w is None
+        assert quote.low_52w is None
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_include_fundamentals_fills_them(self, client):
+        responses.add(responses.GET, f"{urls.QUOTES}AAPL/", json=self.QUOTE, status=200)
+        responses.add(
+            responses.GET, f"{urls.FUNDAMENTALS}AAPL/", json=self.FUNDAMENTALS, status=200,
+        )
+
+        quote = client.get_quote("AAPL", include_fundamentals=True)
+        assert quote.price == 195.50
+        assert quote.volume == 50000000
+        assert quote.pe_ratio == 29.87
+        assert quote.market_cap == 2.95e12
+        assert quote.high_52w == 237.23
+        assert quote.low_52w == 164.08
+
+    @responses.activate
+    def test_null_fundamentals_stay_none(self, client):
+        """A company with no earnings has a null P/E, which is not 0."""
+        responses.add(responses.GET, f"{urls.QUOTES}AAPL/", json=self.QUOTE, status=200)
+        responses.add(
+            responses.GET, f"{urls.FUNDAMENTALS}AAPL/",
+            json={**self.FUNDAMENTALS, "pe_ratio": None}, status=200,
+        )
+
+        quote = client.get_quote("AAPL", include_fundamentals=True)
+        assert quote.pe_ratio is None
+        assert quote.volume == 50000000
 
     @responses.activate
     def test_quote_case_insensitive(self, client):
@@ -109,7 +169,6 @@ class TestGetQuotes:
                         "previous_close": "193.00",
                         "bid_price": "195.40",
                         "ask_price": "195.60",
-                        "last_trade_volume": "50000000",
                     },
                     {
                         "symbol": "MSFT",
@@ -117,7 +176,6 @@ class TestGetQuotes:
                         "previous_close": "418.00",
                         "bid_price": "419.90",
                         "ask_price": "420.10",
-                        "last_trade_volume": "30000000",
                     },
                 ]
             },
@@ -130,6 +188,42 @@ class TestGetQuotes:
         assert "MSFT" in quotes
         assert quotes["AAPL"].price == 195.50
         assert quotes["MSFT"].price == 420.00
+        assert quotes["AAPL"].volume is None
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_batch_include_fundamentals(self, client):
+        responses.add(
+            responses.GET,
+            urls.QUOTES,
+            json={
+                "results": [
+                    {"symbol": "AAPL", "last_trade_price": "195.50", "previous_close": "193.00"},
+                    {"symbol": "MSFT", "last_trade_price": "420.00", "previous_close": "418.00"},
+                ]
+            },
+            status=200,
+        )
+        # Fundamentals come back in request order, with no symbol of their own.
+        responses.add(
+            responses.GET,
+            urls.FUNDAMENTALS,
+            json={
+                "results": [
+                    {"volume": "50000000.000000", "pe_ratio": "29.870000",
+                     "high_52_weeks": "237.230000"},
+                    {"volume": "30000000.000000", "pe_ratio": "35.100000",
+                     "high_52_weeks": "468.350000"},
+                ]
+            },
+            status=200,
+        )
+
+        quotes = client.get_quotes(["aapl", "MSFT"], include_fundamentals=True)
+        assert quotes["AAPL"].volume == 50000000
+        assert quotes["AAPL"].pe_ratio == 29.87
+        assert quotes["MSFT"].volume == 30000000
+        assert quotes["MSFT"].high_52w == 468.35
 
     @responses.activate
     def test_batch_with_null_results(self, client):
@@ -1312,6 +1406,54 @@ class TestOptionOrderParsing:
         assert order.average_price == pytest.approx(1.225)
         assert order.filled_at == datetime(2026, 11, 1, 14, 2, tzinfo=timezone.utc)
 
+    def _order_with(self, **fields):
+        return {"results": [{
+            "id": "o", "chain_symbol": "SPY", "direction": "credit", "quantity": "1",
+            "processed_quantity": "1", "state": "filled",
+            "created_at": "2026-11-01T13:59:00Z",
+            "legs": [self._leg("1.00", "1")], **fields,
+        }], "next": None}
+
+    @responses.activate
+    def test_fees_are_the_sum_of_the_three_fee_fields(self, client):
+        """Option orders have no `fees` field, which is what the parser
+        read, so `Order.fees` was always None for them."""
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json=self._order_with(
+                contract_fees="0.50", regulatory_fees="0.03", pro_trader_fees="0",
+            ),
+            status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.fees == 0.53
+
+    @responses.activate
+    def test_fees_of_zero_are_zero_not_none(self, client):
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json=self._order_with(
+                contract_fees="0", regulatory_fees="0", pro_trader_fees="0",
+            ),
+            status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.fees == 0.0
+
+    @responses.activate
+    def test_fees_are_none_when_the_order_reports_none(self, client):
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS, json=self._order_with(), status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.fees is None
+
     @responses.activate
     def test_spread_has_no_single_average_price(self, client):
         responses.add(
@@ -1547,7 +1689,7 @@ class TestBanking:
                 "results": [
                     {
                         "id": "bank-001",
-                        "bank_account_holder_name": "Chase",
+                        "bank_account_holder_name": "Pat Example",
                         "bank_account_type": "checking",
                         "bank_account_nickname": "My Checking",
                         "state": "approved",
@@ -1563,7 +1705,11 @@ class TestBanking:
         assert len(accounts) == 1
         assert isinstance(accounts[0], BankAccount)
         assert accounts[0].id == "bank-001"
-        assert accounts[0].bank_name == "Chase"
+        # `bank_account_holder_name` is a person, not a bank. It used to be
+        # stored as `bank_name`; the API sends no bank name at all.
+        assert accounts[0].holder_name == "Pat Example"
+        assert accounts[0].account_nickname == "My Checking"
+        assert not hasattr(accounts[0], "bank_name")
         assert accounts[0].account_type == "checking"
         assert accounts[0].state == "approved"
 

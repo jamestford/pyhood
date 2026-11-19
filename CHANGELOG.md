@@ -5,6 +5,27 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `get_quote()` and `get_quotes()` take `include_fundamentals=True` to fill `volume`, `pe_ratio`, `market_cap`, `high_52w` and `low_52w` on `Quote`. Robinhood's quote has none of them, so this makes one more request to the fundamentals endpoint (one per 100 symbols for `get_quotes()`).
+- `get_futures_quote()`, `get_futures_quote_by_id()` and `get_futures_quotes()` take `include_fundamentals=True` to fill `high`, `low`, `prev_close` and `volume` on `FuturesQuote`, from the futures fundamentals endpoint.
+- `Quote.timestamp` is now set, from the quote's `updated_at`.
+
+### Changed
+- **Breaking: `Quote.volume` is `None` unless the quote was fetched with `include_fundamentals=True`.** It was always `0`, because the parser read a `last_trade_volume` field that the quote does not have. It is now `int | None`.
+- **Breaking: `FuturesQuote.high`, `low`, `prev_close` and `volume` are `None` unless the quote was fetched with `include_fundamentals=True`.** They were always `0`, read from fields the futures quote does not have. `FuturesQuote.open_interest` is removed: Robinhood does not publish it, so it was always `0` too.
+- **Breaking: `BankAccount.bank_name` is renamed `holder_name`.** It held the name on the bank account, read from `bank_account_holder_name`, and was never a bank. Robinhood sends no bank name; `account_nickname` is the closest thing to one.
+- `get_futures_contract()` makes a second request, for the contract's product, and `FuturesContract.tick_size` is `float | None`. See Fixed.
+
+### Fixed
+- **More fields read from names Robinhood never sends.** A read-only audit ran 42 methods against a live account and recorded every field the parsers asked for and whether it was there. These were never populated:
+  - **`Quote.volume`, `pe_ratio`, `market_cap`, `high_52w`, `low_52w` and `timestamp`.** See Added and Changed.
+  - **`FuturesContract.tick_size`, `underlying` and `asset_class`** were always `0` and empty. They belong to the contract's product (`/ES` for `/ESZ26`), not the contract, so they are now read from the product record: `priceIncrements`, the product symbol, and `rhdProductGroup` with its prefix removed (`'stock_index'`, `'energy'`, `'metals'`). If the product lookup fails the contract is still returned, with `tick_size` `None`.
+  - **`FuturesQuote.high`, `low`, `prev_close` and `volume`.** See Added and Changed.
+  - **`Order.fees` was always `None` on option orders.** They have no `fees` field. It is now the sum of `contract_fees`, `regulatory_fees` and `pro_trader_fees`.
+- Futures tests that mocked a flat, snake_case contract and quote now use the shapes the API sends.
+
 ## [0.13.1] - 2026-11-19
 
 ### Added

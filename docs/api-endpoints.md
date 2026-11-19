@@ -38,10 +38,11 @@ GET /quotes/AAPL/
 | `ask_price` | string | Current ask |
 | `bid_size` | int | Bid size |
 | `ask_size` | int | Ask size |
-| `last_trade_volume` | string | Volume of last trade |
 | `last_extended_hours_trade_price` | string | After-hours price |
 | `updated_at` | string | Timestamp |
 | `instrument` | string | Instrument URL |
+
+The quote has no volume. Today's volume is `volume` on `/fundamentals/`.
 
 ---
 
@@ -465,15 +466,41 @@ GET /arsenal/v1/futures/contracts/symbol/ESH26/
 
 | Field | Type | Description |
 |-------|------|-------------|
+The contract, inside a `result` envelope:
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `id` | string | Contract UUID |
-| `symbol` | string | Futures symbol (e.g. `ESH26`) |
-| `simple_name` | string | Human-readable name |
-| `expiration_date` | string | Expiration date (YYYY-MM-DD) |
-| `tick_size` | string | Minimum price increment |
+| `productId` | string | UUID of the product the contract belongs to |
+| `symbol` | string | Symbol with exchange (e.g. `/ESH26:XCME`) |
+| `displaySymbol` | string | Symbol (e.g. `/ESH26`) |
+| `description` | string | Human-readable name |
+| `expiration` | string | Expiration date (YYYY-MM-DD) |
 | `multiplier` | string | Contract multiplier |
-| `state` | string | `active`, `expired` |
-| `underlying_symbol` | string | Root symbol (e.g. `ES`) |
-| `asset_class` | string | Asset class (e.g. `equity_index`) |
+| `state` | string | e.g. `FUTURES_STATE_ACTIVE` |
+| `tradability` | string | e.g. `FUTURES_TRADABILITY_TRADABLE` |
+
+The contract has no tick size, underlying or asset class. Those are on its product.
+
+---
+
+### GET /arsenal/v1/futures/products/{product_id}/
+
+The product a contract belongs to, such as `/ES` for `/ESH26`.
+
+**Returns:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Product UUID |
+| `displaySymbol` | string | Product symbol (e.g. `/ES`) |
+| `simpleName` | string | Human-readable name |
+| `exchange` | string | Exchange MIC (e.g. `XCME`) |
+| `priceIncrements` | string | Minimum price increment (e.g. `0.25`) |
+| `rhdProductGroup` | string | e.g. `RHD_PRODUCT_GROUP_STOCK_INDEX`, `RHD_PRODUCT_GROUP_ENERGY` |
+| `underlyingAsset` | string | e.g. `PRODUCT_UNDERLYING_ASSET_INDICES` |
+| `delivery` | string | `PRODUCT_DELIVERY_CASH` or `PRODUCT_DELIVERY_PHYSICAL` |
+| `activeFuturesContractId` | string | UUID of the front contract |
 
 ---
 
@@ -495,14 +522,44 @@ GET /marketdata/futures/quotes/v1/?ids={contract_id}
 
 | Field | Type | Description |
 |-------|------|-------------|
+The quote, inside a `{"status", "data": [{"status", "data": {...}}]}` envelope:
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `last_trade_price` | string | Last trade price |
+| `last_trade_size` | int | Last trade size |
 | `bid_price` | string | Current bid |
+| `bid_size` | int | Bid size |
 | `ask_price` | string | Current ask |
-| `high_price` | string | Session high |
-| `low_price` | string | Session low |
-| `previous_close` | string | Previous close |
+| `ask_size` | int | Ask size |
+| `instrument_id` | string | Contract UUID |
+| `symbol` | string | Symbol with exchange |
+| `updated_at` | string | Timestamp |
+
+The quote has no high, low, previous close or volume. Those are on the fundamentals endpoint. Open interest is on neither.
+
+---
+
+### GET /marketdata/futures/fundamentals/v1/
+
+Session figures for futures contracts.
+
+```
+GET /marketdata/futures/fundamentals/v1/?ids={contract_id}
+```
+
+**Returns:**
+
+The same envelope as the quote, holding:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `instrument_id` | string | Contract UUID |
+| `open` | string | Session open |
+| `high` | string | Session high |
+| `low` | string | Session low |
+| `previous_close_price` | string | Previous close |
 | `volume` | string | Trading volume |
-| `open_interest` | string | Open interest |
 
 ---
 

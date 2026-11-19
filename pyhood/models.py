@@ -15,12 +15,15 @@ class Quote:
     change_pct: float
     bid: float = 0.0
     ask: float = 0.0
-    volume: int = 0
+    # The next five come from the fundamentals endpoint, not the quote, so
+    # they are None unless the quote was fetched with
+    # include_fundamentals=True.
+    volume: int | None = None
     pe_ratio: float | None = None
     market_cap: float | None = None
     high_52w: float | None = None
     low_52w: float | None = None
-    timestamp: datetime | None = None
+    timestamp: datetime | None = None  # when Robinhood last updated the quote
 
 
 @dataclass(frozen=True)
@@ -174,9 +177,13 @@ class UserProfile:
 
 @dataclass(frozen=True)
 class BankAccount:
-    """Linked bank account (ACH relationship)."""
+    """Linked bank account (ACH relationship).
+
+    Robinhood does not send the bank's name. `account_nickname` is the
+    closest thing to one.
+    """
     id: str
-    bank_name: str
+    holder_name: str  # the name on the bank account
     account_type: str  # 'checking' or 'savings'
     account_nickname: str = ""
     state: str = ""  # 'approved', 'pending', etc.
@@ -396,11 +403,13 @@ class FuturesContract:
     name: str
     contract_id: str
     expiration: str
-    tick_size: float
+    # tick_size, underlying and asset_class come from the contract's product
+    # record. They are None or empty if that lookup fails.
+    tick_size: float | None
     multiplier: float
     status: str = "active"
-    underlying: str = ""
-    asset_class: str = ""
+    underlying: str = ""  # product symbol, e.g. 'ES'
+    asset_class: str = ""  # e.g. 'stock_index', 'energy', 'metals'
 
 
 @dataclass(frozen=True)
@@ -410,11 +419,13 @@ class FuturesQuote:
     last_price: float
     bid: float = 0.0
     ask: float = 0.0
-    high: float = 0.0
-    low: float = 0.0
-    prev_close: float = 0.0
-    volume: int = 0
-    open_interest: int = 0
+    # The next four come from the futures fundamentals endpoint, not the
+    # quote, so they are None unless the quote was fetched with
+    # include_fundamentals=True.
+    high: float | None = None
+    low: float | None = None
+    prev_close: float | None = None
+    volume: int | None = None
     contract_id: str = ""
 
 
