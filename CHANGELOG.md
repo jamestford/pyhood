@@ -5,7 +5,7 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.13.1] - 2026-11-19
 
 ### Added
 - `Order.filled_quantity`: shares or contracts actually filled, where `quantity` is what was ordered. They differ on a partial fill, such as an IPO Access allocation, which had no way to report the shares received.
