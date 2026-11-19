@@ -1027,7 +1027,7 @@ class TestOptionOrders:
 class TestOrderManagement:
     @responses.activate
     def test_get_stock_orders(self, client):
-        """Test getting all stock orders."""
+        """Orders carry an instrument URL, not a symbol, and `average_price`."""
         responses.add(
             responses.GET,
             urls.ORDERS,
@@ -1035,31 +1035,42 @@ class TestOrderManagement:
                 "results": [
                     {
                         "id": "order-1",
-                        "symbol": "AAPL",
+                        "instrument": f"{urls.INSTRUMENTS}aapl-id/",
+                        "instrument_id": "aapl-id",
                         "side": "buy",
                         "type": "limit",
-                        "quantity": "10",
-                        "price": "150.00",
+                        "quantity": "10.00000000",
+                        "cumulative_quantity": "10.00000000",
+                        "price": "150.00000000",
+                        "average_price": "149.50000000",
                         "state": "filled",
                         "created_at": "2024-01-01T12:00:00Z",
-                        "updated_at": "2024-01-01T12:05:00Z",
-                        "average_filled_price": "149.50",
+                        "updated_at": "2024-01-01T12:05:30Z",
+                        "last_transaction_at": "2024-01-01T12:05:00Z",
                         "fees": "1.25",
                     },
                     {
                         "id": "order-2",
-                        "symbol": "TSLA",
+                        "instrument": f"{urls.INSTRUMENTS}tsla-id/",
+                        "instrument_id": "tsla-id",
                         "side": "sell",
                         "type": "market",
-                        "quantity": "5",
-                        "state": "pending",
+                        "quantity": "5.00000000",
+                        "cumulative_quantity": "0.00000000",
+                        "average_price": None,
+                        "state": "confirmed",
                         "created_at": "2024-01-01T13:00:00Z",
+                        "last_transaction_at": None,
                     }
                 ],
                 "next": None,
             },
             status=200,
         )
+        responses.add(responses.GET, f"{urls.INSTRUMENTS}aapl-id/",
+                      json={"symbol": "AAPL"}, status=200)
+        responses.add(responses.GET, f"{urls.INSTRUMENTS}tsla-id/",
+                      json={"symbol": "TSLA"}, status=200)
 
         orders = client.get_stock_orders()
         assert len(orders) == 2
@@ -1070,14 +1081,83 @@ class TestOrderManagement:
         assert order1.symbol == "AAPL"
         assert order1.side == "buy"
         assert order1.quantity == 10
+        assert order1.filled_quantity == 10
         assert order1.average_price == 149.50
         assert order1.fees == 1.25
+        # The fill time, not the later bookkeeping update.
+        assert order1.filled_at == datetime(2024, 1, 1, 12, 5, tzinfo=timezone.utc)
 
         order2 = orders[1]
         assert order2.order_id == "order-2"
         assert order2.symbol == "TSLA"
         assert order2.side == "sell"
-        assert order2.status == "pending"
+        assert order2.status == "confirmed"
+        assert order2.filled_quantity == 0
+        assert order2.average_price is None
+        assert order2.filled_at is None
+
+    @responses.activate
+    def test_partial_fill_keeps_the_filled_quantity(self, client):
+        """An IPO Access allocation: 2 of 10 filled, the rest cancelled.
+
+        Shape from a real allocation (ANT, 2026-11-19), with the quantities
+        and IDs replaced. `quantity` stays what was requested, so without
+        `filled_quantity` the shares received appear nowhere.
+        """
+        responses.add(
+            responses.GET,
+            urls.ORDERS,
+            json={"results": [{
+                "id": "ipo-order",
+                "instrument": f"{urls.INSTRUMENTS}ant-id/",
+                "side": "buy",
+                "type": "limit",
+                "quantity": "10.00000000",
+                "cumulative_quantity": "2.00000000",
+                "price": "83.00000000",
+                "average_price": "83.00000000",
+                "state": "partially_filled_rest_cancelled",
+                "created_at": "2026-11-18T21:30:04.959880Z",
+                "updated_at": "2026-11-19T13:14:49.184008Z",
+                "last_transaction_at": "2026-11-19T13:14:22.673713Z",
+                "executions": [{"price": "83.00000000", "quantity": "2.00000000"}],
+                "is_ipo_access_order": True,
+                "fees": "0.00",
+            }], "next": None},
+            status=200,
+        )
+        responses.add(responses.GET, f"{urls.INSTRUMENTS}ant-id/",
+                      json={"symbol": "ANT"}, status=200)
+
+        (order,) = client.get_stock_orders()
+
+        assert order.symbol == "ANT"
+        assert order.quantity == 10
+        assert order.filled_quantity == 2
+        assert order.average_price == 83.0
+        assert order.status == "partially_filled_rest_cancelled"
+        assert order.filled_at == datetime(2026, 11, 19, 13, 14, 22, 673713, tzinfo=timezone.utc)
+
+    @responses.activate
+    def test_symbol_lookup_is_cached_per_instrument(self, client):
+        order = {
+            "instrument": f"{urls.INSTRUMENTS}ant-id/",
+            "side": "buy", "type": "limit", "quantity": "1", "state": "confirmed",
+            "created_at": "2026-11-19T16:31:00Z",
+        }
+        responses.add(
+            responses.GET, urls.ORDERS,
+            json={"results": [{**order, "id": "a"}, {**order, "id": "b"}], "next": None},
+            status=200,
+        )
+        responses.add(responses.GET, f"{urls.INSTRUMENTS}ant-id/",
+                      json={"symbol": "ANT"}, status=200)
+
+        orders = client.get_stock_orders()
+
+        assert [o.symbol for o in orders] == ["ANT", "ANT"]
+        lookups = [c for c in responses.calls if "ant-id" in c.request.url]
+        assert len(lookups) == 1
 
     @responses.activate
     def test_get_order(self, client):
@@ -1087,19 +1167,22 @@ class TestOrderManagement:
             f"{urls.ORDERS}order-123/",
             json={
                 "id": "order-123",
-                "symbol": "NVDA",
+                "instrument": f"{urls.INSTRUMENTS}nvda-id/",
                 "side": "buy",
                 "type": "limit",
-                "quantity": "8",
-                "price": "800.00",
-                "stop_price": "750.00",
-                "state": "pending",
+                "quantity": "8.00000000",
+                "cumulative_quantity": "0.00000000",
+                "price": "800.00000000",
+                "stop_price": "750.00000000",
+                "state": "confirmed",
                 "created_at": "2024-01-01T12:00:00Z",
                 "time_in_force": "gtc",
                 "trigger": "stop",
             },
             status=200,
         )
+        responses.add(responses.GET, f"{urls.INSTRUMENTS}nvda-id/",
+                      json={"symbol": "NVDA"}, status=200)
 
         order = client.get_order("order-123")
         assert isinstance(order, Order)
@@ -1165,6 +1248,109 @@ class TestOrderManagement:
 
         with pytest.raises(OrderError, match="Insufficient buying power"):
             client.buy_stock("AAPL", 100000, price=150.00)
+
+
+class TestOptionOrderParsing:
+    """Field names as the options orders endpoint sends them."""
+
+    def _leg(self, price, qty, ts="2026-11-01T14:00:00Z", option="opt-1"):
+        return {
+            "option": f"{urls.OPTIONS_INSTRUMENTS}{option}/",
+            "side": "buy",
+            "executions": [{"price": price, "quantity": qty, "timestamp": ts}],
+        }
+
+    @responses.activate
+    def test_single_leg_fill(self, client):
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json={"results": [{
+                "id": "opt-order",
+                "chain_symbol": "NKE",
+                "direction": "debit",
+                "type": "limit",
+                "quantity": "1.00000",
+                "processed_quantity": "1.00000",
+                "price": "1.20000000",
+                "average_net_premium_paid": "-122.00000000",
+                "state": "filled",
+                "created_at": "2026-11-01T13:59:00Z",
+                "updated_at": "2026-11-01T14:00:05Z",
+                "legs": [self._leg("1.22000000", "1.00000")],
+            }], "next": None},
+            status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.symbol == "NKE"
+        assert order.price == 1.20
+        # The fill price per share, from the execution, not the limit.
+        assert order.average_price == 1.22
+        assert order.filled_quantity == 1
+        assert order.filled_at == datetime(2026, 11, 1, 14, 0, tzinfo=timezone.utc)
+        # chain_symbol is on the order, so no per-order instrument lookup.
+        assert len(responses.calls) == 1
+
+    @responses.activate
+    def test_execution_average_is_quantity_weighted(self, client):
+        leg = self._leg("1.00000000", "1.00000")
+        leg["executions"].append(
+            {"price": "1.30000000", "quantity": "3.00000", "timestamp": "2026-11-01T14:02:00Z"}
+        )
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json={"results": [{
+                "id": "o", "chain_symbol": "SPY", "quantity": "4", "processed_quantity": "4",
+                "state": "filled", "created_at": "2026-11-01T13:59:00Z", "legs": [leg],
+            }], "next": None},
+            status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.average_price == pytest.approx(1.225)
+        assert order.filled_at == datetime(2026, 11, 1, 14, 2, tzinfo=timezone.utc)
+
+    @responses.activate
+    def test_spread_has_no_single_average_price(self, client):
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json={"results": [{
+                "id": "spread", "chain_symbol": "AAPL", "quantity": "1",
+                "processed_quantity": "1", "state": "filled",
+                "created_at": "2026-11-01T13:59:00Z",
+                "legs": [self._leg("2.00", "1"), self._leg("0.50", "1", option="opt-2")],
+            }], "next": None},
+            status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.average_price is None
+        assert order.filled_quantity == 1
+
+    @responses.activate
+    def test_falls_back_to_leg_lookup_without_chain_symbol(self, client):
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json={"results": [{
+                "id": "old", "quantity": "1", "state": "cancelled",
+                "created_at": "2026-11-01T13:59:00Z",
+                "legs": [{"option": f"{urls.OPTIONS_INSTRUMENTS}opt-1/", "executions": []}],
+            }], "next": None},
+            status=200,
+        )
+        responses.add(
+            responses.GET, f"{urls.OPTIONS_INSTRUMENTS}opt-1/",
+            json={"chain_symbol": "tsla"}, status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.symbol == "TSLA"
+        assert order.average_price is None
+        assert order.filled_at is None
 
 
 class TestStockHistoricals:

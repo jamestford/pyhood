@@ -7,10 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `Order.filled_quantity`: shares or contracts actually filled, where `quantity` is what was ordered. They differ on a partial fill, such as an IPO Access allocation, which had no way to report the shares received.
+
 ### Changed
 - **IPO Access verified against a filled request.** ANT (Anthropic) listed on 2026-11-19, and a request through IPO Access was allocated. This is the first filled request seen, so two endpoints that had only been seen empty or before allocation are now documented from real responses.
-  - `get_ipo_access_allocation_results()` returns `result` (`'allocated'`) and the order ID, with a card giving your rank among allocated investors and the price. It reports whether you were allocated, not how many shares; the count is on the order, as `cumulative_quantity` and its `executions`.
+  - `get_ipo_access_allocation_results()` returns `result` (`'allocated'`) and the order ID, with a card giving your rank among allocated investors and the price. It reports whether you were allocated, not how many shares; for the count, use `filled_quantity` on the order from `get_ipo_access_orders()`.
   - **`get_ipo_access_trade_receipt()` is not updated after a request fills.** It still read "request queued" with a status of "Queued" after the allocation, as did the `trade_receipt_view_model` in `get_ipo_access_order_entry()`. `context.existing_order` in the order-entry view model did stay current. Both docstrings now say to read the outcome from the allocation result or the order.
+
+### Fixed
+- **Order history read fields Robinhood never sends.** `get_stock_orders()`, `get_option_orders()` and `get_order()` all had wrong field names, so several `Order` fields were never populated from real responses. Their tests mocked those same made-up fields, which is why they passed.
+  - **`symbol` was always empty on stock orders.** The orders endpoint sends only the instrument URL, so the symbol is now looked up once per instrument and cached for the call.
+  - **`average_price` was always `None`.** The parsers read `average_filled_price`; stock orders send `average_price`. Option orders send neither, so their average is now the quantity-weighted fill price from the executions: per share, single-leg orders only, since a spread has no single price.
+  - **`filled_at` was `None` on a partial fill** and was the last update time rather than the fill time. It now uses the last fill: `last_transaction_at` on stock orders, the latest execution on option orders.
+  - Option orders made an extra request per order to find the symbol, which the order already carries as `chain_symbol`.
 
 ## [0.13.0] - 2026-11-18
 
