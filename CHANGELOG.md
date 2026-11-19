@@ -5,6 +5,13 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **IPO Access verified against a filled request.** ANT (Anthropic) listed on 2026-11-19, and a request through IPO Access was allocated. This is the first filled request seen, so two endpoints that had only been seen empty or before allocation are now documented from real responses.
+  - `get_ipo_access_allocation_results()` returns `result` (`'allocated'`) and the order ID, with a card giving your rank among allocated investors and the price. It reports whether you were allocated, not how many shares; the count is on the order, as `cumulative_quantity` and its `executions`.
+  - **`get_ipo_access_trade_receipt()` is not updated after a request fills.** It still read "request queued" with a status of "Queued" after the allocation, as did the `trade_receipt_view_model` in `get_ipo_access_order_entry()`. `context.existing_order` in the order-entry view model did stay current. Both docstrings now say to read the outcome from the allocation result or the order.
+
 ## [0.13.0] - 2026-11-18
 
 ### Changed
