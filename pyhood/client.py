@@ -1439,7 +1439,7 @@ class PyhoodClient:
             quantity: Number of shares to buy.
             price: Limit price. If None, places market order.
             stop_price: Stop price for stop/stop-limit orders.
-            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+            time_in_force: 'gtc' (good till cancelled), 'gfd' (good for day), 'ioc', 'fok'.
             extended_hours: Whether to allow extended hours trading.
             account_number: Specific account (e.g. IRA). None = default.
 
@@ -1480,7 +1480,7 @@ class PyhoodClient:
             quantity: Number of shares to sell.
             price: Limit price. If None, places market order.
             stop_price: Stop price for stop/stop-limit orders.
-            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+            time_in_force: 'gtc' (good till cancelled), 'gfd' (good for day), 'ioc', 'fok'.
             extended_hours: Whether to allow extended hours trading.
             account_number: Specific account (e.g. IRA). None = default.
 
@@ -1523,7 +1523,7 @@ class PyhoodClient:
             side: 'buy' or 'sell'.
             price: Limit price. If None, places market order.
             stop_price: Stop price for stop/stop-limit orders.
-            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+            time_in_force: 'gtc' (good till cancelled), 'gfd' (good for day), 'ioc', 'fok'.
             extended_hours: Whether to allow extended hours trading.
             account_number: Specific account (e.g. IRA). None = default.
             trail_amount: Trail by a dollar amount, for a trailing stop.
@@ -1733,7 +1733,7 @@ class PyhoodClient:
             quantity: Number of contracts.
             price: Limit price per contract.
             position_effect: 'open' or 'close'.
-            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+            time_in_force: 'gtc' (good till cancelled), 'gfd' (good for day), 'ioc', 'fok'.
             account_number: Specific account (e.g. IRA). None = default.
 
         Returns:
@@ -1774,7 +1774,7 @@ class PyhoodClient:
             quantity: Number of contracts.
             price: Limit price per contract.
             position_effect: 'open' or 'close'.
-            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+            time_in_force: 'gtc' (good till cancelled), 'gfd' (good for day), 'ioc', 'fok'.
             account_number: Specific account (e.g. IRA). None = default.
 
         Returns:
@@ -1820,7 +1820,7 @@ class PyhoodClient:
             position_effect: 'open' or 'close'.
             credit_or_debit: 'debit' or 'credit'. Auto-determined from
                 side if not provided (buy→debit, sell→credit).
-            time_in_force: 'gtc' (good till cancelled), 'gtd', 'ioc', 'fok'.
+            time_in_force: 'gtc' (good till cancelled), 'gfd' (good for day), 'ioc', 'fok'.
             account_number: Specific account (e.g. IRA). None = default.
 
         Returns:
@@ -1915,7 +1915,7 @@ class PyhoodClient:
                 `option_type` ('call'/'put'), `side` ('buy'/'sell') and
                 `effect` ('open'/'close').
             direction: 'debit' or 'credit'.
-            time_in_force: 'gtc', 'gtd', 'ioc' or 'fok'.
+            time_in_force: 'gtc', 'gfd', 'ioc' or 'fok'.
             account_number: Specific account (e.g. IRA). None = default.
 
         Returns:
