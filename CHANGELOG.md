@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Quote.timestamp` is now set, from the quote's `updated_at`.
 - `Watchlist.id`, the list's ID.
 - `examples/verify_watchlists.py` lists your watchlists, then adds a stock to one and removes it again, asking first.
+- `scripts/field_audit.py`, the audit that found the problems below. It runs the read-only methods against a live account and reports every field a parser reads that Robinhood never sends. It makes GET requests only and prints field names, never values. See the contributing guide.
 
 ### Changed
 - **Breaking: `Quote.volume` is `None` unless the quote was fetched with `include_fundamentals=True`.** It was always `0`, because the parser read a `last_trade_volume` field that the quote does not have. It is now `int | None`.
