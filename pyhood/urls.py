@@ -46,7 +46,7 @@ MARKET_HOURS = f"{BASE}/markets/{{market}}/hours/{{date}}/"
 
 # Discovery & Lists
 MOVERS_SP500 = f"{BASE}/midlands/movers/sp500/"
-TAGS = f"{BASE}/midlands/tags/tag/"
+TAGS = f"{BASE}/midlands/tags/tag/"  # retired: 404
 WATCHLISTS = f"{BASE}/midlands/lists/default/"
 WATCHLIST_ITEMS = f"{BASE}/midlands/lists/items/"
 
@@ -61,7 +61,7 @@ CARD_TRANSACTIONS = "https://minerva.robinhood.com/history/transactions/"
 # Profile & Settings
 USER = f"{BASE}/user/"
 INVESTMENT_PROFILE = f"{BASE}/user/investment_profile/"
-NOTIFICATION_SETTINGS = f"{BASE}/settings/notifications/"
+NOTIFICATION_SETTINGS = f"{BASE}/settings/notifications/"  # retired: 404
 NOTIFICATION_DEVICES = f"{BASE}/notifications/devices/"
 
 # Dividends
@@ -79,7 +79,7 @@ PORTFOLIO_HISTORICALS = f"{BASE}/portfolios/historicals/{{account_number}}/"
 OPTIONS_HISTORICALS = f"{BASE}/marketdata/options/historicals/"
 
 # Popularity / Splits
-POPULARITY = f"{BASE}/instruments/{{instrument_id}}/popularity/"
+POPULARITY = f"{BASE}/instruments/{{instrument_id}}/popularity/"  # retired: 404
 SPLITS = f"{BASE}/instruments/{{instrument_id}}/splits/"
 
 # Day Trades / Margin

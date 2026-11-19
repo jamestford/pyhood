@@ -342,7 +342,7 @@ docs = client.get_documents(doc_type="account_statement")
 | Banking, ACH transfers, and dividends | Functional |
 | Watchlists | Functional |
 | Markets and trading hours | Functional |
-| Research, news, ratings, movers, and popularity | Functional |
+| Research, news, ratings, and movers | Functional |
 | Option historicals and portfolio performance | Functional |
 | Guided credential setup (`pyhood setup`) | Functional |
 | Documents and statements | Functional |

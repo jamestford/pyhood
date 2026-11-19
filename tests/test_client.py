@@ -20,7 +20,6 @@ from pyhood.models import (
     MarketHours,
     Mover,
     NewsArticle,
-    NotificationSettings,
     OptionContract,
     OptionsChain,
     Order,
@@ -1640,43 +1639,18 @@ class TestSettings:
         assert profile.first_name == "James"
         assert profile.last_name == "Ford"
 
+    @pytest.mark.parametrize("call", [
+        lambda c: c.get_notification_settings(),
+        lambda c: c.update_notification_settings(market_open=False),
+    ])
     @responses.activate
-    def test_get_notification_settings(self, client):
-        responses.add(
-            responses.GET,
-            urls.NOTIFICATION_SETTINGS,
-            json={
-                "market_open": True,
-                "dividends": True,
-                "transfers": False,
-                "price_movements": True,
-            },
-            status=200,
-        )
+    def test_notification_settings_are_retired(self, client, call):
+        """Robinhood returns 404 for /settings/notifications/ (2026-11-19)."""
+        from pyhood.exceptions import APIError
 
-        settings = client.get_notification_settings()
-        assert isinstance(settings, NotificationSettings)
-        assert settings.is_enabled("market_open") is True
-        assert settings.is_enabled("transfers") is False
-        assert settings.is_enabled("nonexistent") is False
-
-    @responses.activate
-    def test_update_notification_settings(self, client):
-        responses.add(
-            responses.POST,
-            urls.NOTIFICATION_SETTINGS,
-            json={
-                "market_open": False,
-                "dividends": True,
-                "transfers": False,
-                "price_movements": True,
-            },
-            status=200,
-        )
-
-        settings = client.update_notification_settings(market_open=False)
-        assert isinstance(settings, NotificationSettings)
-        assert settings.is_enabled("market_open") is False
+        with pytest.raises(APIError, match="no longer available"):
+            call(client)
+        assert len(responses.calls) == 0  # nothing is sent
 
 
 class TestBanking:
@@ -2553,53 +2527,24 @@ class TestMovers:
 
 class TestTags:
     @responses.activate
-    def test_get_tags(self, client):
-        responses.add(
-            responses.GET,
-            f"{urls.TAGS}100-most-popular/",
-            json={
-                "instruments": [
-                    f"{BASE}/instruments/aaa/",
-                    f"{BASE}/instruments/bbb/",
-                ],
-            },
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{BASE}/instruments/aaa/",
-            json={"symbol": "AAPL"},
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{BASE}/instruments/bbb/",
-            json={"symbol": "MSFT"},
-            status=200,
-        )
+    def test_get_tags_is_retired(self, client):
+        """Robinhood returns 404 for /midlands/tags/tag/<tag>/ (2026-11-19)."""
+        from pyhood.exceptions import APIError
 
-        symbols = client.get_tags("100-most-popular")
-        assert symbols == ["AAPL", "MSFT"]
+        with pytest.raises(APIError, match="no longer available.*get_watchlists"):
+            client.get_tags("100-most-popular")
+        assert len(responses.calls) == 0
 
 
 class TestPopularity:
     @responses.activate
-    def test_get_popularity(self, client):
-        responses.add(
-            responses.GET,
-            urls.INSTRUMENTS,
-            json={"results": [{"url": f"{BASE}/instruments/abc123/"}]},
-            status=200,
-        )
-        responses.add(
-            responses.GET,
-            f"{BASE}/instruments/abc123/popularity/",
-            json={"num_open_positions": 150432},
-            status=200,
-        )
+    def test_get_popularity_is_retired(self, client):
+        """Robinhood returns 404 for /instruments/<id>/popularity/ (2026-11-19)."""
+        from pyhood.exceptions import APIError
 
-        count = client.get_popularity("AAPL")
-        assert count == 150432
+        with pytest.raises(APIError, match="no longer available"):
+            client.get_popularity("AAPL")
+        assert len(responses.calls) == 0
 
 
 class TestSplits:

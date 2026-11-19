@@ -609,39 +609,38 @@ class PyhoodClient:
         return movers
 
     def get_tags(self, tag: str) -> list[str]:
-        """Get stock symbols for a discovery tag.
+        """Deprecated — Robinhood retired this endpoint.
 
-        Args:
-            tag: Tag name (e.g. '100-most-popular', 'top-movers', 'etf',
-                 '10-most-popular', 'technology', 'healthcare').
+        Raises:
+            APIError: Always. `/midlands/tags/tag/<tag>/` returns 404 for
+                every tag as of 2026-11-19.
+
+        The Robinhood lists you follow in the app, such as its most popular
+        list, come back from `get_watchlists()` with their symbols.
         """
-        data = self._session.get(f"{urls.TAGS}{tag}/")
-        instruments = data.get("instruments", []) if isinstance(data, dict) else []
-        symbols: list[str] = []
-        for instrument_url in instruments:
-            try:
-                inst = self._session.get(instrument_url)
-                symbol = inst.get("symbol", "")
-                if symbol:
-                    symbols.append(symbol)
-            except Exception:
-                pass
-        return symbols
+        from pyhood.exceptions import APIError
+
+        raise APIError(
+            "get_tags() is no longer available: Robinhood retired "
+            "/midlands/tags/tag/ and it returns 404 for every tag. The "
+            "Robinhood lists you follow in the app are returned by "
+            "get_watchlists()."
+        )
 
     def get_popularity(self, symbol: str) -> int:
-        """Get how many Robinhood users hold a stock.
+        """Deprecated — Robinhood retired this endpoint.
 
-        Args:
-            symbol: Stock ticker.
-
-        Returns:
-            Number of open positions (popularity count).
+        Raises:
+            APIError: Always. `/instruments/<id>/popularity/` returns 404 as
+                of 2026-11-19, and pyhood knows of no replacement.
         """
-        instrument = self._get_instrument_url(symbol)
-        instrument_id = instrument.rstrip("/").split("/")[-1]
-        url = urls.POPULARITY.format(instrument_id=instrument_id)
-        data = self._session.get(url)
-        return int(data.get("num_open_positions", 0))
+        from pyhood.exceptions import APIError
+
+        raise APIError(
+            "get_popularity() is no longer available: Robinhood retired "
+            "/instruments/<id>/popularity/ and it returns 404. There is no "
+            "replacement."
+        )
 
     def get_splits(self, symbol: str) -> list[StockSplit]:
         """Get stock split history for a symbol."""
@@ -816,18 +815,34 @@ class PyhoodClient:
         )
 
     def get_notification_settings(self) -> NotificationSettings:
-        """Get current notification preferences."""
-        data = self._session.get(urls.NOTIFICATION_SETTINGS)
-        return NotificationSettings(settings=data)
+        """Deprecated — Robinhood retired this endpoint.
+
+        Raises:
+            APIError: Always. `/settings/notifications/` returns 404 as of
+                2026-11-19, and pyhood knows of no replacement.
+        """
+        from pyhood.exceptions import APIError
+
+        raise APIError(
+            "get_notification_settings() is no longer available: Robinhood "
+            "retired /settings/notifications/ and it returns 404. There is "
+            "no replacement."
+        )
 
     def update_notification_settings(self, **kwargs: bool) -> NotificationSettings:
-        """Update notification preferences.
+        """Deprecated — Robinhood retired this endpoint.
 
-        Pass notification keys as keyword arguments, e.g.:
-            client.update_notification_settings(market_open=False, dividends=True)
+        Raises:
+            APIError: Always, before anything is sent. See
+                `get_notification_settings()`.
         """
-        data = self._session.post(urls.NOTIFICATION_SETTINGS, data=kwargs)
-        return NotificationSettings(settings=data)
+        from pyhood.exceptions import APIError
+
+        raise APIError(
+            "update_notification_settings() is no longer available: "
+            "Robinhood retired /settings/notifications/ and it returns 404. "
+            "There is no replacement."
+        )
 
     # ── Banking / ACH ─────────────────────────────────────────────────
 

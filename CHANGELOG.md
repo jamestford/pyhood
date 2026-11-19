@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `get_futures_contract()` makes a second request, for the contract's product, and `FuturesContract.tick_size` is `float | None`. See Fixed.
 - `get_watchlist()`, `add_to_watchlist()` and `remove_from_watchlist()` default to the list named `'My First List'`, which every account starts with, where they defaulted to `'Default'`, which is not a list Robinhood creates. `add_to_watchlist()` and `remove_from_watchlist()` return Robinhood's raw response. `Watchlist.url` is removed, since lists have no URL.
 
+### Removed
+- **`get_tags()`, `get_popularity()`, `get_notification_settings()` and `update_notification_settings()` raise `APIError`.** Robinhood retired the three endpoints behind them (`/midlands/tags/tag/`, `/instruments/<id>/popularity/` and `/settings/notifications/`), which all return 404. The methods stay, as `get_portfolio_historicals()` did, so that a call fails with an explanation rather than an HTTP error. There is no replacement for popularity or notification settings. For tags, the Robinhood lists you follow in the app come back from `get_watchlists()`. Both migration guides pointed to these methods and no longer do.
+
 ### Fixed
 - **More fields read from names Robinhood never sends.** A read-only audit ran 42 methods against a live account and recorded every field the parsers asked for and whether it was there. These were never populated:
   - **`Quote.volume`, `pe_ratio`, `market_cap`, `high_52w`, `low_52w` and `timestamp`.** See Added and Changed.
@@ -28,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **`FuturesQuote.high`, `low`, `prev_close` and `volume`.** See Added and Changed.
   - **`Order.fees` was always `None` on option orders.** They have no `fees` field. It is now the sum of `contract_fees`, `regulatory_fees` and `pro_trader_fees`.
 - Futures tests that mocked a flat, snake_case contract and quote now use the shapes the API sends.
+- The robin_stocks migration guide sent `get_historical_portfolio()` to `get_portfolio_historicals()`, which raises. It now points to `get_portfolio_performance()`.
+- `docs/quotes.md` said quotes are batched 25 to a request. They are batched 1,000 to a request.
 - **Watchlists did not work at all.** `get_watchlists()` requested `/midlands/lists/`, which Robinhood rejects with 400 unless an `owner_type` is given, and it expected each list to carry its items, which no list record does. `get_watchlist()`, `add_to_watchlist()` and `remove_from_watchlist()` all start by reading the lists, so they failed the same way.
   - `get_watchlists()` now reads `/midlands/lists/default/`, which returns the lists you created and the Robinhood lists you follow, and fetches each non-empty list's symbols from `/midlands/lists/items/`.
   - `get_watchlist()` fetches only the list asked for, and names your lists in the error when there is no match.

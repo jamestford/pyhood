@@ -310,50 +310,13 @@ GET /midlands/movers/sp500/?direction=down
 
 ### GET /midlands/tags/tag/{tag}/
 
-Pre-built stock lists by category.
+**Retired.** Returned pre-built stock lists by category (`100-most-popular`, `technology`, `etf` and so on). It returns 404 for every tag as of 2026-11-19, so `get_tags()` raises `APIError`.
 
-```
-GET /midlands/tags/tag/upcoming-earnings/
-```
+Robinhood's curated lists now live under `/midlands/lists/`. The ones you follow in the app are returned by `/midlands/lists/default/`. See [Account](#account).
 
-**Available tags:**
+### GET /instruments/{id}/popularity/
 
-| Tag | ~Count | Description |
-|-----|--------|-------------|
-| `100-most-popular` | 100 | Top 100 stocks on Robinhood |
-| `top-movers` | 20 | Daily movers |
-| `most-popular-under-25` | 24 | Retail-popular cheap stocks |
-| `upcoming-earnings` | 70 | Earnings in next 2 weeks |
-| `new-on-robinhood` | 172 | Recently added |
-| `large-cap` | 88 | Large cap stocks |
-| `mid-cap` | 16 | Mid cap stocks |
-| `small-cap` | 104 | Small cap stocks |
-| `etf` | 500 | ETFs |
-| `technology` | 500 | Tech sector |
-| `finance` | 500 | Financial sector |
-| `energy` | 386 | Energy sector |
-| `healthcare` | 212 | Healthcare sector |
-| `real-estate` | 453 | Real estate sector |
-| `banking` | 441 | Banking sector |
-| `retail` | 500 | Retail sector |
-| `manufacturing` | 495 | Manufacturing sector |
-| `insurance` | 293 | Insurance sector |
-| `utilities` | 222 | Utilities sector |
-| `food` | 219 | Food sector |
-| `media` | 192 | Media sector |
-| `reit` | 203 | REITs |
-| `automotive` | 175 | Automotive sector |
-| `entertainment` | 138 | Entertainment sector |
-| `china` | 104 | Chinese stocks |
-| `aerospace` | 99 | Aerospace sector |
-| `gold` | 69 | Gold-related |
-| `oil` | 66 | Oil-related |
-| `e-commerce` | 53 | E-commerce |
-| `travel` | 47 | Travel sector |
-| `silver` | 34 | Silver-related |
-| `social-media` | 13 | Social media companies |
-
-**Returns:** `instruments` (list of instrument URLs), `name`, `description`
+**Retired.** Returned the number of Robinhood accounts holding a stock. It returns 404 as of 2026-11-19, so `get_popularity()` raises `APIError`.
 
 ---
 
