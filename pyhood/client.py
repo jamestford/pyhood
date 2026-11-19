@@ -2095,6 +2095,7 @@ class PyhoodClient:
         data = self._session.get_paginated(
             urls.ORDERS, params=self._start_date_params(cutoff),
         )
+        symbol_cache: dict[str, str] = {}
         orders = []
 
         for item in data:
@@ -2105,46 +2106,7 @@ class PyhoodClient:
             if self._before_cutoff(item.get("created_at", ""), cutoff):
                 continue
 
-            created_at = None
-            filled_at = None
-
-            if item.get("created_at"):
-                try:
-                    created_at = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
-                except ValueError:
-                    pass
-
-            if item.get("updated_at") and item.get("state") == "filled":
-                try:
-                    filled_at = datetime.fromisoformat(item["updated_at"].replace("Z", "+00:00"))
-                except ValueError:
-                    pass
-
-            avg_price = None
-            if item.get("average_filled_price"):
-                avg_price = float(item["average_filled_price"])
-
-            fees = None
-            if item.get("fees"):
-                fees = float(item["fees"])
-
-            orders.append(Order(
-                order_id=item.get("id", ""),
-                symbol=item.get("symbol", "").upper(),
-                side=item.get("side", ""),
-                order_type=item.get("type", ""),
-                quantity=float(item.get("quantity", 0)),
-                price=float(item["price"]) if item.get("price") else None,
-                status=item.get("state", "unknown"),
-                created_at=created_at,
-                filled_at=filled_at,
-                stop_price=float(item["stop_price"]) if item.get("stop_price") else None,
-                time_in_force=item.get("time_in_force", "gtc"),
-                trigger=item.get("trigger", "immediate"),
-                instrument_type="stock",
-                average_price=avg_price,
-                fees=fees,
-            ))
+            orders.append(self._stock_order(item, symbol_cache))
 
         return orders
 
@@ -2170,59 +2132,7 @@ class PyhoodClient:
             if self._before_cutoff(item.get("created_at", ""), cutoff):
                 continue
 
-            created_at = None
-            filled_at = None
-
-            if item.get("created_at"):
-                try:
-                    created_at = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
-                except ValueError:
-                    pass
-
-            if item.get("updated_at") and item.get("state") == "filled":
-                try:
-                    filled_at = datetime.fromisoformat(item["updated_at"].replace("Z", "+00:00"))
-                except ValueError:
-                    pass
-
-            # Extract symbol from legs if available
-            symbol = ""
-            legs = item.get("legs", [])
-            if legs and len(legs) > 0:
-                leg = legs[0]
-                option_url = leg.get("option", "")
-                if option_url:
-                    try:
-                        option_data = self._session.get(option_url)
-                        chain_symbol = option_data.get("chain_symbol", "")
-                        symbol = chain_symbol.upper()
-                    except Exception:
-                        pass
-
-            avg_price = None
-            if item.get("average_filled_price"):
-                avg_price = float(item["average_filled_price"])
-
-            fees = None
-            if item.get("fees"):
-                fees = float(item["fees"])
-
-            orders.append(Order(
-                order_id=item.get("id", ""),
-                symbol=symbol,
-                side=item.get("direction", ""),  # options use 'direction' not 'side'
-                order_type=item.get("type", ""),
-                quantity=float(item.get("quantity", 0)),
-                price=float(item["price"]) if item.get("price") else None,
-                status=item.get("state", "unknown"),
-                created_at=created_at,
-                filled_at=filled_at,
-                time_in_force=item.get("time_in_force", "gtc"),
-                trigger=item.get("trigger", "immediate"),
-                instrument_type="option",
-                average_price=avg_price,
-                fees=fees,
-            ))
+            orders.append(self._option_order(item))
 
         return orders
 
@@ -2238,115 +2148,85 @@ class PyhoodClient:
         # Try stock orders first
         try:
             data = self._session.get(f"{urls.ORDERS}{order_id}/")
-
-            created_at = None
-            filled_at = None
-
-            if data.get("created_at"):
-                try:
-                    created_at = datetime.fromisoformat(
-                        data["created_at"].replace("Z", "+00:00")
-                    )
-                except ValueError:
-                    pass
-
-            if data.get("updated_at") and data.get("state") == "filled":
-                try:
-                    filled_at = datetime.fromisoformat(
-                        data["updated_at"].replace("Z", "+00:00")
-                    )
-                except ValueError:
-                    pass
-
-            avg_price = None
-            if data.get("average_filled_price"):
-                avg_price = float(data["average_filled_price"])
-
-            fees = None
-            if data.get("fees"):
-                fees = float(data["fees"])
-
-            return Order(
-                order_id=data.get("id", ""),
-                symbol=data.get("symbol", "").upper(),
-                side=data.get("side", ""),
-                order_type=data.get("type", ""),
-                quantity=float(data.get("quantity", 0)),
-                price=float(data["price"]) if data.get("price") else None,
-                status=data.get("state", "unknown"),
-                created_at=created_at,
-                filled_at=filled_at,
-                stop_price=float(data["stop_price"]) if data.get("stop_price") else None,
-                time_in_force=data.get("time_in_force", "gtc"),
-                trigger=data.get("trigger", "immediate"),
-                instrument_type="stock",
-                average_price=avg_price,
-                fees=fees,
-            )
+            return self._stock_order(data, {})
         except Exception:
             # Try option orders
             try:
                 data = self._session.get(f"{urls.OPTIONS_ORDERS}{order_id}/")
-
-                created_at = None
-                filled_at = None
-
-                if data.get("created_at"):
-                    try:
-                        created_at = datetime.fromisoformat(
-                            data["created_at"].replace("Z", "+00:00")
-                        )
-                    except ValueError:
-                        pass
-
-                if data.get("updated_at") and data.get("state") == "filled":
-                    try:
-                        filled_at = datetime.fromisoformat(
-                            data["updated_at"].replace("Z", "+00:00")
-                        )
-                    except ValueError:
-                        pass
-
-                # Extract symbol from legs if available
-                symbol = ""
-                legs = data.get("legs", [])
-                if legs and len(legs) > 0:
-                    leg = legs[0]
-                    option_url = leg.get("option", "")
-                    if option_url:
-                        try:
-                            option_data = self._session.get(option_url)
-                            chain_symbol = option_data.get("chain_symbol", "")
-                            symbol = chain_symbol.upper()
-                        except Exception:
-                            pass
-
-                avg_price = None
-                if data.get("average_filled_price"):
-                    avg_price = float(data["average_filled_price"])
-
-                fees = None
-                if data.get("fees"):
-                    fees = float(data["fees"])
-
-                return Order(
-                    order_id=data.get("id", ""),
-                    symbol=symbol,
-                    side=data.get("direction", ""),
-                    order_type=data.get("type", ""),
-                    quantity=float(data.get("quantity", 0)),
-                    price=float(data["price"]) if data.get("price") else None,
-                    status=data.get("state", "unknown"),
-                    created_at=created_at,
-                    filled_at=filled_at,
-                    time_in_force=data.get("time_in_force", "gtc"),
-                    trigger=data.get("trigger", "immediate"),
-                    instrument_type="option",
-                    average_price=avg_price,
-                    fees=fees,
-                )
+                return self._option_order(data)
             except Exception as e:
                 raise OrderError(f"Order {order_id} not found") from e
+
+    def _stock_order(self, item: dict, symbol_cache: dict[str, str]) -> Order:
+        """Map a raw stock order onto an Order.
+
+        The orders endpoint sends no symbol, only the instrument URL, so the
+        symbol is looked up once per instrument and cached for the caller.
+        """
+        instrument_url = item.get("instrument", "")
+        if instrument_url and instrument_url not in symbol_cache:
+            try:
+                symbol_cache[instrument_url] = self._session.get(instrument_url).get("symbol", "")
+            except Exception:
+                symbol_cache[instrument_url] = ""
+
+        filled_quantity = _safe_float(item.get("cumulative_quantity"))
+        return Order(
+            order_id=item.get("id", ""),
+            symbol=symbol_cache.get(instrument_url, "").upper(),
+            side=item.get("side", ""),
+            order_type=item.get("type", ""),
+            quantity=float(item.get("quantity", 0)),
+            price=_safe_float(item.get("price")),
+            status=item.get("state", "unknown"),
+            created_at=_parse_time(item.get("created_at")),
+            filled_at=_filled_at(item, filled_quantity, item.get("last_transaction_at")),
+            stop_price=_safe_float(item.get("stop_price")),
+            time_in_force=item.get("time_in_force", "gtc"),
+            trigger=item.get("trigger", "immediate"),
+            instrument_type="stock",
+            average_price=_safe_float(item.get("average_price")),
+            fees=_safe_float(item.get("fees")),
+            filled_quantity=filled_quantity,
+        )
+
+    def _option_order(self, item: dict) -> Order:
+        """Map a raw option order onto an Order.
+
+        The symbol is `chain_symbol` on the order itself. Older responses
+        lacking it fall back to looking up the first leg's instrument.
+        """
+        legs = item.get("legs") or []
+        symbol = item.get("chain_symbol", "")
+        if not symbol and legs and legs[0].get("option"):
+            try:
+                symbol = self._session.get(legs[0]["option"]).get("chain_symbol", "")
+            except Exception:
+                pass
+
+        executions = [e for leg in legs for e in leg.get("executions") or []]
+        last_execution = max((e.get("timestamp") or "" for e in executions), default="")
+        filled_quantity = _safe_float(item.get("processed_quantity"))
+        return Order(
+            order_id=item.get("id", ""),
+            symbol=symbol.upper(),
+            side=item.get("direction", ""),  # options use 'direction' not 'side'
+            order_type=item.get("type", ""),
+            quantity=float(item.get("quantity", 0)),
+            price=_safe_float(item.get("price")),
+            status=item.get("state", "unknown"),
+            created_at=_parse_time(item.get("created_at")),
+            filled_at=_filled_at(item, filled_quantity, last_execution),
+            time_in_force=item.get("time_in_force", "gtc"),
+            trigger=item.get("trigger", "immediate"),
+            instrument_type="option",
+            # Per-share fill price, only for a single leg: a spread has no
+            # single price, and the order-level premium fields are per
+            # contract and signed.
+            average_price=_average_execution_price(executions) if len(legs) == 1 else None,
+            fees=_safe_float(item.get("fees")),
+            filled_quantity=filled_quantity,
+        )
 
     def cancel_order(self, order_id: str) -> dict:
         """Cancel a specific order.
@@ -2663,9 +2543,10 @@ class PyhoodClient:
             and animation assets for the app.
 
         Note:
-            This says whether you were allocated, not how many shares. The
-            share count is on the order: `cumulative_quantity` and its
-            `executions`, where each execution also carries an
+            This says whether you were allocated, not how many shares. For
+            the count, use `filled_quantity` on the order from
+            `get_ipo_access_orders()`; `quantity` there is what was
+            requested. In the raw order, each execution also carries an
             `ipo_access_execution_rank`. The order's state was
             `partially_filled_rest_cancelled`, meaning the unallocated part of
             the request was cancelled and will not fill later.
@@ -3102,3 +2983,39 @@ def _safe_float(val: Any) -> float | None:
         return float(val)
     except (ValueError, TypeError):
         return None
+
+
+def _parse_time(value: Any) -> datetime | None:
+    """Parse an ISO-8601 timestamp from the API, or return None."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _filled_at(item: dict, filled_quantity: float | None, last_fill: Any) -> datetime | None:
+    """When an order last filled, including a partial fill.
+
+    Uses the time of the last fill when the order carries one. Responses
+    without one fall back to `updated_at`, but only for a completely filled
+    order, since an unfilled order is updated by cancellation too.
+    """
+    if filled_quantity and last_fill:
+        return _parse_time(last_fill)
+    if item.get("state") == "filled":
+        return _parse_time(item.get("updated_at"))
+    return None
+
+
+def _average_execution_price(executions: list[dict]) -> float | None:
+    """Quantity-weighted average price across executions, or None."""
+    total = quantity = 0.0
+    for e in executions:
+        price, qty = _safe_float(e.get("price")), _safe_float(e.get("quantity"))
+        if price is None or not qty:
+            continue
+        total += price * qty
+        quantity += qty
+    return total / quantity if quantity else None

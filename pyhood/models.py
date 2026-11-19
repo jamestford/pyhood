@@ -93,6 +93,9 @@ class Order:
     instrument_type: str = "stock"  # 'stock', 'option'
     average_price: float | None = None
     fees: float | None = None
+    # Shares or contracts actually filled; `quantity` is what was ordered.
+    # They differ on a partial fill, such as an IPO Access allocation.
+    filled_quantity: float | None = None
 
 
 @dataclass(frozen=True)
