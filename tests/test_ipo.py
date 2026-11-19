@@ -310,3 +310,120 @@ class TestLiveOfferingShapes:
 
         assert client.has_ipo_offerings() is False
         assert client.get_ipo_access_cards(self.INSTRUMENT_ID)[0]["title"] == "RVII"
+
+
+class TestFilledRequestShapes:
+    """Shapes captured after a request was allocated: ANT on 2026-11-19.
+
+    The first filled IPO Access request seen. It settles two things: the
+    allocation endpoint's populated shape, and that the trade receipt is not
+    updated after the request fills. The order ID, share counts and rank are
+    placeholders; the structure and field names are as received.
+    """
+
+    INSTRUMENT_ID = "08ab6c19-c83d-424b-bf4d-f5dc4e3a0aa6"
+    ORDER_ID = "00000000-0000-4000-8000-000000000001"
+
+    ALLOCATION = {
+        "instrument_id": INSTRUMENT_ID,
+        "order_id": ORDER_ID,
+        "result": "allocated",
+        "allocated": {
+            "card": {
+                "card_style": "classic",
+                "header_title": "IPO DATE — 11/19/2026",
+                "primary_text": "You are the 123,456th allocated investor of ANT on Robinhood",
+                "footer_title": "ANT",
+                "footer_subtitle": "Anthropic, PBC",
+                "footer_detail": "$83.00",
+                "footer_subdetail": "Per Share",
+            },
+            "can_share": True,
+            "buttons": [{
+                "title": "View transaction details",
+                "type": "secondary",
+                "action": {
+                    "action_type": "deeplink",
+                    "action_data": {"uri": f"robinhood://orders?id={ORDER_ID}"},
+                },
+            }],
+        },
+    }
+
+    # The receipt as returned after the order had already filled.
+    TRADE_RECEIPT = {
+        "id": ORDER_ID,
+        "title": "ANT request queued",
+        "order_summary": "Your request to buy 10 shares of ANT is queued for allocation.",
+        "order_detail_items": [
+            {"label": "Request status", "value": "Queued"},
+            {"label": "Shares requested", "value": "10"},
+            {"label": "Estimated cost", "value": "$830.00"},
+        ],
+        "footer_buttons": [{"title": "Done", "type": "primary"}],
+    }
+
+    ORDER_ENTRY = {
+        "account_number": "ACCOUNT_NUMBER",
+        "instrument_id": INSTRUMENT_ID,
+        "context": {
+            "phase": "price_finalized",
+            "instrument_symbol": "ANT",
+            "has_cob_deadline_passed": True,
+            "user_is_enrolled": True,
+            "existing_order": {
+                "order_id": ORDER_ID,
+                "quantity": "10.00000000",
+                "state": "partially_filled_rest_cancelled",
+                "ipoa_limit_type": None,
+                "price": {"currency_code": "USD", "amount": "83"},
+            },
+        },
+        "trade_receipt_view_model": {
+            "title": "ANT request queued",
+            "order_summary": {"title": "Allocation is pending"},
+        },
+    }
+
+    @responses.activate
+    def test_allocation_result(self, client):
+        responses.add(
+            responses.GET,
+            urls.ipo_access_allocation_results_url(self.INSTRUMENT_ID),
+            json=self.ALLOCATION, status=200,
+        )
+
+        result = client.get_ipo_access_allocation_results(self.INSTRUMENT_ID)
+
+        assert result["result"] == "allocated"
+        assert result["order_id"] == self.ORDER_ID
+        card = result[result["result"]]["card"]
+        assert card["footer_title"] == "ANT"
+        assert card["footer_detail"] == "$83.00"
+
+    @responses.activate
+    def test_trade_receipt_is_stale_after_fill(self, client):
+        """Still "Queued" after the request filled, so it can't report the outcome."""
+        responses.add(
+            responses.GET,
+            urls.ipo_access_trade_receipt_url(self.ORDER_ID),
+            json=self.TRADE_RECEIPT, status=200,
+        )
+
+        receipt = client.get_ipo_access_trade_receipt(self.ORDER_ID)
+        status = {i["label"]: i["value"] for i in receipt["order_detail_items"]}
+
+        assert status["Request status"] == "Queued"
+
+    @responses.activate
+    def test_existing_order_is_current_where_receipt_is_not(self, client):
+        responses.add(
+            responses.GET,
+            urls.ipo_access_order_entry_url(self.INSTRUMENT_ID),
+            json=self.ORDER_ENTRY, status=200,
+        )
+
+        vm = client.get_ipo_access_order_entry(self.INSTRUMENT_ID)
+
+        assert vm["context"]["existing_order"]["state"] == "partially_filled_rest_cancelled"
+        assert vm["trade_receipt_view_model"]["order_summary"]["title"] == "Allocation is pending"

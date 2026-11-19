@@ -2632,7 +2632,13 @@ class PyhoodClient:
             `user_is_enrolled`, `account_type`, `existing_order` and
             `available_buying_power`.
 
-            `trade_receipt_view_model` is None until an order exists.
+            `trade_receipt_view_model` is None until an order exists. Once it
+            does, `context.existing_order` carries the order's ID, quantity,
+            state and price, and that state stays current: it read
+            `partially_filled_rest_cancelled` after an allocation (ANT,
+            2026-11-19). The receipt view model does not: it still said
+            "Allocation is pending" after the order filled. Read the state
+            from `existing_order` or the order itself, never the receipt.
 
         Note:
             This is the most informative of the IPO endpoints and the one to
@@ -2646,22 +2652,45 @@ class PyhoodClient:
         )
 
     def get_ipo_access_allocation_results(self, instrument_id: str) -> dict:
-        """Get how many shares you were allocated in an IPO you requested.
+        """Get whether you were allocated shares in an IPO you requested.
+
+        Returns:
+            The raw view model. Shape verified against a filled request (ANT,
+            2026-11-19): `instrument_id`, `order_id`, `result` (e.g.
+            `'allocated'`) and, under the key named by `result`, a `card`
+            whose `primary_text` gives your rank among allocated investors
+            and whose `footer_detail` is the price per share, plus buttons
+            and animation assets for the app.
 
         Note:
-            Returns 404 before allocations are decided — confirmed against a
-            live offering the day before it listed (RVII, 2026-08-12). That is
-            the endpoint behaving correctly rather than a fault: there is no
-            allocation to report until after pricing. The populated shape
-            remains unobserved, since it needs a filled request.
+            This says whether you were allocated, not how many shares. The
+            share count is on the order: `cumulative_quantity` and its
+            `executions`, where each execution also carries an
+            `ipo_access_execution_rank`. The order's state was
+            `partially_filled_rest_cancelled`, meaning the unallocated part of
+            the request was cancelled and will not fill later.
+
+            Returns 404 before allocations are decided, confirmed the day
+            before a listing (RVII, 2026-08-12). That is correct behaviour:
+            there is nothing to report until after pricing.
         """
         return self._session.get(urls.ipo_access_allocation_results_url(instrument_id))
 
     def get_ipo_access_trade_receipt(self, order_id: str) -> dict:
-        """Get the trade receipt for a filled IPO Access order.
+        """Get the trade receipt for an IPO Access order.
 
-        Note:
-            This response shape has not been observed against a real offering.
+        Returns:
+            The raw view model. Shape verified against a real request (ANT,
+            2026-11-19): `id`, `title`, `order_summary` (a sentence),
+            `order_detail_items` (label and value rows such as "Request
+            status" and "Shares requested") and `footer_buttons`.
+
+        Warning:
+            This is the receipt shown when the request was made, and it is not
+            updated afterwards. After the request was allocated and filled it
+            still read "request queued", with a "Request status" of
+            "Queued". Use `get_ipo_access_allocation_results()` for the
+            outcome and the order itself for the shares received.
         """
         return self._session.get(urls.ipo_access_trade_receipt_url(order_id))
 
