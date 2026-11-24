@@ -5,6 +5,22 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+These changes come from watching a local AI model use pyhood with no help. It got the right answer after ten failed commands: it ran pyhood from the source folder with the wrong Python, installed dependencies into the system Python, and guessed a field name that does not exist.
+
+### Added
+- **`pyhood guide`** prints how to use pyhood, written for an AI agent: how to run a script, how to log in, the main methods and the fields of what they return. The method signatures and field lists are read from the code when the guide is printed, so they describe the installed version and cannot go stale.
+- **`pyhood run script.py`** runs a script with the Python pyhood is installed in, so `import pyhood` works however pyhood was installed. `pyhood run -c "..."` works too. An isolated install puts the `pyhood` command on the PATH but not a Python that can import it, and this is the one instruction that works for every kind of install.
+- **`pyhood verify`** and **`pyhood verify crypto`** run the read-only checks that were `examples/verify_stocks.py` and `examples/verify_crypto.py`. The examples are not included when pyhood is installed, so the step the README gave for confirming a login could not be followed after `pip install pyhood`. The example files remain, as thin wrappers.
+- **`AGENTS.md`** in the repository, telling an agent not to run pyhood from the source folder and to start with `pyhood guide`.
+
+### Changed
+- **A wrong field name lists the right ones.** `position.average_buy_price` now raises `AttributeError: Position has no field 'average_buy_price'. Its fields are: symbol, quantity, average_cost, ...`. Every model does this, including the crypto models. `hasattr()`, `getattr()` with a default, copying and pickling behave as before.
+- **Importing pyhood on Python older than 3.10 says so.** It used to fail inside `urls.py` with `unsupported operand type(s) for |`.
+- **A missing dependency says the install is the problem.** Importing pyhood from a source folder used to fail with `No module named 'requests'`, which invites installing `requests` by hand. The error now says pyhood is probably being imported from a source folder and to install pyhood or use `pyhood run`.
+- **Install instructions lead with uv.** `uv tool install --managed-python --python 3.14 pyhood` installs pyhood with its own Python and puts the command on the PATH, with no environment to activate. The pip route stays, with a warning that a virtual environment stops working when the Python it was built on is removed, as Homebrew does when it retires a version.
+
 ## [0.14.0] - 2026-11-19
 
 ### Added

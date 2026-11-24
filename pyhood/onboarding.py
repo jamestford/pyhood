@@ -422,7 +422,11 @@ def build_parser() -> argparse.ArgumentParser:
     """The command-line parser for `pyhood` / `python -m pyhood`."""
     parser = argparse.ArgumentParser(
         prog=invocation(),
-        description="Set up the credentials pyhood needs.",
+        description=(
+            "pyhood, a Python client for Robinhood. Set up a login, check it "
+            "works, and run scripts that use it. AI agents: start with "
+            "`pyhood guide`."
+        ),
     )
     from pyhood import __version__
 
@@ -455,12 +459,68 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip the signed read-only call that confirms new crypto keys work",
     )
+    verify = commands.add_parser(
+        "verify",
+        help="read live data to confirm a saved login works (read-only)",
+        description=(
+            "Reads live market data to confirm a saved login works. Places "
+            "no orders and changes nothing."
+        ),
+    )
+    verify.add_argument(
+        "target",
+        nargs="?",
+        choices=("stocks", "crypto"),
+        default="stocks",
+        help="stocks (default): the main session. crypto: the Crypto API key pair.",
+    )
+    commands.add_parser(
+        "guide",
+        help="print how to use pyhood, written for an AI agent",
+        description=(
+            "Prints how to run pyhood, how to log in, the main methods and "
+            "the fields of what they return, for the installed version."
+        ),
+    )
+    run = commands.add_parser(
+        "run",
+        help="run a Python script with the Python pyhood is installed in",
+        description=(
+            "Runs Python with the interpreter pyhood is installed in, so "
+            "`import pyhood` works however pyhood was installed. Everything "
+            "after `run` is passed to Python unchanged."
+        ),
+        usage="pyhood run script.py [args ...]  |  pyhood run -c \"code\"",
+    )
+    run.add_argument("python_args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
     return parser
+
+
+def run_python(python_args: list[str]) -> int:
+    """Run Python, the interpreter this package is installed in, with args.
+
+    An isolated install (pipx, `uv tool install`) puts the `pyhood` command
+    on the PATH but not a Python that can import pyhood. This is the one
+    way to run a script that works for every kind of install.
+    """
+    import subprocess
+
+    if not python_args:
+        print("usage: pyhood run script.py [args ...]  |  pyhood run -c \"code\"")
+        return 2
+    # The arguments are the user's own command line, passed straight to the
+    # same Python that is running this, without a shell.
+    return subprocess.call([sys.executable, *python_args])  # nosec B603
 
 
 def main(argv: list[str] | None = None) -> int:
     """Entry point for `pyhood` and `python -m pyhood`."""
     parser = build_parser()
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # `run` hands everything after it to Python untouched, including options
+    # such as -c and -m that argparse would otherwise claim as its own.
+    if argv[:1] == ["run"]:
+        return run_python(argv[1:])
     args = parser.parse_args(argv)
 
     if args.command == "version":
@@ -468,6 +528,14 @@ def main(argv: list[str] | None = None) -> int:
 
         print(f"pyhood {__version__}")
         return 0
+    if args.command == "guide":
+        from pyhood import guide
+
+        return guide.main()
+    if args.command == "verify":
+        from pyhood import verify
+
+        return verify.verify_crypto() if args.target == "crypto" else verify.verify_stocks()
     if args.command != "setup":
         parser.print_help()
         return 0

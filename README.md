@@ -20,7 +20,20 @@ pyhood is a modern, typed, maintained Python client for Robinhood. It supports s
 
 ## Install
 
-pyhood needs **Python 3.10 or newer**. We recommend installing it into a virtual environment rather than your system Python:
+The quickest way is with [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS). One command installs pyhood with its own copy of Python and puts the `pyhood` command on your PATH:
+
+```bash
+uv tool install --managed-python --python 3.14 pyhood
+```
+
+There is no Python version to find first and no environment to activate: `pyhood` works from any terminal. `--managed-python` tells uv to use a Python it downloads and keeps for itself. Without it uv may borrow your system's or Homebrew's Python, and the install breaks when that one is upgraded or removed.
+
+Upgrade later with `uv tool upgrade pyhood`.
+
+<details>
+<summary><strong>Installing with pip instead</strong></summary>
+
+pyhood needs **Python 3.10 or newer**. Install it into a virtual environment rather than your system Python:
 
 ```bash
 python3.14 -m venv pyhood-env
@@ -28,33 +41,58 @@ source pyhood-env/bin/activate
 python -m pip install --upgrade pip
 python -m pip install pyhood
 ```
-Substitute whichever interpreter you have — `python3.12`, `python3.13`, `python3.14` are all tested. On Windows the activate line is `pyhood-env\Scripts\activate`.
 
-**Name the version explicitly.** A virtual environment inherits the version of the interpreter that creates it, and `python3` on macOS is still 3.9. Using bare `python3` there produces a 3.9 environment where the install fails with `no matching distribution found` — which reads like the package doesn't exist rather than a version problem. 
+Substitute whichever interpreter you have; 3.10 through 3.14 are tested. On Windows the activate line is `pyhood-env\Scripts\activate`.
+
+Two things to know about this route:
+
+- **Name the version explicitly.** `python3` on macOS is still 3.9, and an environment built from it cannot install pyhood. The error reads `no matching distribution found`, which looks like the package is missing rather than a version problem.
+- **The environment depends on the Python that created it.** If that Python is later removed, as Homebrew does when it retires a version, the environment stops working and has to be rebuilt. The `pyhood` command also only exists while the environment is activated.
+
+Use this route when you are adding pyhood to a project that already has its own environment.
+
+</details>
 
 ## Set Up Stocks, Options and Futures
 
 ```bash
-pyhood setup login                 # store a session
-python examples/verify_stocks.py   # confirm it works
+pyhood setup login   # store a session
+pyhood verify        # confirm it works
 ```
 
-`setup login` prompts for your username and password, then waits for you to approve the device in the Robinhood mobile app. The password is read without echoing and is never stored — only the resulting tokens are saved, to `~/.pyhood/session.json`, readable only by you.
+`setup login` prompts for your username and password, then waits for you to approve the device in the Robinhood mobile app. The password is read without echoing and is never stored. Only the resulting tokens are saved, to `~/.pyhood/session.json`, readable only by you.
 
-[`examples/verify_stocks.py`](https://github.com/jamestford/pyhood/blob/main/examples/verify_stocks.py) is a read-only check: if it prints prices, you are authenticated and working.
+`pyhood verify` is a read-only check: if it prints prices, you are authenticated and working.
 
 ## Set Up Crypto
 
 ```bash
-pyhood setup crypto                # generate and register a key pair
-python examples/verify_crypto.py   # confirm it works
+pyhood setup crypto    # generate and register a key pair
+pyhood verify crypto   # confirm it works
 ```
 
-Robinhood does not issue you a key pair for the Crypto Trading API — you generate one and register the public half. `setup crypto` runs that exchange, writes both parts to `~/.pyhood/crypto.env` at mode `0600`, and then makes one signed read-only call to confirm Robinhood accepts them. The private key goes straight from generation to disk and is never displayed.
+Robinhood does not issue you a key pair for the Crypto Trading API. You generate one and register the public half. `setup crypto` runs that exchange, writes both parts to `~/.pyhood/crypto.env` at mode `0600`, and then makes one signed read-only call to confirm Robinhood accepts them. The private key goes straight from generation to disk and is never displayed.
 
-[`examples/verify_crypto.py`](https://github.com/jamestford/pyhood/blob/main/examples/verify_crypto.py) re-runs that check any time, and reports which source your credentials resolve from — useful when a stale `export` is shadowing the file.
+`pyhood verify crypto` re-runs that check any time, and reports which source your credentials resolve from, which is useful when a stale `export` is shadowing the file.
 
 Run `pyhood setup` at any time to see what is configured. See [Setup](#setup) for the full walkthrough.
+
+## Use It With an AI Agent
+
+pyhood is built to be driven by an AI agent that writes and runs Python. Tell the agent one thing:
+
+```text
+pyhood is installed on this machine. Run `pyhood guide` before using it.
+```
+
+`pyhood guide` prints what an agent needs for the installed version: how to run a script, how to log in, the main methods with their arguments, and the fields of what they return. Put that line in your agent's instructions file (`AGENTS.md`, `CLAUDE.md` or similar) so it does not have to be told each time.
+
+Two things make this dependable:
+
+- **`pyhood run script.py`** runs a script with the Python pyhood is installed in, so `import pyhood` works however pyhood was installed. An agent does not have to find the right Python.
+- **Errors say what to do.** A wrong field name lists the real ones. An unsupported Python, or running from a source folder, says so instead of failing somewhere unrelated.
+
+An agent with your session can place real orders. The guide tells it to show you the exact call and wait for a yes first, but that is an instruction, not a lock. Give session access only to an agent you would trust with the account.
 
 ## Quick Start
 
@@ -75,6 +113,8 @@ print(f"AAPL: ${quote.price:.2f} ({quote.change_pct:+.1f}%)")
 positions = client.get_positions()
 buying_power = client.get_buying_power()
 ```
+
+Save that as `script.py` and run it with `pyhood run script.py`.
 
 `login()` with no arguments tries the cached session, then the refresh token. To force a refresh explicitly:
 

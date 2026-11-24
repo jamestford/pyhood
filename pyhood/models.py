@@ -5,9 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from pyhood._model import Model
+
 
 @dataclass(frozen=True)
-class Quote:
+class Quote(Model):
     """Stock quote data."""
     symbol: str
     price: float
@@ -27,7 +29,7 @@ class Quote:
 
 
 @dataclass(frozen=True)
-class OptionContract:
+class OptionContract(Model):
     """Single option contract with Greeks."""
     symbol: str
     option_type: str  # 'call' or 'put'
@@ -57,7 +59,7 @@ class OptionContract:
 
 
 @dataclass(frozen=True)
-class OptionsChain:
+class OptionsChain(Model):
     """Full options chain for a symbol + expiration."""
     symbol: str
     expiration: str
@@ -66,7 +68,7 @@ class OptionsChain:
 
 
 @dataclass(frozen=True)
-class Position:
+class Position(Model):
     """Account position."""
     symbol: str
     quantity: float
@@ -79,7 +81,7 @@ class Position:
 
 
 @dataclass(frozen=True)
-class Order:
+class Order(Model):
     """Order receipt."""
     order_id: str
     symbol: str
@@ -102,7 +104,7 @@ class Order:
 
 
 @dataclass(frozen=True)
-class Candle:
+class Candle(Model):
     """Single OHLCV price candle."""
     symbol: str
     begins_at: str
@@ -116,7 +118,7 @@ class Candle:
 
 
 @dataclass(frozen=True)
-class OptionPosition:
+class OptionPosition(Model):
     """Open option position with resolved details."""
     symbol: str
     option_type: str  # 'call' or 'put'
@@ -139,7 +141,7 @@ class OptionPosition:
 
 
 @dataclass(frozen=True)
-class Earnings:
+class Earnings(Model):
     """Upcoming earnings info."""
     symbol: str
     date: str
@@ -152,7 +154,7 @@ class Earnings:
 
 
 @dataclass(frozen=True)
-class NotificationSettings:
+class NotificationSettings(Model):
     """User notification preferences (raw key-value pairs from API)."""
     settings: dict = field(default_factory=dict)
 
@@ -162,7 +164,7 @@ class NotificationSettings:
 
 
 @dataclass(frozen=True)
-class UserProfile:
+class UserProfile(Model):
     """Basic user profile information."""
     username: str
     email: str
@@ -176,7 +178,7 @@ class UserProfile:
 
 
 @dataclass(frozen=True)
-class BankAccount:
+class BankAccount(Model):
     """Linked bank account (ACH relationship).
 
     Robinhood does not send the bank's name. `account_nickname` is the
@@ -191,7 +193,7 @@ class BankAccount:
 
 
 @dataclass(frozen=True)
-class ACHTransfer:
+class ACHTransfer(Model):
     """ACH transfer record (deposit or withdrawal)."""
     id: str
     amount: float
@@ -206,7 +208,7 @@ class ACHTransfer:
 
 
 @dataclass(frozen=True)
-class InterestPayment:
+class InterestPayment(Model):
     """Cash sweep interest payment."""
     id: str
     amount: float
@@ -221,7 +223,7 @@ class InterestPayment:
 
 
 @dataclass(frozen=True)
-class SubscriptionFee:
+class SubscriptionFee(Model):
     """Robinhood Gold subscription fee."""
     id: str
     amount: float
@@ -234,7 +236,7 @@ class SubscriptionFee:
 
 
 @dataclass(frozen=True)
-class UnifiedTransfer:
+class UnifiedTransfer(Model):
     """Transfer from the unified payment hub — ACH, internal, and others."""
     id: str
     amount: float
@@ -255,7 +257,7 @@ class UnifiedTransfer:
 
 
 @dataclass(frozen=True)
-class CardTransaction:
+class CardTransaction(Model):
     """Debit card (Cash Management) transaction."""
     id: str
     description: str
@@ -272,7 +274,7 @@ class CardTransaction:
 
 
 @dataclass(frozen=True)
-class Watchlist:
+class Watchlist(Model):
     """A watchlist: one you created, or a Robinhood list you follow."""
     name: str
     symbols: list[str] = field(default_factory=list)
@@ -283,7 +285,7 @@ class Watchlist:
 
 
 @dataclass(frozen=True)
-class Market:
+class Market(Model):
     """Stock exchange / market info."""
     mic: str  # Market Identifier Code (e.g. 'XNYS', 'XNAS')
     name: str
@@ -295,7 +297,7 @@ class Market:
 
 
 @dataclass(frozen=True)
-class MarketHours:
+class MarketHours(Model):
     """Trading hours for a market on a specific date."""
     date: str
     is_open: bool
@@ -309,7 +311,7 @@ class MarketHours:
 
 
 @dataclass(frozen=True)
-class Dividend:
+class Dividend(Model):
     """Dividend payment record."""
     symbol: str
     amount: float
@@ -325,7 +327,7 @@ class Dividend:
 
 
 @dataclass(frozen=True)
-class Rating:
+class Rating(Model):
     """Analyst rating summary for a stock."""
     symbol: str
     num_buy: int = 0
@@ -343,7 +345,7 @@ class Rating:
 
 
 @dataclass(frozen=True)
-class NewsArticle:
+class NewsArticle(Model):
     """News article for a stock."""
     title: str
     source: str
@@ -354,7 +356,7 @@ class NewsArticle:
 
 
 @dataclass(frozen=True)
-class Mover:
+class Mover(Model):
     """S&P 500 mover."""
     symbol: str
     price_change: float = 0.0
@@ -363,7 +365,7 @@ class Mover:
 
 
 @dataclass(frozen=True)
-class PortfolioCandle:
+class PortfolioCandle(Model):
     """Portfolio value at a point in time."""
     begins_at: str
     adjusted_open_equity: float
@@ -375,7 +377,7 @@ class PortfolioCandle:
 
 
 @dataclass(frozen=True)
-class Document:
+class Document(Model):
     """Account document (statement, confirmation, tax doc)."""
     id: str
     type: str
@@ -385,7 +387,7 @@ class Document:
 
 
 @dataclass(frozen=True)
-class StockSplit:
+class StockSplit(Model):
     """Stock split record."""
     instrument: str
     execution_date: str
@@ -397,7 +399,7 @@ class StockSplit:
 
 
 @dataclass(frozen=True)
-class FuturesContract:
+class FuturesContract(Model):
     """Futures contract details."""
     symbol: str
     name: str
@@ -413,7 +415,7 @@ class FuturesContract:
 
 
 @dataclass(frozen=True)
-class FuturesQuote:
+class FuturesQuote(Model):
     """Real-time futures quote."""
     symbol: str
     last_price: float
@@ -430,7 +432,7 @@ class FuturesQuote:
 
 
 @dataclass(frozen=True)
-class FuturesPnL:
+class FuturesPnL(Model):
     """P&L extracted from a futures order."""
     realized_pnl: float
     direction: str  # 'OPENING' or 'CLOSING'
@@ -438,7 +440,7 @@ class FuturesPnL:
 
 
 @dataclass(frozen=True)
-class FuturesOrder:
+class FuturesOrder(Model):
     """Futures order with status and P&L."""
     order_id: str
     symbol: str
