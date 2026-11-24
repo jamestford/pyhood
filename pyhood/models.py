@@ -202,6 +202,7 @@ class BankAccount(Model):
     account_nickname: str = ""
     state: str = ""  # 'approved', 'pending', etc.
     url: str = ""
+    last_four: str = ""  # the end of the bank account number; all Robinhood sends
 
 
 @dataclass(frozen=True)

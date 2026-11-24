@@ -868,6 +868,7 @@ class PyhoodClient:
                 account_nickname=item.get("bank_account_nickname", ""),
                 state=item.get("state", ""),
                 url=item.get("url", ""),
+                last_four=str(item.get("bank_account_number") or "")[-4:],
             )
             for item in data
         ]

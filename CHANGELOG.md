@@ -5,6 +5,22 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Bank transfers, with a preview.** `pyhood deposit AMOUNT` and `pyhood withdraw AMOUNT` move money between a linked bank and Robinhood in the same two steps as an order: a preview that sends nothing, then the same command with its confirmation code. The code is tied to the direction, the amount and the bank. A withdrawal of more than your withdrawable cash is pointed out. `pyhood banks` lists linked banks by nickname, type and last four digits, and `--bank` picks one when several are linked. `pyhood cancel-transfer` cancels a pending transfer at once.
+- **Orders by dollar amount.** `--dollars AMOUNT` on `pyhood buy` and `pyhood sell`, in place of a number of shares. It is a market order of at least $1, and the preview shows about how many shares it comes to.
+- **Option spreads.** `pyhood spread SYMBOL --expires DATE --leg buy:call:350 --leg sell:call:360 --contracts 1 --debit 2.50` places two to four legs as one order. The preview checks that every leg is a real contract, prices the spread from its legs, and points out legs that are the wrong way round: asked for a debit, a spread that pays a credit as written has its bought and sold legs swapped.
+- `BankAccount.last_four`, the end of the bank account number, which is all Robinhood sends.
+
+### Changed
+- **`pyhood guide` is split in two.** It had grown to 240 lines, and a model that read the first hundred never saw how to place a spread, and made up a Python call. `pyhood guide` is now the commands and the rules for orders, in under 150 lines, with placing and cancelling orders ahead of the read commands. `pyhood guide python` is the reference for writing a script: methods, fields and the example.
+- The preview of a limit order for a fraction of a share says that Robinhood takes fractions only as market orders.
+
+### Fixed
+- **A price or quantity with more than six significant digits was printed wrong in the command to confirm an order.** A limit of `12345.67` was printed as `--limit 12345.7`, and five million as `5e+06`. The command the preview said to run was then for a different order, and was refused, so nothing wrong was ever sent, but such an order could not be placed. This affected `pyhood buy`, `sell`, `buy-option`, `sell-option` and `crypto buy` and `sell` since 0.17.0.
+- **Two orders that differed only past the sixth significant digit shared a confirmation code**, for the same reason: 1,234,567 shares and 1,234,568 shares were the same text. A code for one would have placed the other. Every number in a code and in a printed command is now written in full.
+
 ## [0.19.0] - 2026-11-24
 
 ### Added

@@ -762,15 +762,21 @@ class TestOrderCommandLine:
     @pytest.mark.parametrize(("argv", "kwargs"), [
         (["buy", "AAPL", "10", "--limit", "350"],
          {"side": "buy", "symbol": "AAPL", "quantity": 10.0, "limit": 350.0, "stop": None,
-          "time_in_force": "gfd", "extended_hours": False, "account": None, "confirm": None}),
+          "time_in_force": "gfd", "extended_hours": False, "account": None, "confirm": None,
+          "dollars": None}),
         (["sell", "AAPL", "10", "--stop", "340", "--limit", "338", "--account", "roth"],
          {"side": "sell", "symbol": "AAPL", "quantity": 10.0, "limit": 338.0, "stop": 340.0,
-          "time_in_force": "gfd", "extended_hours": False, "account": "roth", "confirm": None}),
+          "time_in_force": "gfd", "extended_hours": False, "account": "roth", "confirm": None,
+          "dollars": None}),
+        (["buy", "AAPL", "--dollars", "50", "--market"],
+         {"side": "buy", "symbol": "AAPL", "quantity": None, "limit": None, "stop": None,
+          "time_in_force": "gfd", "extended_hours": False, "account": None, "confirm": None,
+          "dollars": 50.0}),
         (["sell", "ant", "0.5", "--market", "--tif", "gtc", "--extended-hours",
           "--confirm", "abc123"],
          {"side": "sell", "symbol": "ant", "quantity": 0.5, "limit": None, "stop": None,
           "time_in_force": "gtc", "extended_hours": True, "account": None,
-          "confirm": "abc123"}),
+          "confirm": "abc123", "dollars": None}),
     ])
     def test_buy_and_sell(self, monkeypatch, argv, kwargs):
         seen = []
@@ -1139,6 +1145,116 @@ class TestOptionCommandLine:
         with pytest.raises(SystemExit) as stop:
             onboarding.main(argv)
         assert stop.value.code == 2
+
+
+# ── Numbers survive being typed back in ──────────────────────────────
+
+
+class TestPlainNumbers:
+    """Every number in a printed command and in a confirmation code is
+    written in full. The 'g' format they used keeps six significant
+    digits, so a limit of 12345.67 was printed as 12345.7: the command the
+    preview said to run was for a different price, and was refused."""
+
+    @pytest.mark.parametrize(("value", "text"), [
+        (12345.67, "12345.67"), (5000000.0, "5000000"), (0.00001, "0.00001"),
+        (350.0, "350"), (0.3, "0.3"), (1234567.0, "1234567"), (59250.75, "59250.75"),
+    ])
+    def test_written_in_full(self, value, text):
+        assert cli.plain(value) == text
+        assert float(cli.plain(value)) == value
+
+    def test_a_long_price_round_trips_through_the_printed_command(self, capsys):
+        client = OrderClient(buying_power=10_000_000.0, price=12345.0, bid=12344.0, ask=12346.0)
+
+        cli.stock_order(client, "buy", "BRK", 3, limit=12345.67)
+        out = capsys.readouterr().out
+        printed = out.splitlines()[-1].split()
+
+        assert printed[printed.index("--limit") + 1] == "12345.67"
+        code = printed[printed.index("--confirm") + 1]
+        assert cli.stock_order(client, "buy", "BRK", 3, limit=float("12345.67"), confirm=code,
+                               settle_seconds=0) == 0
+        assert client.writes[0][3]["price"] == 12345.67
+
+    def test_orders_that_differ_past_the_sixth_digit_have_different_codes(self, capsys):
+        """Under the old format 1234567 and 1234568 shares were the same
+        text, so a code for one would have placed the other."""
+        client = OrderClient(buying_power=1e12)
+        cli.stock_order(client, "buy", "AAPL", 1234567, limit=350.0)
+        code = code_from(capsys.readouterr().out)
+
+        assert cli.stock_order(client, "buy", "AAPL", 1234568, limit=350.0, confirm=code,
+                               settle_seconds=0) == 2
+        assert cli.stock_order(client, "buy", "AAPL", 1234567, limit=350.004, confirm=code,
+                               settle_seconds=0) == 2
+        assert client.writes == []
+
+
+class TestDollarOrders:
+    def client(self, **kwargs):
+        client = OrderClient(buying_power=500.0, **kwargs)
+        client.by_price = []
+        client.buy_stock_by_price = lambda s, d, **k: (
+            client.by_price.append(("buy", s, d, k)), client._place("buy", s, d, **k))[1]
+        client.sell_stock_by_price = lambda s, d, **k: (
+            client.by_price.append(("sell", s, d, k)), client._place("sell", s, d, **k))[1]
+        return client
+
+    def test_preview_shows_the_shares_it_comes_to(self, capsys):
+        cli.stock_order(self.client(), "buy", "aapl", dollars=50.0)
+
+        out = capsys.readouterr().out
+        assert "Buy $50.00 of AAPL, at market, good for day" in out
+        assert "Estimated cost:     $50.00" in out
+        assert "About:              0.142816 shares at $350.10" in out
+        assert "pyhood buy AAPL --dollars 50 --market --confirm" in out
+
+    def test_it_is_placed_by_dollar_amount(self, capsys):
+        client = self.client()
+        cli.stock_order(client, "buy", "AAPL", dollars=50.0)
+        code = code_from(capsys.readouterr().out)
+
+        assert cli.stock_order(client, "buy", "AAPL", dollars=50.0, confirm=code,
+                               settle_seconds=0) == 0
+        assert client.by_price == [("buy", "AAPL", 50.0, {"time_in_force": "gfd"})]
+
+    def test_a_code_for_shares_will_not_place_dollars(self, capsys):
+        client = self.client()
+        cli.stock_order(client, "buy", "AAPL", 50, limit=None)
+        code = code_from(capsys.readouterr().out)
+
+        assert cli.stock_order(client, "buy", "AAPL", dollars=50.0, confirm=code,
+                               settle_seconds=0) == 2
+        assert client.by_price == []
+
+    @pytest.mark.parametrize(("kwargs", "message"), [
+        ({"dollars": 50.0, "limit": 300.0}, "is a market order"),
+        ({"dollars": 50.0, "stop": 300.0}, "is a market order"),
+        ({"dollars": 0.5}, "smallest order by dollar amount is \\$1"),
+        ({"dollars": 50.0, "extended_hours": True}, "regular hours only"),
+        ({"dollars": 50.0, "quantity": 2}, "but not both"),
+        ({}, "but not both"),
+    ])
+    def test_what_a_dollar_order_cannot_be(self, kwargs, message):
+        with pytest.raises(cli.UsageError, match=message):
+            cli.stock_order(self.client(), "buy", "AAPL", **kwargs)
+
+    def test_selling_dollars_checks_what_is_held(self, capsys):
+        client = self.client(stocks=[Position("AAPL", 0.1, 300.0, 350.0, 35.0, 5.0, 16.7)])
+
+        cli.stock_order(client, "sell", "AAPL", dollars=50.0)
+
+        out = capsys.readouterr().out
+        assert "Sell $50.00 of AAPL" in out
+        assert "fewer than this order sells" in out
+
+    def test_a_fraction_of_a_share_with_a_limit_is_pointed_out(self, capsys):
+        cli.stock_order(self.client(), "buy", "AAPL", 0.5, limit=340.0)
+        assert "only as a market order" in capsys.readouterr().out
+
+        cli.stock_order(self.client(), "buy", "AAPL", 2, limit=340.0)
+        assert "only as a market order" not in capsys.readouterr().out
 
 
 # ── Accounts ─────────────────────────────────────────────────────────
@@ -1595,7 +1711,9 @@ class TestProgram:
 
 def guide_command_lines():
     """Each `pyhood ...` line in the guide's quick answers, without its note."""
-    section = guide.INTRO[guide.INTRO.index("QUICK ANSWERS"):guide.INTRO.index("RUNNING A SCRIPT")]
+    section = guide.COMMANDS[
+        guide.COMMANDS.index("PLACING ORDERS ("):guide.COMMANDS.index("ANYTHING ELSE")
+    ]
     lines = [line.strip() for line in section.splitlines() if line.strip().startswith("pyhood ")]
     # The command ends where the run of spaces before its description begins.
     return [line.split("    ")[0].strip() for line in lines]
@@ -1616,6 +1734,7 @@ def test_every_command_in_the_guide_parses(line):
 
 
 COMMANDS_IN_THE_GUIDE = {
+    "spread", "banks", "deposit", "withdraw", "cancel-transfer",
     "accounts", "positions", "orders", "buying-power", "quote", "options", "earnings",
     "ratings", "news", "movers", "history", "dividends", "transfers", "watchlists", "watch",
     "unwatch", "buy", "sell", "buy-option", "sell-option", "cancel", "crypto", "futures",

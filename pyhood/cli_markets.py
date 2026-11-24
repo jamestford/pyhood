@@ -26,6 +26,7 @@ from pyhood.cli import (
     money,
     number,
     percent,
+    plain,
     program,
     signed_money,
     table,
@@ -44,7 +45,7 @@ def pair(symbol: str) -> str:
 
 def quantity_text(quantity: float) -> str:
     """A quantity as the API wants it: plain digits, never 1e-05."""
-    return f"{quantity:.8f}".rstrip("0").rstrip(".")
+    return plain(quantity)
 
 
 # ── Crypto: reading ──────────────────────────────────────────────────
@@ -152,10 +153,10 @@ def crypto_order(
     """
     symbol = pair(symbol)
     asset = symbol.split("-")[0]
-    kind = "market" if limit is None else f"{limit:.8f}"
+    kind = "market" if limit is None else plain(limit)
     code = confirmation_code("crypto", side, symbol, quantity_text(quantity), kind)
     command = f"{program()} crypto {side} {asset} {quantity_text(quantity)} " + (
-        "--market" if limit is None else f"--limit {limit:g}"
+        "--market" if limit is None else f"--limit {plain(limit)}"
     )
     if confirm is not None and confirm != code:
         return _wrong_code()
@@ -167,7 +168,7 @@ def crypto_order(
     if confirm is not None:
         config = {"asset_quantity": quantity_text(quantity)}
         if limit is not None:
-            config["limit_price"] = f"{limit:.8f}".rstrip("0").rstrip(".")
+            config["limit_price"] = plain(limit)
         try:
             order = client.place_order(
                 account.account_number, side, "market" if limit is None else "limit",
