@@ -28,9 +28,12 @@ Once it is set up, talk to your agent the way you would to a person:
 | "What do I own, and how is it doing?" | It lists your positions with cost, value and profit or loss |
 | "What did I buy this month?" | It lists your orders, with what filled and at what price |
 | "How much can I spend?" | It reads your buying power |
+| "What's in my Roth IRA?" | It shows that account's positions |
+| "When does Apple report earnings, and what do analysts think?" | It gives the date, the ratings and the price targets |
 | "Show me AAPL calls expiring next month" | It shows the contracts near the stock's price, with bid, ask and delta |
 | "Buy 10 shares of AAPL at $350 or better" | It shows you a preview and waits for your yes |
 | "Buy one of those $350 calls for $2.50" | It shows you a preview and waits for your yes |
+| "Sell my AAPL if it drops to $340" | It previews a stop order and waits for your yes |
 | "Cancel that order" | It cancels it and tells you what happened |
 
 ## Get started
@@ -145,19 +148,22 @@ So give this only to an agent you would trust with the account, and start with s
 | | From your agent or the command line | From Python |
 |---|---|---|
 | Positions, orders, buying power, quotes | Yes | Yes |
+| IRA and other accounts | Yes | Yes |
+| Price history, earnings dates, analyst ratings, news, movers | Yes | Yes |
+| Dividends and transfer history | Yes | Yes |
+| Watchlists | Yes | Yes |
 | Option expirations and contracts | Yes | Yes |
-| Buy and sell stock | Yes, with a preview | Yes |
+| Buy and sell stock, including stop orders | Yes, with a preview | Yes |
 | Buy and sell single options | Yes, with a preview | Yes |
 | Cancel an order | Yes | Yes |
-| Option spreads, stop orders | | Yes |
-| IRA and other accounts | | Yes |
+| Option spreads, trailing stops, orders by dollar amount | | Yes |
 | Crypto, through Robinhood's official Crypto API | | Yes |
 | Futures quotes, orders and profit and loss | | Yes |
-| Transfers, dividends, documents, news, ratings | | Yes |
+| Moving money to and from your bank, documents | | Yes |
 
 For anything in the Python column only, the agent writes a short script and runs it. `pyhood guide` tells it how.
 
-**What has been run against Robinhood for real:** buying stock with a limit, buying an option to open, and cancelling both. Selling and market orders go through the same code, but those commands have not yet been run live. Option spreads have never been placed.
+**What has been run against Robinhood for real:** every read command, buying stock with a limit, buying an option to open, and cancelling both. Selling, market orders, stop orders and orders in an IRA go through the same code, but those commands have not yet been run live. Option spreads have never been placed.
 
 **What it has been tested with:** a local model, Qwen3.6 35B, running in the [Pi](https://github.com/earendil-works/pi) agent. Given the one-line install request above and nothing else, it fetched the instructions and installed pyhood with no errors. Asked to buy, it previewed and waited.
 
@@ -175,11 +181,12 @@ pyhood orders                # orders from the last 30 days
 pyhood buying-power          # cash available to trade with
 pyhood quote AAPL MSFT       # current prices
 pyhood options AAPL          # option expiration dates
+pyhood earnings AAPL         # next earnings date
 pyhood buy AAPL 10 --limit 350    # preview; add the code it prints to place it
 pyhood cancel ORDER_ID       # cancel an open order
 ```
 
-Add `--json` to any of the first five for exact values. The [command line page](https://jamestford.github.io/pyhood/cli/) covers every command and option.
+Add `--json` to any of the first six for exact values, and `--account roth` to work in another account. The [command line page](https://jamestford.github.io/pyhood/cli/) covers every command and option.
 
 To upgrade pyhood later:
 

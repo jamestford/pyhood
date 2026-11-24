@@ -550,7 +550,10 @@ class PyhoodClient:
             num_buy=int(summary.get("num_buy_ratings", 0)),
             num_hold=int(summary.get("num_hold_ratings", 0)),
             num_sell=int(summary.get("num_sell_ratings", 0)),
-            published_at=data.get("instrument_id", ""),
+            published_at=data.get("ratings_published_at") or "",
+            price_target_high=_safe_float(summary.get("high_price_target")),
+            price_target_low=_safe_float(summary.get("low_price_target")),
+            price_target_mean=_safe_float(summary.get("mean_price_target")),
         )
 
     def get_news(self, symbol: str, resolve_symbols: bool = True) -> list[NewsArticle]:
@@ -591,8 +594,10 @@ class PyhoodClient:
         movers: list[Mover] = []
         for item in results:
             instrument_url = item.get("instrument_url", "")
-            symbol = ""
-            if instrument_url:
+            # The mover carries its symbol. Older responses did not, and
+            # for those the instrument is looked up.
+            symbol = item.get("symbol", "")
+            if not symbol and instrument_url:
                 try:
                     inst = self._session.get(instrument_url)
                     symbol = inst.get("symbol", "")
@@ -600,11 +605,17 @@ class PyhoodClient:
                     pass
             movement = item.get("price_movement", {})
             pct = float(movement.get("market_hours_last_movement_pct", 0) or 0)
+            price = _safe_float(movement.get("market_hours_last_price"))
+            change = None
+            if price is not None and pct > -100:
+                # price is after the move: before it was price / (1 + pct/100).
+                change = round(price - price / (1 + pct / 100), 4)
             movers.append(Mover(
                 symbol=symbol,
-                price_change=pct,
+                price_change=change,
                 price_change_pct=pct,
                 instrument_url=instrument_url,
+                price=price,
             ))
         return movers
 

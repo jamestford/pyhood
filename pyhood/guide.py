@@ -81,16 +81,38 @@ RULES
 QUICK ANSWERS (no script needed, all read-only)
   Try these first. They cover most questions about an account.
 
+    The account
+      pyhood accounts             the accounts under this login: individual, IRA
       pyhood positions            what the account holds, with profit and loss
       pyhood orders               orders from the last 30 days, newest first
-      pyhood orders --since 2026-01-01    or --all, or --symbol AAPL
+      pyhood orders --since 2026-01-01    or --all, or --symbol AAPL, or --open
       pyhood buying-power         cash available to trade with
+      pyhood dividends            dividends paid and pending
+      pyhood transfers            money moved in, out and between accounts
+
+    The market
       pyhood quote AAPL MSFT      current prices; add --fundamentals for more
+      pyhood history AAPL         past prices; --span week, month, 3month, year, 5year
       pyhood options AAPL         the expiration dates of AAPL's options
       pyhood options AAPL --expires 2026-12-18    the contracts for that date
+      pyhood earnings AAPL MSFT   when each next reports earnings
+      pyhood ratings AAPL         analyst buy, hold and sell counts, price targets
+      pyhood news AAPL            recent headlines, with links
+      pyhood movers               the S&P 500's biggest rises today; --down for falls
+
+    Watchlists
+      pyhood watchlists           your watchlists and what is on them
+      pyhood watch F GM           add stocks to a watchlist; --list NAME to pick one
+      pyhood unwatch F            take stocks off a watchlist
 
   Each prints a table. Add --json for exact values. Times in the tables
   are local; in --json and in scripts they are UTC.
+  Commands use the first account unless told otherwise. For another, add
+  --account with part of its name from `pyhood accounts`, such as
+  --account roth. It works on positions, buying-power, buy, sell,
+  buy-option and sell-option.
+  watch and unwatch change a watchlist at once. No money is involved, so
+  they need no preview.
 
 PLACING ORDERS (two steps, every time)
   Step 1. Preview. This sends nothing:
@@ -98,6 +120,7 @@ PLACING ORDERS (two steps, every time)
       pyhood buy AAPL 10 --limit 350
       pyhood sell AAPL 10 --limit 360
       pyhood buy AAPL 10 --market
+      pyhood sell AAPL 10 --stop 340 --market --tif gtc
       pyhood buy-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 2.50
       pyhood sell-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 3.00
 
@@ -113,6 +136,9 @@ PLACING ORDERS (two steps, every time)
   If the user changes their mind about quantity or price, preview again.
   An order needs --limit PRICE or --market; there is no default.
   Orders are good for the day unless you add --tif gtc.
+  --stop PRICE makes a stop order: it waits until the price reaches PRICE,
+  then places the --market or --limit order. A stop meant as protection
+  needs --tif gtc, or it expires at the end of the day.
   Option prices are per share and a contract is 100 shares: --limit 2.50
   on 1 contract is $250. Look up real expirations and strikes with
   `pyhood options` first; do not guess them. buy-option opens a position

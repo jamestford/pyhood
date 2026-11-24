@@ -2344,8 +2344,13 @@ class TestRatings:
                     "num_buy_ratings": 25,
                     "num_hold_ratings": 8,
                     "num_sell_ratings": 2,
+                    "high_price_target": "425.0000",
+                    "low_price_target": "250.0000",
+                    "mean_price_target": "348.5199",
                 },
+                "ratings": [],
                 "instrument_id": "abc123",
+                "ratings_published_at": "2026-11-07T01:49:36Z",
             },
             status=200,
         )
@@ -2358,6 +2363,13 @@ class TestRatings:
         assert rating.num_sell == 2
         assert rating.total == 35
         assert rating.buy_pct == pytest.approx(71.43, abs=0.01)
+        # published_at used to be read from instrument_id, so it held an ID.
+        # The key exists in the response, which is why the field audit,
+        # which looks for keys that are missing, did not catch it.
+        assert rating.published_at == "2026-11-07T01:49:36Z"
+        assert rating.price_target_high == 425.0
+        assert rating.price_target_low == 250.0
+        assert rating.price_target_mean == 348.5199
 
 
 class TestNews:
@@ -2634,6 +2646,39 @@ class TestMovers:
         assert isinstance(movers[0], Mover)
         assert movers[0].symbol == "NVDA"
         assert movers[0].price_change_pct == 3.45
+        # No price in this older shape, so the dollar change is unknown. It
+        # used to be set to the percentage.
+        assert movers[0].price is None
+        assert movers[0].price_change is None
+
+    @responses.activate
+    def test_movers_in_the_shape_the_api_sends_now(self, client):
+        """The mover carries its symbol and last price (2026-11-24), so
+        there is nothing to look up, and the dollar change can be worked out."""
+        responses.add(
+            responses.GET,
+            urls.MOVERS_SP500,
+            json={"results": [{
+                "instrument_url": f"{BASE}/instruments/abc123/",
+                "symbol": "DLTR",
+                "updated_at": "2026-11-24T21:00:00Z",
+                "description": "Dollar Tree",
+                "price_movement": {
+                    "market_hours_last_movement_pct": "11.19",
+                    "market_hours_last_price": "154.6600",
+                },
+            }]},
+            status=200,
+        )
+
+        (mover,) = client.get_movers("up")
+
+        assert mover.symbol == "DLTR"
+        assert mover.price == 154.66
+        assert mover.price_change_pct == 11.19
+        # 154.66 is 11.19% above 139.0952, a rise of 15.5648.
+        assert mover.price_change == pytest.approx(15.5648, abs=0.0001)
+        assert len(responses.calls) == 1  # no instrument lookup
 
 
 class TestTags:

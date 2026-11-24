@@ -16,12 +16,20 @@ import pytest
 from pyhood import cli, guide, onboarding
 from pyhood.exceptions import APIError, AuthError, OrderError
 from pyhood.models import (
+    Candle,
+    Dividend,
+    Earnings,
+    Mover,
+    NewsArticle,
     OptionContract,
     OptionPosition,
     OptionsChain,
     Order,
     Position,
     Quote,
+    Rating,
+    UnifiedTransfer,
+    Watchlist,
 )
 
 UTC = timezone.utc
@@ -86,10 +94,27 @@ class FakeClient:
         self.buying_power = buying_power
         self.calls = []
 
-    def get_positions(self):
+    ACCOUNTS = [
+        {"account_number": "111122223", "brokerage_account_type": "individual", "nickname": "",
+         "total_equity": {"amount": "7785.45", "currency_code": "USD"},
+         "uninvested_cash": {"amount": "168.85", "currency_code": "USD"},
+         "account_buying_power": {"amount": "168.85", "currency_code": "USD"}},
+        {"account_number": "444455556", "brokerage_account_type": "ira_roth", "nickname": "",
+         "total_equity": {"amount": "7000.00", "currency_code": "USD"},
+         "uninvested_cash": {"amount": "7000.00", "currency_code": "USD"},
+         "account_buying_power": {"amount": "7000.00", "currency_code": "USD"}},
+    ]
+
+    def get_all_accounts(self):
+        self.calls.append(("get_all_accounts",))
+        return [dict(a) for a in self.ACCOUNTS]
+
+    def get_positions(self, account_number=None):
+        if account_number:
+            self.calls.append(("get_positions", account_number))
         return self.stocks
 
-    def get_option_positions(self):
+    def get_option_positions(self, account_number=None):
         return self.options
 
     def get_stock_orders(self, start_date=None):
@@ -100,7 +125,9 @@ class FakeClient:
         self.calls.append(("get_option_orders", start_date))
         return list(self.option_orders)
 
-    def get_buying_power(self):
+    def get_buying_power(self, account_number=None):
+        if account_number:
+            self.calls.append(("get_buying_power", account_number))
         return self.buying_power
 
     def get_quotes(self, symbols, include_fundamentals=False):
@@ -374,8 +401,9 @@ class TestRun:
         assert "Robinhood request failed: 503 Service Unavailable" in capsys.readouterr().err
 
     @pytest.mark.parametrize(("argv", "command", "kwargs"), [
-        (["positions"], cli.positions, {"as_json_output": False}),
-        (["positions", "--json"], cli.positions, {"as_json_output": True}),
+        (["positions"], cli.positions, {"account": None, "as_json_output": False}),
+        (["positions", "--json", "--account", "roth"], cli.positions,
+         {"account": "roth", "as_json_output": True}),
         (["orders"], cli.orders,
          {"since": None, "symbol": None, "everything": False, "open_only": False,
           "as_json_output": False}),
@@ -385,7 +413,24 @@ class TestRun:
         (["orders", "--all", "--open"], cli.orders,
          {"since": None, "symbol": None, "everything": True, "open_only": True,
           "as_json_output": False}),
-        (["buying-power"], cli.buying_power, {"as_json_output": False}),
+        (["buying-power"], cli.buying_power, {"account": None, "as_json_output": False}),
+        (["accounts"], cli.accounts, {"as_json_output": False}),
+        (["earnings", "AAPL", "NVDA", "--days", "30"], cli.earnings,
+         {"symbols": ["AAPL", "NVDA"], "days": 30, "as_json_output": False}),
+        (["ratings", "AAPL"], cli.ratings, {"symbols": ["AAPL"], "as_json_output": False}),
+        (["news", "AAPL", "--count", "3", "--json"], cli.news,
+         {"symbol": "AAPL", "count": 3, "as_json_output": True}),
+        (["movers", "--down"], cli.movers, {"down": True, "as_json_output": False}),
+        (["history", "AAPL", "--span", "year"], cli.history,
+         {"symbol": "AAPL", "span": "year", "as_json_output": False}),
+        (["dividends", "--symbol", "KO"], cli.dividends,
+         {"symbol": "KO", "as_json_output": False}),
+        (["transfers"], cli.transfers, {"as_json_output": False}),
+        (["watchlists"], cli.watchlists, {"as_json_output": False}),
+        (["watch", "F", "GM"], cli.watch,
+         {"symbols": ["F", "GM"], "list_name": "My First List", "remove": False}),
+        (["unwatch", "F", "--list", "Tech"], cli.watch,
+         {"symbols": ["F"], "list_name": "Tech", "remove": True}),
         (["quote", "AAPL", "MSFT", "--fundamentals"], cli.quote,
          {"symbols": ["AAPL", "MSFT"], "fundamentals": True, "as_json_output": False}),
     ])
@@ -426,8 +471,10 @@ class OrderClient(FakeClient):
         return Quote(symbol=symbol, price=self.price, prev_close=345.0, change_pct=1.45,
                      bid=self.bid, ask=self.ask)
 
-    def get_buying_power(self):
+    def get_buying_power(self, account_number=None):
         self.reads.append("get_buying_power")
+        if account_number:
+            self.calls.append(("get_buying_power", account_number))
         return self.buying_power
 
     def is_market_open(self):
@@ -714,12 +761,16 @@ class TestOpenOrders:
 class TestOrderCommandLine:
     @pytest.mark.parametrize(("argv", "kwargs"), [
         (["buy", "AAPL", "10", "--limit", "350"],
-         {"side": "buy", "symbol": "AAPL", "quantity": 10.0, "limit": 350.0,
-          "time_in_force": "gfd", "extended_hours": False, "confirm": None}),
+         {"side": "buy", "symbol": "AAPL", "quantity": 10.0, "limit": 350.0, "stop": None,
+          "time_in_force": "gfd", "extended_hours": False, "account": None, "confirm": None}),
+        (["sell", "AAPL", "10", "--stop", "340", "--limit", "338", "--account", "roth"],
+         {"side": "sell", "symbol": "AAPL", "quantity": 10.0, "limit": 338.0, "stop": 340.0,
+          "time_in_force": "gfd", "extended_hours": False, "account": "roth", "confirm": None}),
         (["sell", "ant", "0.5", "--market", "--tif", "gtc", "--extended-hours",
           "--confirm", "abc123"],
-         {"side": "sell", "symbol": "ant", "quantity": 0.5, "limit": None,
-          "time_in_force": "gtc", "extended_hours": True, "confirm": "abc123"}),
+         {"side": "sell", "symbol": "ant", "quantity": 0.5, "limit": None, "stop": None,
+          "time_in_force": "gtc", "extended_hours": True, "account": None,
+          "confirm": "abc123"}),
     ])
     def test_buy_and_sell(self, monkeypatch, argv, kwargs):
         seen = []
@@ -749,6 +800,8 @@ class TestOrderCommandLine:
         ["buy", "AAPL", "ten", "--limit", "350"],
         ["buy", "AAPL", "nan", "--limit", "350"],
         ["buy", "AAPL", "10", "--limit", "0"],
+        ["sell", "AAPL", "10", "--stop", "340"],              # a stop still needs a price
+        ["sell", "AAPL", "10", "--stop", "0", "--market"],
         ["sell", "AAPL", "10", "--limit", "350", "--tif", "ioc"],
         ["cancel"],
     ])
@@ -1044,7 +1097,7 @@ class TestOptionCommandLine:
         assert seen == [(cli.option_order, {
             "side": "buy", "symbol": "F", "expiration": "2026-12-11", "strike": 12.0,
             "option_type": "call", "contracts": 2, "limit": 0.30, "effect": None,
-            "time_in_force": "gfd", "confirm": None,
+            "time_in_force": "gfd", "account": None, "confirm": None,
         })]
 
     def test_sell_option_to_open(self, monkeypatch):
@@ -1086,6 +1139,407 @@ class TestOptionCommandLine:
         with pytest.raises(SystemExit) as stop:
             onboarding.main(argv)
         assert stop.value.code == 2
+
+
+# ── Accounts ─────────────────────────────────────────────────────────
+
+
+class TestAccounts:
+    def test_lists_each_account_with_its_number_masked(self, capsys):
+        assert cli.accounts(FakeClient()) == 0
+
+        out = capsys.readouterr().out
+        rows = out.splitlines()
+        assert rows[1].split() == ["Individual", "…2223", "$7,785.45", "$168.85", "$168.85"]
+        assert rows[2].split()[:3] == ["Roth", "IRA", "…5556"]
+        assert "111122223" not in out and "444455556" not in out
+        assert "pyhood positions --account roth" in out
+
+    def test_json_gives_the_numbers_in_full(self, capsys):
+        cli.accounts(FakeClient(), as_json_output=True)
+
+        data = json.loads(capsys.readouterr().out)
+        assert data[1] == {
+            "account": "Roth IRA", "type": "ira_roth", "account_number": "444455556",
+            "value": 7000.0, "cash": 7000.0, "buying_power": 7000.0,
+        }
+
+    @pytest.mark.parametrize("selector", [
+        "roth", "ROTH", "ira", "Roth IRA", "ira_roth", "5556", "444455556",
+    ])
+    def test_an_account_can_be_named_several_ways(self, selector):
+        number, label = cli.find_account(FakeClient(), selector)
+        assert number == "444455556"
+        assert label == "Roth IRA (…5556)"
+
+    def test_no_selector_means_the_default_and_no_lookup(self):
+        client = FakeClient()
+        assert cli.find_account(client, None) == (None, "")
+        assert client.calls == []
+
+    def test_an_account_that_does_not_exist_lists_the_ones_that_do(self):
+        with pytest.raises(cli.UsageError) as error:
+            cli.find_account(FakeClient(), "401k")
+        assert "No account matches '401k'" in str(error.value)
+        assert "Individual (…2223), Roth IRA (…5556)" in str(error.value)
+
+    def test_a_selector_that_fits_two_accounts_is_refused(self):
+        """Guessing which account an order goes to is not acceptable."""
+        client = FakeClient()
+        client.ACCOUNTS = [
+            *FakeClient.ACCOUNTS,
+            {"account_number": "777788889", "brokerage_account_type": "ira_traditional",
+             "nickname": ""},
+        ]
+        with pytest.raises(cli.UsageError, match="more than one account"):
+            cli.find_account(client, "ira")
+        assert cli.find_account(client, "traditional")[0] == "777788889"
+
+    def test_three_digits_are_too_few_to_name_an_account(self):
+        with pytest.raises(cli.UsageError):
+            cli.find_account(FakeClient(), "556")
+
+    def test_positions_and_buying_power_read_the_named_account(self, capsys):
+        client = FakeClient(buying_power=7000.0)
+
+        cli.positions(client, account="roth")
+        cli.buying_power(client, account="roth")
+
+        out = capsys.readouterr().out
+        assert ("get_positions", "444455556") in client.calls
+        assert ("get_buying_power", "444455556") in client.calls
+        assert out.startswith("Roth IRA (…5556)")
+        assert "Buying power in Roth IRA (…5556): $7,000.00" in out
+
+    def test_usage_errors_exit_2_without_a_traceback(self, monkeypatch, capsys):
+        import pyhood
+
+        monkeypatch.setattr(pyhood, "login", lambda: object())
+        monkeypatch.setattr("pyhood.client.PyhoodClient", lambda session: FakeClient())
+
+        assert cli.run(cli.positions, account="401k") == 2
+        assert "No account matches '401k'" in capsys.readouterr().err
+
+
+class TestOrdersInAnAccount:
+    def test_a_stock_order_goes_to_the_named_account(self, capsys):
+        client = OrderClient(buying_power=7000.0)
+
+        cli.stock_order(client, "buy", "AAPL", 10, limit=350.0, account="roth")
+
+        out = capsys.readouterr().out
+        assert "Buy 10 AAPL, limit $350.00, good for day, in Roth IRA (…5556)" in out
+        assert ("get_buying_power", "444455556") in client.calls
+        assert out.splitlines()[-1].split(" --confirm ")[0].endswith("--limit 350 --account roth")
+
+        cli.stock_order(client, "buy", "AAPL", 10, limit=350.0, account="roth",
+                        confirm=code_from(out), settle_seconds=0)
+        assert client.writes[0][3]["account_number"] == "444455556"
+
+    def test_a_code_for_one_account_will_not_place_in_another(self, capsys):
+        client = OrderClient(buying_power=7000.0)
+        cli.stock_order(client, "buy", "AAPL", 10, limit=350.0)
+        code = code_from(capsys.readouterr().out)
+
+        assert cli.stock_order(client, "buy", "AAPL", 10, limit=350.0, account="roth",
+                               confirm=code, settle_seconds=0) == 2
+        assert client.writes == []
+
+    def test_an_order_names_no_account_unless_asked(self, capsys):
+        client = OrderClient(buying_power=7000.0)
+        cli.stock_order(client, "buy", "AAPL", 10, limit=350.0)
+        code = code_from(capsys.readouterr().out)
+
+        cli.stock_order(client, "buy", "AAPL", 10, limit=350.0, confirm=code, settle_seconds=0)
+
+        assert "account_number" not in client.writes[0][3]
+        assert ("get_all_accounts",) not in client.calls
+
+    def test_an_option_order_goes_to_the_named_account(self, capsys):
+        client = OptionClient(buying_power=7000.0)
+        order = dict(side="buy", symbol="F", expiration="2026-12-11", strike=12.0,
+                     option_type="call", contracts=1, limit=0.30, account="roth")
+
+        cli.option_order(client, **order)
+        out = capsys.readouterr().out
+        assert "good for day, in Roth IRA (…5556)" in out
+
+        cli.option_order(client, **order, confirm=code_from(out), settle_seconds=0)
+        assert client.writes[0][2]["account_number"] == "444455556"
+
+
+class TestStopOrders:
+    HELD = [Position("ANT", 95.0, 97.13, 82.0, 7790.0, -1437.0, -15.6)]
+
+    def client(self, **kwargs):
+        return OrderClient(stocks=self.HELD, price=82.0, bid=81.9, ask=82.1, **kwargs)
+
+    def test_a_stop_market_order(self, capsys):
+        client = self.client()
+
+        cli.stock_order(client, "sell", "ANT", 10, limit=None, stop=70.0)
+
+        out = capsys.readouterr().out
+        assert "Sell 10 ANT, stop $70.00 then at market, good for day" in out
+        assert "Estimated proceeds: $700.00" in out  # at the stop, not today's price
+        assert "pyhood sell ANT 10 --stop 70 --market --confirm" in out
+
+        cli.stock_order(client, "sell", "ANT", 10, limit=None, stop=70.0,
+                        confirm=code_from(out), settle_seconds=0)
+        assert client.writes == [("sell", "ANT", 10, {
+            "price": None, "time_in_force": "gfd", "extended_hours": False,
+            "stop_price": 70.0,
+        })]
+
+    def test_a_stop_limit_order(self, capsys):
+        client = self.client()
+
+        cli.stock_order(client, "sell", "ANT", 10, limit=69.0, stop=70.0, time_in_force="gtc")
+
+        out = capsys.readouterr().out
+        assert "Sell 10 ANT, stop $70.00 then limit $69.00, good till cancelled" in out
+        assert "pyhood sell ANT 10 --stop 70 --limit 69 --tif gtc --confirm" in out
+        assert "today only" not in out
+
+    def test_a_stop_that_would_trigger_at_once_is_pointed_out(self, capsys):
+        cli.stock_order(self.client(), "sell", "ANT", 10, limit=None, stop=90.0)
+        assert "already at or above the last price of $82.00" in capsys.readouterr().out
+
+        cli.stock_order(self.client(buying_power=9999.0), "buy", "ANT", 1, limit=None, stop=80.0)
+        assert "already at or below the last price of $82.00" in capsys.readouterr().out
+
+    def test_a_stop_good_only_for_today_is_pointed_out(self, capsys):
+        """A stop that quietly expires at the close protects nothing."""
+        cli.stock_order(self.client(), "sell", "ANT", 10, limit=None, stop=70.0)
+        assert "This stop lasts for today only. Add --tif gtc" in capsys.readouterr().out
+
+    def test_a_code_without_the_stop_will_not_place_the_stop_order(self, capsys):
+        client = self.client()
+        cli.stock_order(client, "sell", "ANT", 10, limit=69.0)
+        plain = code_from(capsys.readouterr().out)
+
+        assert cli.stock_order(client, "sell", "ANT", 10, limit=69.0, stop=70.0,
+                               confirm=plain, settle_seconds=0) == 2
+        assert client.writes == []
+
+    def test_an_ordinary_order_sends_no_stop(self, capsys):
+        client = self.client()
+        cli.stock_order(client, "sell", "ANT", 10, limit=85.0)
+        cli.stock_order(client, "sell", "ANT", 10, limit=85.0,
+                        confirm=code_from(capsys.readouterr().out), settle_seconds=0)
+
+        assert "stop_price" not in client.writes[0][3]
+
+
+# ── Research, money and watchlists ───────────────────────────────────
+
+
+class ResearchClient(FakeClient):
+    def get_earnings(self, symbol, lookahead_days=14):
+        self.calls.append(("get_earnings", symbol, lookahead_days))
+        if symbol == "AAPL":
+            return Earnings("AAPL", "2027-01-28", timing="pm", eps_estimate=2.92)
+        return None
+
+    def get_ratings(self, symbol):
+        return Rating(symbol, num_buy=29, num_hold=13, num_sell=7,
+                      published_at="2026-11-07T01:49:36Z", price_target_high=425.0,
+                      price_target_low=250.0, price_target_mean=348.5199)
+
+    def get_news(self, symbol):
+        return [
+            NewsArticle(title=f"Headline {n}", source="Zacks", url=f"https://example.com/{n}",
+                        published_at="2026-11-24T21:08:30Z")
+            for n in range(1, 9)
+        ]
+
+    def get_movers(self, direction="up"):
+        self.calls.append(("get_movers", direction))
+        return [Mover("ADI", price_change=-65.14, price_change_pct=-17.2, price=313.59),
+                Mover("OLD", price_change=None, price_change_pct=-1.5)]
+
+    def get_stock_historicals(self, symbol, interval="day", span="year"):
+        self.calls.append(("get_stock_historicals", symbol, interval, span))
+        return [
+            Candle(symbol, "2026-11-17T00:00:00Z", 352.83, 351.91, 355.36, 349.67, 37407537),
+            Candle(symbol, "2026-11-23T00:00:00Z", 347.87, 349.08, 352.60, 345.44, 58588703),
+        ]
+
+    DIVIDENDS = [
+        Dividend("KO", 4.85, 0.485, "2026-10-01", "2026-09-15", "paid"),
+        Dividend("KO", 4.85, 0.485, "2027-01-02", "2026-12-15", "pending"),
+        Dividend("T", 2.78, 0.2775, "2026-11-02", "2026-10-10", "paid"),
+    ]
+
+    def get_dividends(self):
+        return list(self.DIVIDENDS)
+
+    def get_dividends_by_symbol(self, symbol):
+        return [d for d in self.DIVIDENDS if d.symbol == symbol]
+
+    def get_unified_transfers(self):
+        return [
+            UnifiedTransfer("t1", 500.0, direction="pull", transfer_type="originated_ach",
+                            state="completed", description=None,
+                            originating_account_type="rhs_account",
+                            receiving_account_type="ach_relationship",
+                            created_at="2024-12-29T10:00:00Z", completed_at=None),
+            UnifiedTransfer("t2", 7000.0, direction="push", transfer_type="internal",
+                            state="completed", description="IRA Contribution",
+                            originating_account_type="rhs_account",
+                            receiving_account_type="rhs_roth_ira",
+                            created_at="2026-03-23T10:00:00Z", completed_at=None),
+        ]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.lists = {"My First List": ["AAPL", "F"], "Empty": []}
+        self.stuck = set()
+
+    def get_watchlists(self):
+        return [Watchlist(name, list(symbols), id=name) for name, symbols in self.lists.items()]
+
+    def get_watchlist(self, name="My First List"):
+        return Watchlist(name, list(self.lists[name]), id=name)
+
+    def add_to_watchlist(self, symbols, name="My First List"):
+        self.calls.append(("add_to_watchlist", symbols, name))
+        self.lists[name] += [s for s in symbols if s not in self.stuck]
+
+    def remove_from_watchlist(self, symbols, name="My First List"):
+        self.calls.append(("remove_from_watchlist", symbols, name))
+        self.lists[name] = [s for s in self.lists[name] if s not in symbols]
+
+
+class TestResearch:
+    def test_earnings(self, capsys):
+        client = ResearchClient()
+
+        cli.earnings(client, ["aapl", "NVDA"], days=30)
+
+        rows = capsys.readouterr().out.splitlines()
+        assert rows[1].split() == ["AAPL", "2027-01-28", "after", "the", "close", "2.92", "-"]
+        assert rows[2].startswith("NVDA    none in the next 30 days")
+        assert ("get_earnings", "AAPL", 30) in client.calls
+
+    def test_ratings_show_counts_and_price_targets(self, capsys):
+        cli.ratings(ResearchClient(), ["AAPL"])
+
+        assert capsys.readouterr().out.splitlines()[1].split() == [
+            "AAPL", "29", "13", "7", "59%", "$250.00", "$348.52", "$425.00",
+        ]
+
+    def test_news_is_cut_to_the_count_with_local_times(self, capsys):
+        cli.news(ResearchClient(), "AAPL", count=2)
+
+        out = capsys.readouterr().out
+        assert out.count("Headline") == 2
+        assert "2026-11-24 16:08 EST  Zacks" in out
+        assert "https://example.com/1" in out
+
+    def test_movers(self, capsys):
+        client = ResearchClient()
+
+        cli.movers(client, down=True)
+
+        rows = capsys.readouterr().out.splitlines()
+        assert rows[0] == "S&P 500, biggest moves down today"
+        assert rows[2].split() == ["ADI", "$313.59", "-$65.14", "-17.20%"]
+        assert rows[3].split() == ["OLD", "-", "-", "-1.50%"]  # no price sent
+        assert client.calls == [("get_movers", "down")]
+
+    @pytest.mark.parametrize(("span", "interval"), [
+        ("week", "day"), ("month", "day"), ("3month", "day"), ("year", "week"),
+        ("5year", "week"),
+    ])
+    def test_history_picks_a_row_size_to_suit_the_span(self, span, interval):
+        client = ResearchClient()
+        cli.history(client, "aapl", span=span)
+        assert client.calls == [("get_stock_historicals", "AAPL", interval, span)]
+
+    def test_history_table_and_change_over_the_period(self, capsys):
+        cli.history(ResearchClient(), "AAPL", span="week")
+
+        out = capsys.readouterr().out
+        assert out.startswith("AAPL, the last week, one row a day")
+        assert "2026-11-17  $352.83  $355.36  $349.67  $351.91  37,407,537" in out
+        assert "Over the period: $352.83 to $349.08, -1.06%." in out
+
+    def test_dividends_newest_first_with_the_paid_total(self, capsys):
+        cli.dividends(ResearchClient())
+
+        rows = capsys.readouterr().out.splitlines()
+        assert [row.split()[0] for row in rows[1:4]] == ["2027-01-02", "2026-11-02", "2026-10-01"]
+        assert rows[-1] == "Paid in total: $7.63"  # the pending one is not counted
+
+    def test_dividends_for_one_symbol_and_for_none(self, capsys):
+        cli.dividends(ResearchClient(), symbol="t")
+        assert capsys.readouterr().out.count("2026-") == 1
+
+        cli.dividends(ResearchClient(), symbol="NVDA")
+        assert capsys.readouterr().out.strip() == "No dividends for NVDA on record."
+
+    def test_transfers_show_robinhoods_terms_and_survive_missing_values(self, capsys):
+        """A transfer with no description once broke the table."""
+        cli.transfers(ResearchClient())
+
+        rows = capsys.readouterr().out.splitlines()
+        assert rows[1].split()[:4] == ["2026-03-23", "$7,000.00", "push", "internal"]
+        assert rows[1].endswith("IRA Contribution")
+        assert rows[2].split()[-1] == "-"
+        assert "Robinhood's own terms, shown as sent" in rows[-1]
+
+    def test_every_new_command_has_json(self, capsys):
+        client = ResearchClient()
+        for command, args in (
+            (cli.earnings, (["AAPL"],)), (cli.ratings, (["AAPL"],)), (cli.news, ("AAPL",)),
+            (cli.movers, ()), (cli.history, ("AAPL",)), (cli.dividends, ()),
+            (cli.transfers, ()), (cli.watchlists, ()),
+        ):
+            assert command(client, *args, as_json_output=True) == 0
+            json.loads(capsys.readouterr().out)
+
+
+class TestWatchlists:
+    def test_watchlists_are_listed_with_their_symbols(self, capsys):
+        cli.watchlists(ResearchClient())
+
+        out = capsys.readouterr().out
+        assert "My First List (2 symbols)\n  AAPL, F" in out
+        assert "Empty (0 symbols)" in out
+
+    def test_watch_adds_and_confirms_by_reading_back(self, capsys):
+        client = ResearchClient()
+
+        assert cli.watch(client, ["gm", "ko"]) == 0
+
+        assert ("add_to_watchlist", ["GM", "KO"], "My First List") in client.calls
+        assert capsys.readouterr().out.strip() == "Added GM, KO to 'My First List'."
+
+    def test_unwatch_removes(self, capsys):
+        client = ResearchClient()
+
+        assert cli.watch(client, ["F"], remove=True) == 0
+
+        assert client.lists["My First List"] == ["AAPL"]
+        assert capsys.readouterr().out.strip() == "Removed F from 'My First List'."
+
+    def test_a_symbol_that_did_not_take_is_reported(self, capsys):
+        client = ResearchClient()
+        client.stuck = {"GM"}
+
+        assert cli.watch(client, ["GM", "KO"]) == 1
+
+        captured = capsys.readouterr()
+        assert "Added KO to 'My First List'." in captured.out
+        assert "GM is not on 'My First List' after the request." in captured.err
+
+
+class TestTable:
+    def test_a_missing_value_prints_as_a_dash(self):
+        assert cli.table(["A", "B"], [["x", None], ["", "y"]]).splitlines() == [
+            "A  B", "x  -", "-  y",
+        ]
 
 
 # ── Printed commands work where they are printed ─────────────────────
@@ -1158,7 +1612,17 @@ def test_every_command_in_the_guide_parses(line):
 
     args = onboarding.build_parser().parse_args(argv)
 
-    assert args.command in (
-        "positions", "orders", "buying-power", "quote", "options", "buy", "sell",
-        "buy-option", "sell-option", "cancel",
-    )
+    assert args.command in COMMANDS_IN_THE_GUIDE
+
+
+COMMANDS_IN_THE_GUIDE = {
+    "accounts", "positions", "orders", "buying-power", "quote", "options", "earnings",
+    "ratings", "news", "movers", "history", "dividends", "transfers", "watchlists", "watch",
+    "unwatch", "buy", "sell", "buy-option", "sell-option", "cancel",
+}
+
+
+def test_the_guide_mentions_every_account_command():
+    """A command an agent is never told about is one it will not use."""
+    named = {shlex.split(line)[1] for line in guide_command_lines()}
+    assert COMMANDS_IN_THE_GUIDE - named == set()
