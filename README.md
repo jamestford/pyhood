@@ -96,7 +96,29 @@ PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT  FILLED  AVG PRICE  
 2026-11-19 11:31 EST  buy   AAPL    stock       10  $340.00       0          -  cancelled
 ```
 
-Every command is read-only. Each prints a table with times in your own time zone, and takes `--json` for exact values. Placing orders is done from Python, not from the command line.
+Those are read-only. Each prints a table with times in your own time zone, and takes `--json` for exact values.
+
+### Placing orders
+
+`pyhood buy`, `pyhood sell` and `pyhood cancel` work in two steps. Run once, a command only previews:
+
+```text
+$ pyhood buy AAPL 10 --limit 350
+PREVIEW. Nothing has been sent.
+
+  Buy 10 AAPL, limit $350.00, good for day
+  Estimated cost:     $3,500.00
+  AAPL now:           $352.01 (bid $351.99, ask $352.01)
+  Buying power:       $5,000.00
+  Market open:        yes
+
+To place this order, show this preview to the user. If they say yes, run:
+  pyhood buy AAPL 10 --limit 350 --confirm 98dee3
+```
+
+Run again with the code it printed, and the order is placed. The code belongs to that exact order on that day: change the symbol, quantity or price and it is refused, so what is placed is always what was previewed. An order needs `--limit PRICE` or `--market`; there is no default.
+
+The code is a guardrail against mistakes, not a lock. Anything that can run the preview can read the code.
 
 ## Use It With an AI Agent
 
@@ -110,11 +132,12 @@ pyhood is installed on this machine. Run `pyhood guide` before using it.
 
 Three things make this dependable:
 
+- **Orders are previewed before they are placed.** `pyhood buy` shows the order, its cost and any problem with it, and places nothing until it is run again with the code the preview printed. The guide tells the agent to show you the preview and wait for a yes.
 - **The commands above answer most questions with no script.** An agent asked what you bought runs `pyhood orders` and reads a table. Left to write a script, models trip on the same things: formatting the price of an order that never filled, which is `None`, and reading UTC timestamps as local time.
 - **`pyhood run script.py`** runs a script with the Python pyhood is installed in, so `import pyhood` works however pyhood was installed. An agent does not have to find the right Python.
 - **Errors say what to do.** A wrong field name lists the real ones. An unsupported Python, or running from a source folder, says so instead of failing somewhere unrelated.
 
-An agent with your session can place real orders. The guide tells it to show you the exact call and wait for a yes first, but that is an instruction, not a lock. Give session access only to an agent you would trust with the account.
+An agent with your session can place real orders. The guide tells it to preview, show you, and wait for a yes, and the confirmation code makes it preview first. But those are an instruction and a guardrail, not a lock. Give session access only to an agent you would trust with the account.
 
 ## Quick Start
 

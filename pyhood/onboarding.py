@@ -501,6 +501,57 @@ def build_parser() -> argparse.ArgumentParser:
     )
     orders.add_argument("--all", action="store_true", help="show every order on record")
     orders.add_argument("--symbol", help="show orders for one symbol only")
+    orders.add_argument(
+        "--open", action="store_true",
+        help="show only orders that can still fill, which are the ones that can be cancelled",
+    )
+    two_steps = (
+        " Runs in two steps. Without --confirm it only previews: it shows what "
+        "would be sent and prints a confirmation code, and sends nothing. With "
+        "--confirm and that code, it acts."
+    )
+    for side in ("buy", "sell"):
+        order = commands.add_parser(
+            side,
+            help=f"preview a stock {side} order, then place it with --confirm",
+            description=f"Places an order to {side} a stock." + two_steps,
+        )
+        order.add_argument("symbol", metavar="SYMBOL", help="the stock's ticker")
+        order.add_argument(
+            "quantity", type=_positive, metavar="QUANTITY", help="number of shares",
+        )
+        price = order.add_mutually_exclusive_group(required=True)
+        price.add_argument(
+            "--limit", type=_positive, metavar="PRICE",
+            help=f"{side} at this price or better",
+        )
+        price.add_argument(
+            "--market", action="store_true",
+            help=f"{side} at the best price available, whatever it is",
+        )
+        order.add_argument(
+            "--tif", choices=("gfd", "gtc"), default="gfd",
+            help="gfd (default): good for day. gtc: good till cancelled",
+        )
+        order.add_argument(
+            "--extended-hours", action="store_true",
+            help="allow the order to trade outside regular hours",
+        )
+        order.add_argument(
+            "--confirm", metavar="CODE",
+            help="the code a preview of this exact order printed; places the order",
+        )
+    cancel = commands.add_parser(
+        "cancel",
+        help="preview cancelling an open order, then cancel it with --confirm",
+        description="Cancels an order that has not finished filling." + two_steps
+        + " Find order IDs with `pyhood orders --open`.",
+    )
+    cancel.add_argument("order_id", metavar="ORDER_ID", help="from `pyhood orders --open`")
+    cancel.add_argument(
+        "--confirm", metavar="CODE",
+        help="the code a preview of this cancellation printed; cancels the order",
+    )
     commands.add_parser(
         "buying-power",
         parents=[as_json],
@@ -538,6 +589,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("python_args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
     return parser
+
+
+def _positive(value: str) -> float:
+    """An argparse type: a number greater than zero."""
+    try:
+        number = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a number") from None
+    # `not number > 0` also refuses nan.
+    if not number > 0 or number == float("inf"):
+        raise argparse.ArgumentTypeError(f"{value!r} must be greater than zero")
+    return number
 
 
 def _date(value: str) -> str:
@@ -589,6 +652,16 @@ def main(argv: list[str] | None = None) -> int:
         from pyhood import guide
 
         return guide.main()
+    if args.command in ("buy", "sell", "cancel"):
+        from pyhood import cli
+
+        if args.command == "cancel":
+            return cli.run(cli.cancel, order_id=args.order_id, confirm=args.confirm)
+        return cli.run(
+            cli.stock_order, side=args.command, symbol=args.symbol, quantity=args.quantity,
+            limit=args.limit, time_in_force=args.tif, extended_hours=args.extended_hours,
+            confirm=args.confirm,
+        )
     if args.command in ("positions", "orders", "buying-power", "quote"):
         from pyhood import cli
 
@@ -597,7 +670,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "orders":
             return cli.run(
                 cli.orders, since=args.since, symbol=args.symbol,
-                everything=args.all, as_json_output=args.json,
+                everything=args.all, open_only=args.open, as_json_output=args.json,
             )
         if args.command == "buying-power":
             return cli.run(cli.buying_power, as_json_output=args.json)

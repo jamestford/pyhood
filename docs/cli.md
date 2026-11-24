@@ -2,7 +2,7 @@
 
 The `pyhood` command answers the most common questions about an account without any code, and sets up and checks your login.
 
-Every command on this page that touches your account is **read-only**. Orders are placed from Python, not from the command line.
+The account commands are **read-only**. The order commands change your account, and work in two steps: a preview, then a confirmation.
 
 ## Account commands
 
@@ -36,6 +36,9 @@ PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT  FILLED  AVG PRICE  
 | `--since YYYY-MM-DD` | Orders placed on or after that date |
 | `--all` | Every order on record |
 | `--symbol AAPL` | Orders for one symbol only |
+| `--open` | Only orders that can still fill, which are the ones that can be cancelled |
+
+The last column is the order ID, which `pyhood cancel` takes.
 
 `ORDERED` is what was asked for and `FILLED` is what actually traded. They differ on a partial fill, such as an IPO Access allocation. An order that never filled shows `0` and `-`.
 
@@ -60,6 +63,77 @@ Two differences from the tables:
 - **Times are UTC**, as Robinhood sends them, in ISO-8601 form. The tables convert them to your computer's time zone.
 - **Unknown values are `null`**, where the tables print `-`.
 
+## Order commands
+
+`pyhood buy`, `pyhood sell` and `pyhood cancel` never act the first time they are run.
+
+### Step 1: preview
+
+```text
+$ pyhood buy AAPL 10 --limit 350
+PREVIEW. Nothing has been sent.
+
+  Buy 10 AAPL, limit $350.00, good for day
+  Estimated cost:     $3,500.00
+  AAPL now:           $352.01 (bid $351.99, ask $352.01)
+  Buying power:       $5,000.00
+  Market open:        yes
+
+To place this order, show this preview to the user. If they say yes, run:
+  pyhood buy AAPL 10 --limit 350 --confirm 98dee3
+```
+
+The preview reads your quote, buying power or holdings, and points out anything that looks wrong:
+
+- the cost is more than your buying power
+- a sell is for more shares than you hold
+- the limit is 5% or more away from the last price
+- the order is a market order, which fills at whatever price is available
+
+### Step 2: confirm
+
+Run the command the preview printed. The order is placed and its status reported:
+
+```text
+$ pyhood buy AAPL 10 --limit 350 --confirm 98dee3
+PLACED: Buy 10 AAPL, limit $350.00, good for day
+  Status:    confirmed
+  Order ID:  1a2b3c4d-...
+
+Check it with:  pyhood orders --symbol AAPL
+Cancel it with: pyhood cancel 1a2b3c4d-...
+```
+
+### The confirmation code
+
+The code is worked out from the order itself and today's date. So:
+
+- **What is placed is what was previewed.** A different symbol, quantity, price or duration has a different code, and the wrong code is refused before anything is sent.
+- **A preview always comes first**, because that is the only place the code appears.
+- **A code stops working at the end of the day.**
+
+It is a guardrail against mistakes, not a lock: anything that can run the preview can read the code. It makes an agent show its work. It does not stop an agent that ignores its instructions.
+
+### Options
+
+| Command | |
+|---|---|
+| `pyhood buy SYMBOL QUANTITY --limit PRICE` | Buy at that price or better |
+| `pyhood buy SYMBOL QUANTITY --market` | Buy at the best price available |
+| `pyhood sell SYMBOL QUANTITY --limit PRICE` | Sell at that price or better |
+| `pyhood sell SYMBOL QUANTITY --market` | Sell at the best price available |
+| `pyhood cancel ORDER_ID` | Cancel an order that has not finished filling |
+
+| Option | Effect |
+|---|---|
+| `--limit PRICE` or `--market` | One is required. There is no default |
+| `--tif gfd` | Good for day. The default |
+| `--tif gtc` | Good till cancelled |
+| `--extended-hours` | Allow the order to trade outside regular hours |
+| `--confirm CODE` | Act, using the code from the preview |
+
+These cover stock orders in your main account. Stop orders, option orders and orders in other accounts are placed from Python.
+
 ## Setup and checks
 
 | Command | What it does |
@@ -80,7 +154,9 @@ Two differences from the tables:
 
 ## When a command fails
 
-A failure prints one line to standard error and exits with status 1:
+A wrong confirmation code exits with status 2, and nothing is sent. Any other failure prints one line to standard error and exits with status 1:
+
+- `Robinhood did not accept the order: ...` with Robinhood's reason
 
 - `Not logged in: ...` followed by `Run: pyhood setup login`
 - `Robinhood request failed: ...`

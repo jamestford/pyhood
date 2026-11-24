@@ -182,7 +182,7 @@ class TestGuide:
     def test_orders_are_listed_apart_from_reads(self):
         text = guide.render()
         reading = text[text.index("READING"):text.index("FIELDS")]
-        orders = text[text.index("ORDERS (ask the user first"):]
+        orders = text[text.index("ORDERS FROM A SCRIPT"):]
         for name in guide.WRITE_METHODS:
             assert f"client.{name}(" not in reading
             assert f"client.{name}(" in orders

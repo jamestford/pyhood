@@ -74,7 +74,8 @@ RULES
      not import it from a source folder.
   2. Never ask for, read or type a password or API key. Login is saved.
   3. Never place, change or cancel an order, or move money, without
-     showing the user the exact call first and getting a yes.
+     showing the user exactly what will happen first and getting a yes.
+     See PLACING ORDERS.
   4. Do not guess field or method names. They are all listed below.
 
 QUICK ANSWERS (no script needed, all read-only)
@@ -88,6 +89,28 @@ QUICK ANSWERS (no script needed, all read-only)
 
   Each prints a table. Add --json for exact values. Times in the tables
   are local; in --json and in scripts they are UTC.
+
+PLACING ORDERS (two steps, every time)
+  Step 1. Preview. This sends nothing:
+
+      pyhood buy AAPL 10 --limit 350
+      pyhood sell AAPL 10 --limit 360
+      pyhood buy AAPL 10 --market
+      pyhood cancel ORDER_ID
+
+  The preview shows the order, its cost, the current price and any
+  problem with it, and ends with the exact command that would place it,
+  including a confirmation code.
+
+  Step 2. Show the whole preview to the user and ask. Only if they say
+  yes, run the command the preview printed, unchanged.
+
+  Do not invent a code and do not change an order after previewing it: a
+  code works for one exact order on one day, and anything else is refused.
+  If the user changes their mind about quantity or price, preview again.
+  An order needs --limit PRICE or --market; there is no default.
+  Orders are good for the day unless you add --tif gtc.
+  Find the ID of an order to cancel with: pyhood orders --open
 
 RUNNING A SCRIPT
   For anything the commands above do not cover, write Python and run it:
@@ -211,7 +234,11 @@ def render() -> str:
         INTRO.replace("{version}", __version__),
         _methods("READING (safe to call freely)", READ_METHODS),
         _models(),
-        _methods("ORDERS (ask the user first, every time)", WRITE_METHODS),
+        _methods(
+            "ORDERS FROM A SCRIPT (prefer the commands under PLACING ORDERS, which\n"
+            "preview first; these send at once, so ask the user first, every time)",
+            WRITE_METHODS,
+        ),
         OUTRO,
     ))
 
