@@ -5,7 +5,7 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.20.0] - 2026-11-24
 
 ### Added
 - **Bank transfers, with a preview.** `pyhood deposit AMOUNT` and `pyhood withdraw AMOUNT` move money between a linked bank and Robinhood in the same two steps as an order: a preview that sends nothing, then the same command with its confirmation code. The code is tied to the direction, the amount and the bank. A withdrawal of more than your withdrawable cash is pointed out. `pyhood banks` lists linked banks by nickname, type and last four digits, and `--bank` picks one when several are linked. `pyhood cancel-transfer` cancels a pending transfer at once.
