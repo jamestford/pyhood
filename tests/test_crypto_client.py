@@ -148,6 +148,46 @@ class TestCryptoClient:
         assert account.account_number == "12345"
 
     @responses.activate
+    def test_trading_pairs_filter_is_sent_as_repeated_symbol(self):
+        """`symbols=BTC-USD,ETH-USD` is ignored by the API, which then returns
+        every pair. Asking for one pair returned 92, and code taking the
+        first got another coin's rules."""
+        responses.add(
+            responses.GET, CRYPTO_TRADING_PAIRS,
+            json={"results": [{"symbol": "BTC-USD", "asset_code": "BTC", "quote_code": "USD",
+                               "status": "tradable", "is_api_tradable": True}]},
+            status=200,
+        )
+
+        self.client.get_trading_pairs("BTC-USD", "ETH-USD")
+
+        query = responses.calls[-1].request.url.split("?", 1)[1]
+        assert query == "symbol=BTC-USD&symbol=ETH-USD"
+
+    @responses.activate
+    def test_trading_pair_minimum_is_an_amount_not_a_quantity(self):
+        """Keys as sent on 2026-11-24. There is no `min_order_size`, which
+        is what was read, so the minimum was always 0."""
+        responses.add(
+            responses.GET, CRYPTO_TRADING_PAIRS,
+            json={"results": [{
+                "asset_code": "BTC", "quote_code": "USD",
+                "quote_increment": "0.010000000000000000",
+                "asset_increment": "0.000000010000000000",
+                "max_order_size": "20.0000000000000000", "min_order_amount": "0.1",
+                "status": "tradable", "symbol": "BTC-USD", "is_api_tradable": True,
+            }]},
+            status=200,
+        )
+
+        (btc,) = self.client.get_trading_pairs("BTC-USD")
+
+        assert btc.min_order_amount == 0.1
+        assert btc.min_order_size is None
+        assert btc.max_order_size == 20.0
+        assert btc.quantity_increment == 1e-08
+
+    @responses.activate
     def test_get_trading_pairs(self):
         """Fields captured live 2026-08-09.
 

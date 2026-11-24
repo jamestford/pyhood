@@ -156,6 +156,68 @@ Two differences from the tables:
 - **Times are UTC**, as Robinhood sends them, in ISO-8601 form. The tables convert them to your computer's time zone.
 - **Unknown values are `null`**, where the tables print `-`.
 
+## Crypto
+
+Crypto goes through Robinhood's official Crypto Trading API, which has its own credentials. Set them up once with `pyhood setup crypto`. A coin can be written `BTC` or `BTC-USD`.
+
+```bash
+pyhood crypto quote BTC ETH    # best bid and ask
+pyhood crypto holdings         # the coins you hold, and crypto buying power
+pyhood crypto orders           # crypto orders, newest first; --open for open ones
+```
+
+### Buying and selling
+
+`pyhood crypto buy` and `pyhood crypto sell` work in the same two steps as stock orders. The quantity is in the coin, not in dollars.
+
+```text
+$ pyhood crypto buy BTC 0.001 --limit 50000
+PREVIEW. Nothing has been sent.
+
+  Buy 0.001 BTC, limit $50,000.00
+  Estimated cost:     $50.57 ($50.00 plus a fee of about $0.57)
+  BTC now:            $60,000.00 to buy
+  Buying power:       $500.00
+
+  Note: The limit is 16.7% below the current price of $60,000.00.
+
+  Note: A crypto limit order stays open until it fills or you cancel it.
+
+To place this order, show this preview to the user. If they say yes, run:
+  pyhood crypto buy BTC 0.001 --limit 50000 --confirm 4c1f0e
+```
+
+The preview differs from a stock order's in three ways:
+
+- **It shows Robinhood's fee**, as part of what a buy costs and taken off what a sale brings in. The fee comes from Robinhood's own estimate for that order.
+- **It checks the coin can be traded through the API.** Some coins trade in the app but not here, and those are refused.
+- **It points out an order under Robinhood's minimum**, which is a dollar value, about ten cents.
+
+`pyhood crypto cancel ORDER_ID` cancels an open crypto order at once.
+
+## Futures
+
+Futures are read-only. Name a product, such as `ES` for the E-mini S&P 500, `NQ` for the Nasdaq, `CL` for crude oil or `GC` for gold, and pyhood uses its nearest contract. You do not have to know which month is current.
+
+```bash
+pyhood futures quote ES NQ      # last, bid, ask, and the session's high, low and volume
+pyhood futures contract ES      # the product's contracts and when each expires
+pyhood futures contract ESZ26   # one contract: what a point and a tick are worth
+pyhood futures orders           # orders, with realized profit and loss
+pyhood futures positions        # open positions
+```
+
+```text
+$ pyhood futures quote ES
+ES: the nearest contract is ESZ26, expiring 2026-12-18.
+SYMBOL      LAST  CHANGE      BID       ASK   HIGH       LOW  PREV CLOSE  VOLUME
+ESZ26   7,206.75  -0.15%  7,206.5  7,206.75  7,224  7,205.75     7,217.5   4,172
+```
+
+A contract can also be named in full, by product, month and year: `ESZ26` is `ES` for December 2026.
+
+`pyhood futures positions` prints what Robinhood sends without arranging it into columns. pyhood has not seen an open futures position, and does not guess at field names.
+
 ## Order commands
 
 `pyhood buy` and `pyhood sell` never act the first time they are run.
@@ -295,7 +357,7 @@ CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share, placed
 - An order that has already finished is left alone, and the command says so.
 - A cancel is a request. If the order filled before it landed, the command reports that in place of `CANCELLED`, and any part that had already filled is not undone.
 
-These cover stock orders, stop orders and single-leg option orders, in any of your accounts. Option spreads, trailing stops and orders by dollar amount are placed from Python.
+These cover stock orders, stop orders and single-leg option orders, in any of your accounts, and crypto orders. Option spreads, trailing stops, orders by dollar amount and futures orders are placed from Python.
 
 ## Setup and checks
 

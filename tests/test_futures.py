@@ -134,6 +134,54 @@ class TestGetFuturesContract:
             client.get_futures_contract("FAKE99")
 
 
+class TestProductContracts:
+    """A product (ES) and its contracts (ESZ26, ESH27), in the shapes the
+    arsenal endpoints sent on 2026-11-24."""
+
+    def _add(self, contracts):
+        responses.add(
+            responses.GET, urls.FUTURES_PRODUCTS,
+            json={"results": [
+                {"id": "other", "symbol": "/6E:XCME", "displaySymbol": "/6E",
+                 "priceIncrements": "0.00005", "rhdProductGroup": "RHD_PRODUCT_GROUP_FX"},
+                PRODUCT_RESPONSE,
+            ]},
+            status=200,
+        )
+        responses.add(
+            responses.GET, urls.FUTURES_CONTRACTS,
+            match=[responses.matchers.query_param_matcher({"productIds": PRODUCT_ID})],
+            json={"results": contracts}, status=200,
+        )
+
+    @responses.activate
+    def test_active_contracts_nearest_first(self, client):
+        later = contract_response("ESH27", "id-h")["result"] | {"expiration": "2027-03-19"}
+        nearer = contract_response("ESZ26", "id-z")["result"] | {"expiration": "2026-12-18"}
+        expired = contract_response("ESU26", "id-u")["result"] | {
+            "expiration": "2026-09-18", "state": "FUTURES_STATE_EXPIRED",
+        }
+        self._add([later, expired, nearer])
+
+        contracts = client.get_futures_product_contracts("/es")
+
+        assert [c.symbol for c in contracts] == ["ESZ26", "ESH27"]
+        front = contracts[0]
+        assert front.contract_id == "id-z"
+        assert front.expiration == "2026-12-18"
+        # The product's details come with it, at no extra request.
+        assert (front.tick_size, front.underlying, front.asset_class) == (
+            0.25, "ES", "stock_index",
+        )
+        assert len(responses.calls) == 2
+
+    @responses.activate
+    def test_unknown_product(self, client):
+        self._add([])
+        with pytest.raises(SymbolNotFoundError, match="No futures product NOPE"):
+            client.get_futures_product_contracts("NOPE")
+
+
 class TestLiveApiShapes:
     """Payloads captured from the live API on 2026-08-09.
 
