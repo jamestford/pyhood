@@ -73,9 +73,9 @@ RULES
   1. pyhood is installed. Do not install it or its dependencies, and do
      not import it from a source folder.
   2. Never ask for, read or type a password or API key. Login is saved.
-  3. Never place, change or cancel an order, or move money, without
-     showing the user exactly what will happen first and getting a yes.
-     See PLACING ORDERS.
+  3. Never place an order or move money without showing the user exactly
+     what will happen first and getting a yes. See PLACING ORDERS.
+     Cancel an order only when the user asks you to.
   4. Do not guess field or method names. They are all listed below.
 
 QUICK ANSWERS (no script needed, all read-only)
@@ -86,6 +86,8 @@ QUICK ANSWERS (no script needed, all read-only)
       pyhood orders --since 2026-01-01    or --all, or --symbol AAPL
       pyhood buying-power         cash available to trade with
       pyhood quote AAPL MSFT      current prices; add --fundamentals for more
+      pyhood options AAPL         the expiration dates of AAPL's options
+      pyhood options AAPL --expires 2026-12-18    the contracts for that date
 
   Each prints a table. Add --json for exact values. Times in the tables
   are local; in --json and in scripts they are UTC.
@@ -96,7 +98,8 @@ PLACING ORDERS (two steps, every time)
       pyhood buy AAPL 10 --limit 350
       pyhood sell AAPL 10 --limit 360
       pyhood buy AAPL 10 --market
-      pyhood cancel ORDER_ID
+      pyhood buy-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 2.50
+      pyhood sell-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 3.00
 
   The preview shows the order, its cost, the current price and any
   problem with it, and ends with the exact command that would place it,
@@ -110,7 +113,18 @@ PLACING ORDERS (two steps, every time)
   If the user changes their mind about quantity or price, preview again.
   An order needs --limit PRICE or --market; there is no default.
   Orders are good for the day unless you add --tif gtc.
-  Find the ID of an order to cancel with: pyhood orders --open
+  Option prices are per share and a contract is 100 shares: --limit 2.50
+  on 1 contract is $250. Look up real expirations and strikes with
+  `pyhood options` first; do not guess them. buy-option opens a position
+  and sell-option closes one unless you add --to open or --to close.
+
+CANCELLING AN ORDER (one step)
+      pyhood orders --open        the orders that can still be cancelled, with IDs
+      pyhood cancel ORDER_ID      cancels that order at once
+
+  There is no preview and no code: the user asking you to cancel is the
+  yes. Cancel the order they mean and tell them what the command reported.
+  Never cancel an order they did not ask you to cancel.
 
 RUNNING A SCRIPT
   For anything the commands above do not cover, write Python and run it:
@@ -260,7 +274,7 @@ def render() -> str:
         _models(),
         _methods(
             "ORDERS FROM A SCRIPT (prefer the commands under PLACING ORDERS, which\n"
-            "preview first; these send at once, so ask the user first, every time)",
+            "preview first; these send at once, so ask the user first)",
             WRITE_METHODS,
         ),
         OUTRO,

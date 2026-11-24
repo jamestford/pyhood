@@ -1,17 +1,17 @@
 """Account commands: `pyhood positions`, `orders`, `buying-power`, `quote`,
-and `pyhood buy`, `sell` and `cancel`.
+`options`, and `pyhood buy`, `sell`, `buy-option`, `sell-option` and `cancel`.
 
-The first four are read-only and answer the questions asked most often
+The first five are read-only and answer the questions asked most often
 without a script. They exist for AI agents first: a model asked "what did
 I buy?" otherwise writes a script, and the scripts fail in the same few
 ways, by formatting a price that is None on an unfilled order, or by
 reading a UTC timestamp as local time. Here those are handled once. Each
 takes `--json` for exact values in place of the table.
 
-`buy`, `sell` and `cancel` change the account, so they work in two steps.
-Run once, a command only describes what it would do and prints a
-confirmation code. Run again with that code, it does it. See
-`confirmation_code`.
+The commands that place an order work in two steps. Run once, a command
+only describes what it would do and prints a confirmation code. Run again
+with that code, it does it. See `confirmation_code`. `cancel` acts at
+once: it can only remove one named order.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import shutil
 import sys
 import time
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -290,6 +290,104 @@ def quote(
     return 1 if missing else 0
 
 
+def _days_until(expiration: str) -> int | None:
+    try:
+        return (date.fromisoformat(expiration) - date.today()).days
+    except ValueError:
+        return None
+
+
+def _expiry(expiration: str) -> str:
+    """'2026-12-18 (24 days)'."""
+    days = _days_until(expiration)
+    if days is None:
+        return expiration
+    when = "today" if days == 0 else f"{days} day{'' if days == 1 else 's'}"
+    return f"{expiration} ({when})"
+
+
+def _nearest(values: list[Any], target: Any, count: int, key: Callable[[Any], float]) -> list[Any]:
+    """The `count` values closest to `target`, in their original order."""
+    chosen = sorted(values, key=lambda v: abs(key(v) - target))[:count]
+    return [v for v in values if any(v is c for c in chosen)]
+
+
+def options(
+    client: Any,
+    symbol: str,
+    expires: str | None = None,
+    option_type: str | None = None,
+    strikes: int = 10,
+    as_json_output: bool = False,
+) -> int:
+    """Expiration dates for a symbol, or the contracts for one of them."""
+    symbol = symbol.upper()
+    expirations = client.get_options_expirations(symbol)
+
+    if expires is None:
+        if as_json_output:
+            print(as_json(expirations))
+            return 0
+        if not expirations:
+            print(f"No options are listed for {symbol}.")
+            return 1
+        print(f"{symbol} option expirations (today is {date.today():%Y-%m-%d})")
+        print(table(
+            ["EXPIRES", "DAYS AWAY"],
+            [[e, str(_days_until(e)) if _days_until(e) is not None else "-"] for e in expirations],
+            right={1},
+        ))
+        print(f"\nTo see the contracts for one: {program()} options {symbol} --expires YYYY-MM-DD")
+        return 0
+
+    if expires not in expirations:
+        return _no_such_expiration(symbol, expires, expirations)
+
+    chain = client.get_options_chain(symbol, expires, option_type)
+    spot = client.get_quote(symbol).price
+    groups = [("call", chain.calls), ("put", chain.puts)]
+    groups = [
+        (kind, _nearest(sorted(found, key=lambda c: c.strike), spot, strikes, lambda c: c.strike))
+        for kind, found in groups
+        if option_type in (None, kind)
+    ]
+
+    if as_json_output:
+        print(as_json({
+            "symbol": symbol, "price": spot, "expiration": expires,
+            **{f"{kind}s": found for kind, found in groups},
+        }))
+        return 0
+
+    print(f"{symbol} is at {money(spot)}. Options expiring {_expiry(expires)}.")
+    print("Prices are per share. One contract is 100 shares, so $2.50 costs $250.")
+    for kind, found in groups:
+        print(f"\n{kind.upper()}S, the {len(found)} strikes nearest the price")
+        print(table(
+            ["STRIKE", "BID", "ASK", "MARK", "DELTA", "IV", "VOLUME", "OPEN INT"],
+            [
+                [
+                    money(c.strike), money(c.bid), money(c.ask), money(c.mark),
+                    "-" if c.delta is None else f"{c.delta:+.3f}",
+                    "-" if c.iv is None else f"{c.iv:.1%}",
+                    number(c.volume), number(c.open_interest),
+                ]
+                for c in found
+            ],
+            right={0, 1, 2, 3, 4, 5, 6, 7},
+        ))
+    return 0
+
+
+def _no_such_expiration(symbol: str, expires: str, expirations: list[str]) -> int:
+    print(f"{symbol} has no options expiring {expires}.", file=sys.stderr)
+    if expirations:
+        target = date.fromisoformat(expires).toordinal()
+        near = _nearest(expirations, target, 5, lambda e: date.fromisoformat(e).toordinal())
+        print(f"The nearest expirations are: {', '.join(near)}", file=sys.stderr)
+    return 1
+
+
 # ── Orders: preview, then confirm ────────────────────────────────────
 
 
@@ -435,37 +533,186 @@ def stock_order(
     return 0
 
 
-def cancel(
+def option_order(
     client: Any,
-    order_id: str,
+    side: str,
+    symbol: str,
+    expiration: str,
+    strike: float,
+    option_type: str,
+    contracts: int,
+    limit: float,
+    effect: str | None = None,
+    time_in_force: str = "gfd",
     confirm: str | None = None,
-    settle_seconds: float = 1.0,
-    attempts: int = 5,
+    settle_seconds: float = 2.0,
 ) -> int:
-    """Preview cancelling an order, or cancel it when given its confirmation code."""
-    code = confirmation_code("cancel", order_id)
+    """Preview a single-leg option order, or place it when given its code.
+
+    `limit` is per share, as option prices are quoted. `effect` is 'open'
+    or 'close'; left out, a buy opens and a sell closes.
+    """
+    symbol = symbol.upper()
+    default_effect = "open" if side == "buy" else "close"
+    effect = effect or default_effect
+    code = confirmation_code(
+        "option", side, effect, symbol, expiration, f"{strike:g}", option_type, contracts,
+        f"{limit:.4f}", time_in_force,
+    )
+    command = (
+        f"{program()} {side}-option {symbol} --expires {expiration} --strike {strike:g} "
+        f"--{option_type} --contracts {contracts} --limit {limit:g}"
+    )
+    if effect != default_effect:
+        command += f" --to {effect}"
+    if time_in_force != "gfd":
+        command += f" --tif {time_in_force}"
+
     if confirm is not None and confirm != code:
         return _wrong_code()
 
+    plural = "contract" if contracts == 1 else "contracts"
+    name = f"{symbol} {money(strike)} {option_type} expiring {expiration}"
+    duration = "good for day" if time_in_force == "gfd" else "good till cancelled"
+    summary = (
+        f"{side.capitalize()} to {effect} {contracts} {plural} of {name}, "
+        f"limit {money(limit)} per share, {duration}"
+    )
+
+    if confirm is not None:
+        place = client.buy_option if side == "buy" else client.sell_option
+        try:
+            order = place(
+                symbol, strike, expiration, option_type, contracts, limit,
+                position_effect=effect, time_in_force=time_in_force,
+            )
+        except OrderError as e:
+            print(f"Robinhood did not accept the order: {e}", file=sys.stderr)
+            return 1
+        if settle_seconds:
+            time.sleep(settle_seconds)
+        try:
+            order = client.get_order(order.order_id)
+        except PyhoodError:
+            pass
+        print(f"PLACED: {summary}")
+        print(f"  Status:    {order.status}")
+        if order.filled_quantity:
+            print(f"  Filled:    {number(order.filled_quantity)} at {money(order.average_price)}")
+        print(f"  Order ID:  {order.order_id}")
+        print(f"\nCheck it with:  {program()} orders --symbol {symbol}")
+        if order.status in OPEN_STATES:
+            print(f"Cancel it with: {program()} cancel {order.order_id}")
+        return 0
+
+    expirations = client.get_options_expirations(symbol)
+    if expiration not in expirations:
+        return _no_such_expiration(symbol, expiration, expirations)
+    chain = client.get_options_chain(symbol, expiration, option_type)
+    listed = sorted(chain.calls if option_type == "call" else chain.puts, key=lambda c: c.strike)
+    contract = next((c for c in listed if abs(c.strike - strike) < 0.0005), None)
+    if contract is None:
+        near = _nearest(listed, strike, 6, lambda c: c.strike)
+        print(
+            f"{symbol} has no {money(strike)} {option_type} expiring {expiration}.",
+            file=sys.stderr,
+        )
+        if near:
+            print(
+                "The nearest strikes are: " + ", ".join(money(c.strike) for c in near),
+                file=sys.stderr,
+            )
+        return 1
+
+    value = contracts * 100 * limit
+    spot = client.get_quote(symbol).price
+
+    print("PREVIEW. Nothing has been sent.\n")
+    print(f"  {summary}")
+    label = "Estimated cost:" if side == "buy" else "Estimated proceeds:"
+    print(f"  {label:<20}{money(value)} ({contracts} {plural} x 100 shares x {money(limit)})")
+    print(f"  {'Contract now:':<20}mark {money(contract.mark)} "
+          f"(bid {money(contract.bid)}, ask {money(contract.ask)})")
+    print(f"  {symbol + ' now:':<20}{money(spot)}")
+    if contract.delta is not None and contract.iv is not None:
+        print(f"  {'Delta, IV:':<20}{contract.delta:+.3f}, {contract.iv:.1%}")
+    print(f"  {'Expires:':<20}{_expiry(expiration)}")
+
+    warnings = []
+    if side == "buy" and effect == "open":
+        available = client.get_buying_power()
+        print(f"  {'Buying power:':<20}{money(available)}")
+        if value > available:
+            warnings.append(
+                "The estimated cost is more than your buying power. Robinhood is "
+                "likely to reject this order."
+            )
+    else:
+        held = sum(
+            p.quantity for p in client.get_option_positions()
+            if p.symbol.upper() == symbol and p.expiration == expiration
+            and p.option_type == option_type and abs(p.strike - strike) < 0.0005
+        )
+        print(f"  {'You hold:':<20}{number(held)} of this contract")
+        if side == "sell" and effect == "close" and contracts > held:
+            warnings.append(
+                f"You hold {number(held)} of this contract, fewer than this order sells. "
+                "Robinhood is likely to reject it. Selling a contract you do not hold "
+                "is selling to open, which needs --to open."
+            )
+    print(f"  {'Market open:':<20}{'yes' if client.is_market_open() else 'no'}")
+
+    if side == "sell" and effect == "open":
+        warnings.append(
+            "Selling to open writes a contract: you take on the obligation it "
+            "carries until it is bought back or expires. Robinhood needs approval "
+            "and collateral for that, and may reject the order."
+        )
+    if side == "buy" and effect == "close":
+        warnings.append("Buying to close is for a contract you sold to open.")
+    if contract.mark:
+        gap = (limit - contract.mark) / contract.mark * 100
+        if abs(gap) >= 20:
+            warnings.append(
+                f"The limit is {abs(gap):.0f}% {'above' if gap > 0 else 'below'} "
+                f"the contract's mark of {money(contract.mark)}."
+            )
+    if _days_until(expiration) == 0:
+        warnings.append("This contract expires today.")
+    for warning in warnings:
+        print(f"\n  Note: {warning}")
+
+    print("\nTo place this order, show this preview to the user. If they say yes, run:")
+    print(f"  {command} --confirm {code}")
+    return 0
+
+
+def cancel(
+    client: Any,
+    order_id: str,
+    settle_seconds: float = 1.0,
+    attempts: int = 5,
+) -> int:
+    """Cancel an open order, and say what became of it.
+
+    One step, unlike placing an order. A cancel names one order and can
+    only remove it: there is no symbol, quantity or price to get wrong,
+    and when someone wants out of an order a second step is time in which
+    it can fill.
+    """
     order = client.get_order(order_id)
     limit = "at market" if order.price is None else f"limit {money(order.price)}"
+    what = order.symbol
+    if order.instrument_type == "option":
+        what += " option " + ("contract" if order.quantity == 1 else "contracts")
     summary = (
-        f"{order.side} {number(order.quantity)} {order.symbol}, {limit}, "
+        f"{order.side} {number(order.quantity)} {what}, {limit}, "
         f"placed {local_time(order.created_at)}"
     )
     if order.status not in OPEN_STATES:
         print(f"Order {order_id} is already {order.status}, so there is nothing to cancel.")
         print(f"  {summary}")
         return 1
-
-    if confirm is None:
-        print("PREVIEW. Nothing has been sent.\n")
-        print(f"  Cancel: {summary}")
-        print(f"  {'Status:':<20}{order.status}")
-        print(f"  {'Filled so far:':<20}{number(order.filled_quantity or 0)}")
-        print("\nTo cancel this order, show this preview to the user. If they say yes, run:")
-        print(f"  {program()} cancel {order_id} --confirm {code}")
-        return 0
 
     client.cancel_order(order_id)
     # A cancel is a request: the order takes a moment to leave the book,
@@ -478,8 +725,15 @@ def cancel(
             break
     if order.status == "cancelled":
         print(f"CANCELLED: {summary}")
+        if order.filled_quantity:
+            print(
+                f"  {number(order.filled_quantity)} had already filled at "
+                f"{money(order.average_price)} and is not undone."
+            )
         return 0
     print(f"Cancel requested, but the order is now {order.status}: {summary}")
+    if order.filled_quantity:
+        print(f"  Filled: {number(order.filled_quantity)} at {money(order.average_price)}")
     print(f"Check it with:  {program()} orders --symbol {order.symbol}")
     return 0 if order.status not in OPEN_STATES else 1
 

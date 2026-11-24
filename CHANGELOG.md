@@ -5,6 +5,24 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`pyhood options SYMBOL`** lists a stock's option expirations. With `--expires YYYY-MM-DD` it shows the contracts for that date nearest the stock's price, with bid, ask, mark, delta and implied volatility. `--call`, `--put` and `--strikes N` narrow it, and `--json` gives exact values.
+- **`pyhood buy-option` and `pyhood sell-option`** place single-leg option orders in the same two steps as `pyhood buy`: a preview that sends nothing and prints a confirmation code, then the same command with the code.
+  - Every term is named and required: `--expires`, `--strike`, `--call` or `--put`, `--contracts` and `--limit`. Nothing about an option order is filled in by default.
+  - The preview checks the contract exists, and names the nearest expirations or strikes if it does not. It shows the cost worked out in full (`2 contracts x 100 shares x $0.30`), the contract's bid, ask and mark, and its delta and IV.
+  - A buy opens a position and a sell closes one. `--to open` on a sell writes a contract, and the preview says what that means.
+  - The preview points out a limit 20% or more from the contract's mark. That catches a price typed per contract where per share was meant, which is a hundred times too high.
+- `pyhood cancel` describes an option order as one.
+
+### Changed
+- **`pyhood cancel ORDER_ID` cancels in one step.** In 0.17.0 it previewed and needed a confirmation code, like placing an order. A cancel names one order and can only remove it: there is no symbol, quantity or price to get wrong. And when you want out of an order because the price is moving toward it, a second step is time in which it can fill. It still needs a specific order ID, leaves a finished order alone, and reports if the order filled before the cancel landed. `--confirm` is no longer accepted on `cancel`.
+- `pyhood guide` tells an agent to cancel when the user asks, without asking again, and never on its own initiative.
+
+### Fixed
+- **The option order docstrings said the price is "per contract". It is per share.** `buy_option()`, `sell_option()` and `order_option()` send the price as option prices are quoted, so `price=1.60` is $160 a contract. Read as written, the docstring would have someone pass `160` for that order.
+
 ## [0.17.0] - 2026-11-24
 
 ### Added

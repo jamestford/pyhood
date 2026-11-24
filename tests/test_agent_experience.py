@@ -176,7 +176,8 @@ class TestGuide:
         text = guide.render()
         assert f"pyhood {pyhood.__version__}" in text
         assert "pyhood run script.py" in text
-        assert "Never place, change or cancel an order" in text
+        assert "Never place an order or move money without showing the user" in text
+        assert "Cancel an order only when the user asks you to." in text
         assert "Never ask for, read or type a password" in text
 
     def test_orders_are_listed_apart_from_reads(self):
@@ -294,7 +295,8 @@ class TestInstallFolder:
         assert "bin/pyhood guide" in text
         assert "Do not install anything" in text
         assert "~/.pyhood/" in text
-        assert "Never place, change or cancel an order" in text
+        assert "Never place an order without the user's yes" in text
+        assert "Cancel an order only when the user asks you to" in text
 
     def test_it_is_not_the_file_for_the_source_folder(self):
         """One says pyhood is installed here; the other says it is not."""

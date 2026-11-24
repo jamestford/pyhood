@@ -8,7 +8,7 @@ Do not run pyhood from this folder. This is its source code, not an install. It 
 2. If it is, run `pyhood guide` and follow it. It covers running scripts, logging in, the main methods and the fields they return.
 3. If it is not, ask the user before installing anything. The install command is in `README.md`. Never use `pip install --break-system-packages`.
 
-Never ask for, read or type a password or API key. Never place, change or cancel an order without showing the user the exact call first and getting a yes.
+Never ask for, read or type a password or API key. Never place an order without showing the user exactly what will be sent first and getting a yes. Cancel an order only when the user asks you to.
 
 ## If you are changing pyhood
 

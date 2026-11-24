@@ -95,6 +95,7 @@ pyhood orders                # orders from the last 30 days, newest first
 pyhood orders --since 2026-01-01 --symbol AAPL
 pyhood buying-power          # cash available to trade with
 pyhood quote AAPL MSFT       # current prices; add --fundamentals for more
+pyhood options AAPL          # option expirations; add --expires DATE for contracts
 ```
 
 ```text
@@ -108,7 +109,7 @@ Those are read-only. Each prints a table with times in your own time zone, and t
 
 ### Placing orders
 
-`pyhood buy`, `pyhood sell` and `pyhood cancel` work in two steps. Run once, a command only previews:
+`pyhood buy` and `pyhood sell` work in two steps. Run once, a command only previews:
 
 ```text
 $ pyhood buy AAPL 10 --limit 350
@@ -124,9 +125,17 @@ To place this order, show this preview to the user. If they say yes, run:
   pyhood buy AAPL 10 --limit 350 --confirm 98dee3
 ```
 
+Option orders work the same way, with every term of the contract named:
+
+```bash
+pyhood buy-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 2.50
+```
+
 Run again with the code it printed, and the order is placed. The code belongs to that exact order on that day: change the symbol, quantity or price and it is refused, so what is placed is always what was previewed. An order needs `--limit PRICE` or `--market`; there is no default.
 
 The code is a guardrail against mistakes, not a lock. Anything that can run the preview can read the code.
+
+`pyhood cancel ORDER_ID` cancels an order in one step. A cancel names one order and can only remove it, and when you want out of an order a second step is time in which it can fill.
 
 ## Use It With an AI Agent
 

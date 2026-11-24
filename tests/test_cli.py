@@ -15,7 +15,14 @@ import pytest
 
 from pyhood import cli, guide, onboarding
 from pyhood.exceptions import APIError, AuthError, OrderError
-from pyhood.models import OptionPosition, Order, Position, Quote
+from pyhood.models import (
+    OptionContract,
+    OptionPosition,
+    OptionsChain,
+    Order,
+    Position,
+    Quote,
+)
 
 UTC = timezone.utc
 
@@ -582,61 +589,73 @@ class TestStockOrder:
 
 
 class TestCancel:
+    """A cancel is one step. It names one order and can only remove it, and
+    someone who wants out of an order should not wait on a second command."""
+
     OPEN = stock_order(
         order_id="order-9", status="confirmed", quantity=40.0, price=90.0,
         average_price=None, filled_at=None, filled_quantity=0.0,
     )
 
-    def test_without_a_code_it_previews_and_sends_nothing(self, capsys):
+    def test_it_cancels_at_once_and_says_what_it_cancelled(self, capsys):
         client = OrderClient(existing=self.OPEN)
 
-        assert cli.cancel(client, "order-9") == 0
-
-        out = capsys.readouterr().out
-        assert client.writes == []
-        assert out.startswith("PREVIEW. Nothing has been sent.")
-        assert "Cancel: buy 40 ANT, limit $90.00" in out
-        assert f"pyhood cancel order-9 --confirm {code_from(out)}" in out
-
-    def test_with_its_code_it_cancels_and_reports_the_outcome(self, capsys):
-        client = OrderClient(existing=self.OPEN)
-        cli.cancel(client, "order-9")
-        code = code_from(capsys.readouterr().out)
-
-        assert cli.cancel(client, "order-9", confirm=code, settle_seconds=0) == 0
+        assert cli.cancel(client, "order-9", settle_seconds=0) == 0
 
         assert client.writes == [("cancel", "order-9")]
-        assert capsys.readouterr().out.startswith("CANCELLED: buy 40 ANT")
-
-    def test_a_code_for_one_order_will_not_cancel_another(self, capsys):
-        client = OrderClient(existing=self.OPEN)
-        cli.cancel(client, "order-9")
-        code = code_from(capsys.readouterr().out)
-        client.reads.clear()
-
-        assert cli.cancel(client, "order-8", confirm=code, settle_seconds=0) == 2
-        assert client.writes == []
-        assert client.reads == []
+        out = capsys.readouterr().out
+        assert out.startswith("CANCELLED: buy 40 ANT, limit $90.00, placed 2026-11-19")
+        assert "PREVIEW" not in out and "--confirm" not in out
 
     def test_an_order_that_filled_before_the_cancel_landed_says_so(self, capsys):
         client = OrderClient(existing=self.OPEN, after_cancel="filled")
-        cli.cancel(client, "order-9")
-        code = code_from(capsys.readouterr().out)
 
-        cli.cancel(client, "order-9", confirm=code, settle_seconds=0)
+        cli.cancel(client, "order-9", settle_seconds=0)
 
         out = capsys.readouterr().out
         assert "CANCELLED" not in out
         assert "the order is now filled" in out
+        assert "pyhood orders --symbol ANT" in out
 
-    def test_a_finished_order_has_nothing_to_cancel(self, capsys):
-        client = OrderClient(existing=stock_order(order_id="order-1"))  # filled
+    def test_a_part_that_already_filled_is_reported_as_not_undone(self, capsys):
+        part_filled = stock_order(
+            order_id="order-9", status="partially_filled", quantity=40.0, price=90.0,
+            average_price=89.5, filled_quantity=15.0,
+        )
+        client = OrderClient(existing=part_filled)
+        client.cancel_order = lambda order_id: (
+            client.writes.append(("cancel", order_id)),
+            setattr(client, "existing", stock_order(
+                order_id="order-9", status="cancelled", quantity=40.0, price=90.0,
+                average_price=89.5, filled_quantity=15.0,
+            )),
+        )
 
-        assert cli.cancel(client, "order-1") == 1
+        assert cli.cancel(client, "order-9", settle_seconds=0) == 0
 
         out = capsys.readouterr().out
-        assert "already filled" in out
-        assert "--confirm" not in out
+        assert out.startswith("CANCELLED: buy 40 ANT")
+        assert "15 had already filled at $89.50 and is not undone" in out
+
+    def test_a_finished_order_is_left_alone(self, capsys):
+        client = OrderClient(existing=stock_order(order_id="order-1"))  # filled
+
+        assert cli.cancel(client, "order-1", settle_seconds=0) == 1
+
+        assert "already filled, so there is nothing to cancel" in capsys.readouterr().out
+        assert client.writes == []
+
+    def test_an_order_that_stays_open_is_a_failure(self, capsys):
+        client = OrderClient(existing=self.OPEN, after_cancel="confirmed")
+
+        assert cli.cancel(client, "order-9", settle_seconds=0, attempts=2) == 1
+        assert "Cancel requested, but the order is now confirmed" in capsys.readouterr().out
+
+    def test_an_unknown_order_id_changes_nothing(self):
+        client = OrderClient(existing=None)
+
+        with pytest.raises(OrderError, match="not found"):
+            cli.cancel(client, "no-such-order", settle_seconds=0)
         assert client.writes == []
 
 
@@ -679,8 +698,14 @@ class TestOrderCommandLine:
         seen = []
         monkeypatch.setattr(cli, "run", lambda fn, **kw: seen.append((fn, kw)) or 0)
 
-        onboarding.main(["cancel", "order-9", "--confirm", "abc123"])
-        assert seen == [(cli.cancel, {"order_id": "order-9", "confirm": "abc123"})]
+        onboarding.main(["cancel", "order-9"])
+        assert seen == [(cli.cancel, {"order_id": "order-9"})]
+
+    def test_cancel_takes_no_confirmation_code(self):
+        """It did in 0.17.0. A cancel is now one step."""
+        with pytest.raises(SystemExit) as stop:
+            onboarding.main(["cancel", "order-9", "--confirm", "abc123"])
+        assert stop.value.code == 2
 
     @pytest.mark.parametrize("argv", [
         ["buy", "AAPL", "10"],                              # neither --limit nor --market
@@ -695,6 +720,332 @@ class TestOrderCommandLine:
     ])
     def test_an_order_that_is_not_fully_specified_is_refused(self, argv, capsys):
         """No price means no order, not a market order by default."""
+        with pytest.raises(SystemExit) as stop:
+            onboarding.main(argv)
+        assert stop.value.code == 2
+
+
+# ── options: the chain, and option orders ────────────────────────────
+
+
+def contract(strike, kind="call", bid=0.28, ask=0.33, mark=0.31, delta=0.5, iv=0.314):
+    return OptionContract(
+        symbol="F", option_type=kind, strike=strike, expiration="2026-12-11", mark=mark,
+        bid=bid, ask=ask, iv=iv, delta=delta, volume=560, open_interest=3547,
+    )
+
+
+class OptionClient(OrderClient):
+    EXPIRATIONS = ["2026-11-27", "2026-12-04", "2026-12-11", "2026-12-18", "2027-01-15"]
+    STRIKES = [10.0, 11.0, 11.5, 12.0, 12.5, 13.0, 14.0]
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("price", 11.95)
+        super().__init__(**kwargs)
+
+    def get_options_expirations(self, symbol):
+        self.reads.append("get_options_expirations")
+        return list(self.EXPIRATIONS)
+
+    def get_options_chain(self, symbol, expiration, option_type=None):
+        self.reads.append("get_options_chain")
+        calls = [contract(k) for k in self.STRIKES]
+        puts = [contract(k, "put", delta=-0.5) for k in self.STRIKES]
+        return OptionsChain(
+            symbol=symbol, expiration=expiration,
+            calls=calls if option_type in (None, "call") else [],
+            puts=puts if option_type in (None, "put") else [],
+        )
+
+    def _place_option(self, side, *args, **kwargs):
+        self.writes.append((side, args, kwargs))
+        if self.reject:
+            raise OrderError(self.reject)
+        self.existing = stock_order(
+            order_id="option-order", symbol=args[0], side=side, quantity=float(args[4]),
+            price=args[5], status="queued", average_price=None, filled_at=None,
+            filled_quantity=0.0, instrument_type="option",
+        )
+        return self.existing
+
+    def buy_option(self, *args, **kwargs):
+        return self._place_option("buy", *args, **kwargs)
+
+    def sell_option(self, *args, **kwargs):
+        return self._place_option("sell", *args, **kwargs)
+
+
+class TestOptionsChain:
+    def test_a_symbol_alone_lists_expirations(self, capsys):
+        assert cli.options(OptionClient(), "f") == 0
+
+        out = capsys.readouterr().out
+        assert out.startswith("F option expirations (today is ")
+        assert "2026-12-11" in out and "2027-01-15" in out
+        assert "pyhood options F --expires YYYY-MM-DD" in out
+
+    def test_an_expiration_shows_the_strikes_nearest_the_price(self, capsys):
+        assert cli.options(OptionClient(), "F", expires="2026-12-11", strikes=3) == 0
+
+        out = capsys.readouterr().out
+        assert "F is at $11.95. Options expiring 2026-12-11" in out
+        assert "One contract is 100 shares" in out
+        calls = out[out.index("CALLS"):out.index("PUTS")]
+        assert [line.split()[0] for line in calls.splitlines()[2:5]] == [
+            "$11.50", "$12.00", "$12.50",
+        ]
+        assert "$10.00" not in out and "$14.00" not in out
+        assert "+0.500" in calls and "31.4%" in calls
+        assert "-0.500" in out[out.index("PUTS"):]
+
+    def test_calls_only(self, capsys):
+        cli.options(OptionClient(), "F", expires="2026-12-11", option_type="call")
+        out = capsys.readouterr().out
+        assert "CALLS" in out and "PUTS" not in out
+
+    def test_unpublished_greeks_print_as_a_dash(self, capsys):
+        client = OptionClient()
+        client.get_options_chain = lambda *a, **k: OptionsChain(
+            symbol="F", expiration="2026-12-11",
+            calls=[contract(12.0, delta=None, iv=None)], puts=[],
+        )
+
+        cli.options(client, "F", expires="2026-12-11", option_type="call")
+
+        row = capsys.readouterr().out.splitlines()[-1].split()
+        assert row[:6] == ["$12.00", "$0.28", "$0.33", "$0.31", "-", "-"]
+
+    def test_an_expiration_that_does_not_exist_names_the_nearest(self, capsys):
+        assert cli.options(OptionClient(), "F", expires="2026-12-25") == 1
+
+        err = capsys.readouterr().err
+        assert "F has no options expiring 2026-12-25." in err
+        assert "2026-12-18" in err and "2027-01-15" in err
+
+    def test_json(self, capsys):
+        cli.options(OptionClient(), "F", expires="2026-12-11", strikes=2, as_json_output=True)
+
+        data = json.loads(capsys.readouterr().out)
+        assert data["symbol"] == "F" and data["price"] == 11.95
+        assert [c["strike"] for c in data["calls"]] == [11.5, 12.0]
+        assert len(data["puts"]) == 2
+
+
+class TestOptionOrder:
+    ORDER = dict(side="buy", symbol="F", expiration="2026-12-11", strike=12.0,
+                 option_type="call", contracts=2, limit=0.30)
+
+    def test_without_a_code_it_previews_and_sends_nothing(self, capsys):
+        client = OptionClient(buying_power=500.0)
+
+        assert cli.option_order(client, **self.ORDER) == 0
+
+        out = capsys.readouterr().out
+        assert client.writes == []
+        assert out.startswith("PREVIEW. Nothing has been sent.")
+        assert (
+            "Buy to open 2 contracts of F $12.00 call expiring 2026-12-11, "
+            "limit $0.30 per share, good for day"
+        ) in out
+        # Two contracts of 100 shares at 30 cents: sixty dollars, not sixty cents.
+        assert "Estimated cost:     $60.00 (2 contracts x 100 shares x $0.30)" in out
+        assert "Contract now:       mark $0.31 (bid $0.28, ask $0.33)" in out
+        assert "Delta, IV:          +0.500, 31.4%" in out
+        assert "Buying power:       $500.00" in out
+        assert (
+            "pyhood buy-option F --expires 2026-12-11 --strike 12 --call --contracts 2 "
+            f"--limit 0.3 --confirm {code_from(out)}"
+        ) in out
+
+    def test_the_printed_command_places_exactly_the_previewed_order(self, capsys):
+        client = OptionClient(buying_power=500.0)
+        cli.option_order(client, **self.ORDER)
+        code = code_from(capsys.readouterr().out)
+
+        assert cli.option_order(client, **self.ORDER, confirm=code, settle_seconds=0) == 0
+
+        assert client.writes == [
+            ("buy", ("F", 12.0, "2026-12-11", "call", 2, 0.30),
+             {"position_effect": "open", "time_in_force": "gfd"}),
+        ]
+        out = capsys.readouterr().out
+        assert out.startswith("PLACED: Buy to open 2 contracts of F $12.00 call")
+        assert "pyhood cancel option-order" in out
+
+    @pytest.mark.parametrize("changed", [
+        {"contracts": 20},
+        {"strike": 12.5},
+        {"option_type": "put"},
+        {"expiration": "2026-12-18"},
+        {"limit": 3.0},
+        {"side": "sell"},
+        {"effect": "close"},
+        {"symbol": "GM"},
+        {"time_in_force": "gtc"},
+    ])
+    def test_a_code_for_one_order_will_not_place_another(self, capsys, changed):
+        client = OptionClient(buying_power=500.0)
+        cli.option_order(client, **self.ORDER)
+        code = code_from(capsys.readouterr().out)
+        client.reads.clear()
+
+        result = cli.option_order(client, **{**self.ORDER, **changed}, confirm=code,
+                                  settle_seconds=0)
+
+        assert result == 2
+        assert client.writes == []
+        assert client.reads == []
+
+    def test_a_buy_opens_and_a_sell_closes_unless_told_otherwise(self, capsys):
+        held = OptionPosition(
+            symbol="F", option_type="call", strike=12.0, expiration="2026-12-11",
+            quantity=2, average_open_price=0.25, cost_basis=50.0, current_mark=0.31,
+            current_value=62.0, unrealized_pl=12.0, unrealized_pl_pct=24.0,
+            strategy="long_call",
+        )
+        client = OptionClient(options=[held])
+
+        cli.option_order(client, **{**self.ORDER, "side": "sell"})
+
+        out = capsys.readouterr().out
+        assert "Sell to close 2 contracts" in out
+        assert "Estimated proceeds: $60.00" in out
+        assert "You hold:           2 of this contract" in out
+        assert "fewer than this order sells" not in out
+        assert "--to" not in out.splitlines()[-1]
+
+    def test_selling_to_close_more_than_held_is_flagged(self, capsys):
+        cli.option_order(OptionClient(), **{**self.ORDER, "side": "sell"})
+
+        out = capsys.readouterr().out
+        assert "You hold 0 of this contract, fewer than this order sells" in out
+        assert "needs --to open" in out
+
+    def test_selling_to_open_is_explicit_and_explained(self, capsys):
+        client = OptionClient()
+
+        cli.option_order(client, **{**self.ORDER, "side": "sell", "effect": "open"})
+
+        out = capsys.readouterr().out
+        assert "Sell to open 2 contracts" in out
+        assert "Selling to open writes a contract" in out
+        assert "fewer than this order sells" not in out
+        assert out.splitlines()[-1].split(" --confirm ")[0].endswith("--limit 0.3 --to open")
+
+        cli.option_order(client, **{**self.ORDER, "side": "sell", "effect": "open"},
+                         confirm=code_from(out), settle_seconds=0)
+        assert client.writes[0][0] == "sell"
+        assert client.writes[0][2]["position_effect"] == "open"
+
+    def test_a_limit_far_from_the_mark_is_pointed_out(self, capsys):
+        cli.option_order(OptionClient(buying_power=99999.0), **{**self.ORDER, "limit": 31.0})
+
+        out = capsys.readouterr().out
+        # 31.00 where 0.31 was meant: a hundred times the price.
+        assert "Estimated cost:     $6,200.00" in out
+        assert "9900% above the contract's mark of $0.31" in out
+
+    def test_more_than_buying_power_is_flagged(self, capsys):
+        cli.option_order(OptionClient(buying_power=10.0), **self.ORDER)
+        assert "more than your buying power" in capsys.readouterr().out
+
+    def test_a_strike_that_does_not_exist_names_the_nearest(self, capsys):
+        client = OptionClient()
+
+        assert cli.option_order(client, **{**self.ORDER, "strike": 12.34}) == 1
+
+        captured = capsys.readouterr()
+        assert "F has no $12.34 call expiring 2026-12-11." in captured.err
+        assert "$12.00" in captured.err and "$12.50" in captured.err
+        assert "--confirm" not in captured.out
+        assert client.writes == []
+
+    def test_an_expiration_that_does_not_exist_names_the_nearest(self, capsys):
+        assert cli.option_order(OptionClient(), **{**self.ORDER, "expiration": "2026-12-25"}) == 1
+        assert "The nearest expirations are:" in capsys.readouterr().err
+
+    def test_a_rejected_order_reports_robinhoods_reason(self, capsys):
+        client = OptionClient(buying_power=500.0, reject="Option order rejected: not approved")
+        cli.option_order(client, **self.ORDER)
+        code = code_from(capsys.readouterr().out)
+
+        assert cli.option_order(client, **self.ORDER, confirm=code, settle_seconds=0) == 1
+        assert "not approved" in capsys.readouterr().err
+
+    def test_cancelling_an_option_order_says_it_is_one(self, capsys):
+        waiting = stock_order(
+            order_id="option-order", symbol="F", side="debit", quantity=2.0, price=0.30,
+            status="queued", average_price=None, filled_at=None, filled_quantity=0.0,
+            instrument_type="option",
+        )
+
+        cli.cancel(OptionClient(existing=waiting), "option-order", settle_seconds=0)
+
+        out = capsys.readouterr().out
+        assert out.startswith("CANCELLED: debit 2 F option contracts, limit $0.30")
+
+
+class TestOptionCommandLine:
+    def test_options(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(cli, "run", lambda fn, **kw: seen.append((fn, kw)) or 0)
+
+        onboarding.main(["options", "F", "--expires", "2026-12-11", "--put", "--strikes", "4"])
+        assert seen == [(cli.options, {
+            "symbol": "F", "expires": "2026-12-11", "option_type": "put", "strikes": 4,
+            "as_json_output": False,
+        })]
+
+    def test_buy_option(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(cli, "run", lambda fn, **kw: seen.append((fn, kw)) or 0)
+
+        onboarding.main([
+            "buy-option", "F", "--expires", "2026-12-11", "--strike", "12", "--call",
+            "--contracts", "2", "--limit", "0.30",
+        ])
+        assert seen == [(cli.option_order, {
+            "side": "buy", "symbol": "F", "expiration": "2026-12-11", "strike": 12.0,
+            "option_type": "call", "contracts": 2, "limit": 0.30, "effect": None,
+            "time_in_force": "gfd", "confirm": None,
+        })]
+
+    def test_sell_option_to_open(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(cli, "run", lambda fn, **kw: seen.append((fn, kw)) or 0)
+
+        onboarding.main([
+            "sell-option", "F", "--strike", "12", "--put", "--expires", "2026-12-11",
+            "--limit", "0.36", "--contracts", "1", "--to", "open", "--tif", "gtc",
+            "--confirm", "abc123",
+        ])
+        kwargs = seen[0][1]
+        assert kwargs["side"] == "sell" and kwargs["effect"] == "open"
+        assert kwargs["option_type"] == "put" and kwargs["confirm"] == "abc123"
+
+    BASE = ["buy-option", "F", "--expires", "2026-12-11", "--strike", "12", "--call",
+            "--contracts", "1", "--limit", "0.30"]
+
+    @pytest.mark.parametrize("drop", ["--expires", "--strike", "--call", "--contracts", "--limit"])
+    def test_every_term_of_the_contract_is_required(self, drop):
+        """Nothing about an option order is filled in by default."""
+        argv = list(self.BASE)
+        index = argv.index(drop)
+        del argv[index:index + (1 if drop == "--call" else 2)]
+
+        with pytest.raises(SystemExit) as stop:
+            onboarding.main(argv)
+        assert stop.value.code == 2
+
+    @pytest.mark.parametrize("argv", [
+        BASE + ["--put"],                                   # a call and a put
+        [*BASE[:-1], "0"],                                  # no price
+        [*BASE[:-3], "1.5", "--limit", "0.30"],             # half a contract
+        [*BASE[:-3], "0", "--limit", "0.30"],
+        [*BASE[:3], "12/11/2026", *BASE[4:]],               # not a date
+        BASE + ["--to", "roll"],
+    ])
+    def test_malformed_option_orders_are_refused(self, argv):
         with pytest.raises(SystemExit) as stop:
             onboarding.main(argv)
         assert stop.value.code == 2
@@ -771,5 +1122,6 @@ def test_every_command_in_the_guide_parses(line):
     args = onboarding.build_parser().parse_args(argv)
 
     assert args.command in (
-        "positions", "orders", "buying-power", "quote", "buy", "sell", "cancel",
+        "positions", "orders", "buying-power", "quote", "options", "buy", "sell",
+        "buy-option", "sell-option", "cancel",
     )

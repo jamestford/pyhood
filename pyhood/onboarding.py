@@ -541,17 +541,80 @@ def build_parser() -> argparse.ArgumentParser:
             "--confirm", metavar="CODE",
             help="the code a preview of this exact order printed; places the order",
         )
+    chain = commands.add_parser(
+        "options",
+        parents=[as_json],
+        help="show a stock's option expirations, or the contracts for one (read-only)",
+        description=(
+            "With only a symbol, lists the expiration dates. With --expires, shows "
+            "the contracts for that date nearest the stock's price: bid, ask, mark, "
+            "delta and implied volatility. Prices are per share."
+        ),
+    )
+    chain.add_argument("symbol", metavar="SYMBOL", help="the underlying stock's ticker")
+    chain.add_argument("--expires", type=_date, metavar="YYYY-MM-DD", help="an expiration date")
+    kind = chain.add_mutually_exclusive_group()
+    kind.add_argument("--call", dest="option_type", action="store_const", const="call",
+                      help="show calls only")
+    kind.add_argument("--put", dest="option_type", action="store_const", const="put",
+                      help="show puts only")
+    chain.add_argument(
+        "--strikes", type=_count, default=10, metavar="N",
+        help="how many strikes nearest the price to show (default 10)",
+    )
+    for side in ("buy", "sell"):
+        usual = "open" if side == "buy" else "close"
+        option = commands.add_parser(
+            f"{side}-option",
+            help=f"preview an order to {side} option contracts, then place it with --confirm",
+            description=(
+                f"Places a limit order to {side} contracts of one option." + two_steps
+                + " Find contracts with `pyhood options SYMBOL --expires DATE`."
+            ),
+        )
+        option.add_argument("symbol", metavar="SYMBOL", help="the underlying stock's ticker")
+        option.add_argument(
+            "--expires", type=_date, required=True, metavar="YYYY-MM-DD",
+            help="the contract's expiration date",
+        )
+        option.add_argument(
+            "--strike", type=_positive, required=True, metavar="PRICE",
+            help="the contract's strike price",
+        )
+        kind = option.add_mutually_exclusive_group(required=True)
+        kind.add_argument("--call", dest="option_type", action="store_const", const="call",
+                          help="a call")
+        kind.add_argument("--put", dest="option_type", action="store_const", const="put",
+                          help="a put")
+        option.add_argument(
+            "--contracts", type=_count, required=True, metavar="N",
+            help="how many contracts; each is 100 shares",
+        )
+        option.add_argument(
+            "--limit", type=_positive, required=True, metavar="PRICE",
+            help="the most to pay or least to accept, per share: 2.50 is $250 a contract",
+        )
+        option.add_argument(
+            "--to", dest="effect", choices=("open", "close"),
+            help=f"open a position or close one (default: {usual})",
+        )
+        option.add_argument(
+            "--tif", choices=("gfd", "gtc"), default="gfd",
+            help="gfd (default): good for day. gtc: good till cancelled",
+        )
+        option.add_argument(
+            "--confirm", metavar="CODE",
+            help="the code a preview of this exact order printed; places the order",
+        )
     cancel = commands.add_parser(
         "cancel",
-        help="preview cancelling an open order, then cancel it with --confirm",
-        description="Cancels an order that has not finished filling." + two_steps
-        + " Find order IDs with `pyhood orders --open`.",
+        help="cancel an open order",
+        description=(
+            "Cancels an order that has not finished filling, at once, and "
+            "reports what became of it. Find order IDs with `pyhood orders --open`."
+        ),
     )
     cancel.add_argument("order_id", metavar="ORDER_ID", help="from `pyhood orders --open`")
-    cancel.add_argument(
-        "--confirm", metavar="CODE",
-        help="the code a preview of this cancellation printed; cancels the order",
-    )
     commands.add_parser(
         "buying-power",
         parents=[as_json],
@@ -600,6 +663,17 @@ def _positive(value: str) -> float:
     # `not number > 0` also refuses nan.
     if not number > 0 or number == float("inf"):
         raise argparse.ArgumentTypeError(f"{value!r} must be greater than zero")
+    return number
+
+
+def _count(value: str) -> int:
+    """An argparse type: a whole number greater than zero."""
+    try:
+        number = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a whole number") from None
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"{value!r} must be at least 1")
     return number
 
 
@@ -652,11 +726,27 @@ def main(argv: list[str] | None = None) -> int:
         from pyhood import guide
 
         return guide.main()
+    if args.command in ("buy-option", "sell-option"):
+        from pyhood import cli
+
+        return cli.run(
+            cli.option_order, side=args.command.split("-")[0], symbol=args.symbol,
+            expiration=args.expires, strike=args.strike, option_type=args.option_type,
+            contracts=args.contracts, limit=args.limit, effect=args.effect,
+            time_in_force=args.tif, confirm=args.confirm,
+        )
+    if args.command == "options":
+        from pyhood import cli
+
+        return cli.run(
+            cli.options, symbol=args.symbol, expires=args.expires,
+            option_type=args.option_type, strikes=args.strikes, as_json_output=args.json,
+        )
     if args.command in ("buy", "sell", "cancel"):
         from pyhood import cli
 
         if args.command == "cancel":
-            return cli.run(cli.cancel, order_id=args.order_id, confirm=args.confirm)
+            return cli.run(cli.cancel, order_id=args.order_id)
         return cli.run(
             cli.stock_order, side=args.command, symbol=args.symbol, quantity=args.quantity,
             limit=args.limit, time_in_force=args.tif, extended_hours=args.extended_hours,
