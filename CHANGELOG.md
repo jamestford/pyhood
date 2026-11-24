@@ -5,7 +5,7 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.19.0] - 2026-11-24
 
 ### Added
 - **Accounts.** `pyhood accounts` lists the accounts under your login, such as an individual account and an IRA, with value, cash and buying power. `--account` on `positions`, `buying-power`, `buy`, `sell`, `buy-option` and `sell-option` picks one by part of its type (`roth`, `ira`, `individual`) or the last four characters of its number. If what is typed fits no account, or more than one, the command stops and lists them. The account is part of an order's confirmation code, so a code for one account will not place an order in another.
