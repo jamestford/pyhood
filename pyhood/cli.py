@@ -94,6 +94,24 @@ def local_time(value: datetime | None) -> str:
     return value.astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
 
+def order_side(order: Any) -> str:
+    """'buy', or 'buy to open' for an option order."""
+    if order.instrument_type == "option" and order.position_effect:
+        return f"{order.side} to {order.position_effect}"
+    return order.side
+
+
+def order_kind(order: Any) -> str:
+    """'stock', '$12.00 call 2026-12-11', or '2-leg option' for a spread."""
+    if order.instrument_type != "option":
+        return order.instrument_type
+    if order.strike is not None and order.option_type and order.expiration:
+        return f"{money(order.strike)} {order.option_type} {order.expiration}"
+    if order.leg_count and order.leg_count > 1:
+        return f"{order.leg_count}-leg option"
+    return "option"
+
+
 def table(headers: list[str], rows: list[list[str]], right: set[int] | None = None) -> str:
     """Plain aligned columns. `right` holds the indexes to right-align."""
     right = right or set()
@@ -217,7 +235,7 @@ def orders(
     print(f"{scope} (times are {zone}; today is {datetime.now():%Y-%m-%d})")
     rows = [
         [
-            local_time(o.created_at), o.side, o.symbol, o.instrument_type, number(o.quantity),
+            local_time(o.created_at), order_side(o), o.symbol, order_kind(o), number(o.quantity),
             money(o.price), number(o.filled_quantity), money(o.average_price), o.status,
             o.order_id,
         ]
@@ -704,9 +722,11 @@ def cancel(
     limit = "at market" if order.price is None else f"limit {money(order.price)}"
     what = order.symbol
     if order.instrument_type == "option":
-        what += " option " + ("contract" if order.quantity == 1 else "contracts")
+        # '1 F $12.00 call 2026-12-11', or '2 F 2-leg option' for a spread.
+        what += f" {order_kind(order)}"
+        limit += " per share"
     summary = (
-        f"{order.side} {number(order.quantity)} {what}, {limit}, "
+        f"{order_side(order)} {number(order.quantity)} {what}, {limit}, "
         f"placed {local_time(order.created_at)}"
     )
     if order.status not in OPEN_STATES:

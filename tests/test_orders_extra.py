@@ -73,6 +73,9 @@ class TestOptionSpread:
 
         order = client.order_option_spread("AAPL", 1, 1.50, self.LEGS, "debit")
 
+        # Sent as a debit, returned as a buy, like every other order.
+        assert order.side == "buy"
+        assert order.leg_count == 2
         body = json.loads(responses.calls[-1].request.body)
         assert len(body["legs"]) == 2
         assert body["direction"] == "debit"

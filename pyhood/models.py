@@ -85,7 +85,9 @@ class Order(Model):
     """Order receipt."""
     order_id: str
     symbol: str
-    side: str  # 'buy' or 'sell'
+    # 'buy' or 'sell', for option orders too. Robinhood calls an option
+    # order a 'debit' or a 'credit'; a debit is a buy and a credit a sell.
+    side: str
     order_type: str  # 'market', 'limit', 'stop', 'stop_limit'
     quantity: float
     price: float | None
@@ -101,6 +103,16 @@ class Order(Model):
     # Shares or contracts actually filled; `quantity` is what was ordered.
     # They differ on a partial fill, such as an IPO Access allocation.
     filled_quantity: float | None = None
+    # The next five are for option orders, and None on stock orders.
+    # leg_count is 1 for a single contract and more for a spread. The other
+    # four describe the contract of a single-leg order. On a spread the legs
+    # differ, so strike, expiration and option_type are None, and
+    # position_effect is set only if every leg shares it.
+    leg_count: int | None = None
+    position_effect: str | None = None  # 'open' or 'close'
+    option_type: str | None = None  # 'call' or 'put'
+    strike: float | None = None
+    expiration: str | None = None
 
 
 @dataclass(frozen=True)
