@@ -5,6 +5,25 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`pyhood buy`, `pyhood sell` and `pyhood cancel`**, which work in two steps so that an order is always previewed before it is placed.
+  - Run once, a command previews: it shows the order, the estimated cost or proceeds, the current price, and your buying power or holdings. It sends nothing.
+  - The preview ends with the exact command that places the order, including a confirmation code. Run that, and the order is placed and its status reported.
+  - The code is worked out from the order and the date. A different symbol, quantity, price or duration has a different code, and a wrong code is refused before any request is made. What is placed is what was previewed.
+  - The preview points out an order that costs more than your buying power, sells more than you hold, has a limit 5% or more from the last price, or is a market order.
+  - An order needs `--limit PRICE` or `--market`. There is no default, so leaving the price off cannot place a market order. Orders are good for the day unless `--tif gtc` is given.
+  - These cover stock orders in the main account. Stop orders, option orders and other accounts are still placed from Python.
+- `pyhood orders --open` shows only orders that can still fill, and every row of `pyhood orders` now ends with the order ID, which `pyhood cancel` takes.
+
+- **An install carries its own `AGENTS.md`.** It lands at the top of the environment pyhood is installed into, beside `bin/` and `lib/`, and tells an AI agent started in that folder to run `bin/pyhood guide`. With no instructions at all, a local model took 15 to 19 commands to answer a question it answers in 2 or 3 with them, and printed the saved session file along the way. Until now the instructions had to be written by hand.
+
+### Changed
+- **Install instructions put pyhood in a folder of its own, `~/pyhood`, which is also where you work from.** `uv venv --managed-python --python 3.14 ~/pyhood`, then `uv pip install --python ~/pyhood/bin/python pyhood`. Open an agent in that folder and it reads the `AGENTS.md` there. This replaces `uv tool install`, which hides the install where there is nowhere to work from.
+- **Commands that pyhood prints for you to run next use its full path when `pyhood` alone would not reach this install,** as when the install folder is not on the PATH. `pyhood guide` says so at the top in that case.
+- `pyhood guide` has a PLACING ORDERS section: preview, show the user, and only on a yes run the command the preview printed. The Python order methods stay listed, marked as sending at once.
+
 ## [0.16.0] - 2026-11-24
 
 After 0.15.0 the same local model was given the same prompt twice more. It read `pyhood guide` and went from about ten failed commands to one. Both times the one failure was the same, and both times its answer had the same second flaw. These changes are for those two.

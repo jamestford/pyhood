@@ -20,36 +20,44 @@ pyhood is a modern, typed, maintained Python client for Robinhood. It supports s
 
 ## Install
 
-The quickest way is with [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS). One command installs pyhood with its own copy of Python and puts the `pyhood` command on your PATH:
+pyhood installs into a folder of its own, and that folder is also where you work from. With [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS):
 
 ```bash
-uv tool install --managed-python --python 3.14 pyhood
+uv venv --managed-python --python 3.14 ~/pyhood
+uv pip install --python ~/pyhood/bin/python pyhood
 ```
 
-There is no Python version to find first and no environment to activate: `pyhood` works from any terminal. `--managed-python` tells uv to use a Python it downloads and keeps for itself. Without it uv may borrow your system's or Homebrew's Python, and the install breaks when that one is upgraded or removed.
+That creates `~/pyhood`, holding pyhood, its own copy of Python, and an `AGENTS.md` that tells an AI agent what to do there. The command is `~/pyhood/bin/pyhood`. To type just `pyhood` from any folder, link it into a folder on your PATH:
 
-Upgrade later with `uv tool upgrade pyhood`.
+```bash
+ln -s ~/pyhood/bin/pyhood ~/.local/bin/pyhood
+```
+
+The rest of this page writes `pyhood`. If you skipped the link, type `~/pyhood/bin/pyhood`.
+
+`--managed-python` tells uv to use a Python it downloads and keeps for itself. Without it uv may borrow your system's or Homebrew's Python, and the install breaks when that one is upgraded or removed.
+
+Upgrade later with `uv pip install --python ~/pyhood/bin/python --upgrade pyhood`.
 
 <details>
 <summary><strong>Installing with pip instead</strong></summary>
 
-pyhood needs **Python 3.10 or newer**. Install it into a virtual environment rather than your system Python:
+pyhood needs **Python 3.10 or newer**.
 
 ```bash
-python3.14 -m venv pyhood-env
-source pyhood-env/bin/activate
-python -m pip install --upgrade pip
-python -m pip install pyhood
+python3.14 -m venv ~/pyhood
+~/pyhood/bin/python -m pip install --upgrade pip
+~/pyhood/bin/python -m pip install pyhood
 ```
 
-Substitute whichever interpreter you have; 3.10 through 3.14 are tested. On Windows the activate line is `pyhood-env\Scripts\activate`.
+Substitute whichever interpreter you have; 3.10 through 3.14 are tested. On Windows the commands are in `pyhood\Scripts` rather than `pyhood/bin`.
 
 Two things to know about this route:
 
 - **Name the version explicitly.** `python3` on macOS is still 3.9, and an environment built from it cannot install pyhood. The error reads `no matching distribution found`, which looks like the package is missing rather than a version problem.
-- **The environment depends on the Python that created it.** If that Python is later removed, as Homebrew does when it retires a version, the environment stops working and has to be rebuilt. The `pyhood` command also only exists while the environment is activated.
+- **The environment depends on the Python that created it.** If that Python is later removed, as Homebrew does when it retires a version, the environment stops working and has to be rebuilt.
 
-Use this route when you are adding pyhood to a project that already has its own environment.
+To add pyhood to a project that already has its own environment, `pip install pyhood` there as usual.
 
 </details>
 
@@ -96,25 +104,56 @@ PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT  FILLED  AVG PRICE  
 2026-11-19 11:31 EST  buy   AAPL    stock       10  $340.00       0          -  cancelled
 ```
 
-Every command is read-only. Each prints a table with times in your own time zone, and takes `--json` for exact values. Placing orders is done from Python, not from the command line.
+Those are read-only. Each prints a table with times in your own time zone, and takes `--json` for exact values.
+
+### Placing orders
+
+`pyhood buy`, `pyhood sell` and `pyhood cancel` work in two steps. Run once, a command only previews:
+
+```text
+$ pyhood buy AAPL 10 --limit 350
+PREVIEW. Nothing has been sent.
+
+  Buy 10 AAPL, limit $350.00, good for day
+  Estimated cost:     $3,500.00
+  AAPL now:           $352.01 (bid $351.99, ask $352.01)
+  Buying power:       $5,000.00
+  Market open:        yes
+
+To place this order, show this preview to the user. If they say yes, run:
+  pyhood buy AAPL 10 --limit 350 --confirm 98dee3
+```
+
+Run again with the code it printed, and the order is placed. The code belongs to that exact order on that day: change the symbol, quantity or price and it is refused, so what is placed is always what was previewed. An order needs `--limit PRICE` or `--market`; there is no default.
+
+The code is a guardrail against mistakes, not a lock. Anything that can run the preview can read the code.
 
 ## Use It With an AI Agent
 
-pyhood is built to be driven by an AI agent that writes and runs Python. Tell the agent one thing:
+pyhood is built to be driven by an AI agent. Open your agent in the install folder:
+
+```bash
+cd ~/pyhood
+```
+
+The install put an `AGENTS.md` there, which agents that follow that convention read when they start. It tells the agent to run `pyhood guide`, and the guide gives it the rest: the commands, how to run a script, and the rules for placing orders. There is nothing to set up by hand.
+
+To use pyhood from some other folder, put one line in that folder's `AGENTS.md` (or `CLAUDE.md`):
 
 ```text
 pyhood is installed on this machine. Run `pyhood guide` before using it.
 ```
 
-`pyhood guide` prints what an agent needs for the installed version: the commands above, how to run a script, how to log in, the main methods with their arguments, and the fields of what they return. Put that line in your agent's instructions file (`AGENTS.md`, `CLAUDE.md` or similar) so it does not have to be told each time.
+Without either, an agent has to find pyhood for itself. In testing, a model given no instructions took 15 to 19 commands to answer a question it answers in 2 or 3 with them, and along the way printed the saved session file to look at it.
 
-Three things make this dependable:
+What makes this dependable:
 
+- **Orders are previewed before they are placed.** `pyhood buy` shows the order, its cost and any problem with it, and places nothing until it is run again with the code the preview printed. The guide tells the agent to show you the preview and wait for a yes.
 - **The commands above answer most questions with no script.** An agent asked what you bought runs `pyhood orders` and reads a table. Left to write a script, models trip on the same things: formatting the price of an order that never filled, which is `None`, and reading UTC timestamps as local time.
-- **`pyhood run script.py`** runs a script with the Python pyhood is installed in, so `import pyhood` works however pyhood was installed. An agent does not have to find the right Python.
+- **`pyhood run script.py`** runs a script with the Python pyhood is installed in. An agent does not have to find the right Python.
 - **Errors say what to do.** A wrong field name lists the real ones. An unsupported Python, or running from a source folder, says so instead of failing somewhere unrelated.
 
-An agent with your session can place real orders. The guide tells it to show you the exact call and wait for a yes first, but that is an instruction, not a lock. Give session access only to an agent you would trust with the account.
+An agent with your session can place real orders. The guide tells it to preview, show you, and wait for a yes, and the confirmation code makes it preview first. But those are an instruction and a guardrail, not a lock. Give session access only to an agent you would trust with the account.
 
 ## Quick Start
 

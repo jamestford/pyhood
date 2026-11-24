@@ -1,27 +1,55 @@
-"""Read-only account commands: `pyhood positions`, `orders`, `buying-power`, `quote`.
+"""Account commands: `pyhood positions`, `orders`, `buying-power`, `quote`,
+and `pyhood buy`, `sell` and `cancel`.
 
-These answer the questions asked most often without a script. They exist
-for AI agents first: a model asked "what did I buy?" otherwise writes a
-script, and the scripts fail in the same few ways, by formatting a price
-that is None on an unfilled order, or by reading a UTC timestamp as local
-time. Here those are handled once.
+The first four are read-only and answer the questions asked most often
+without a script. They exist for AI agents first: a model asked "what did
+I buy?" otherwise writes a script, and the scripts fail in the same few
+ways, by formatting a price that is None on an unfilled order, or by
+reading a UTC timestamp as local time. Here those are handled once. Each
+takes `--json` for exact values in place of the table.
 
-Every command is read-only, and takes `--json` for exact values in place
-of the table.
+`buy`, `sell` and `cancel` change the account, so they work in two steps.
+Run once, a command only describes what it would do and prints a
+confirmation code. Run again with that code, it does it. See
+`confirmation_code`.
 """
 
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
+import shutil
 import sys
+import time
 from collections.abc import Callable
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
-from pyhood.exceptions import AuthError, PyhoodError
+from pyhood.exceptions import AuthError, OrderError, PyhoodError
 
 DEFAULT_ORDER_DAYS = 30
+
+# States in which an order can still fill, and so can still be cancelled.
+OPEN_STATES = frozenset({"queued", "unconfirmed", "confirmed", "partially_filled"})
+
+
+def program() -> str:
+    """How to run pyhood from a shell here: `pyhood`, or its full path.
+
+    The commands that pyhood prints for someone to run next have to work as
+    printed. An install in its own folder is often not on the PATH, and
+    there `pyhood buy ...` would be "command not found".
+    """
+    here = Path(sys.executable).with_name("pyhood")
+    found = shutil.which("pyhood")
+    if found is None:
+        return str(here) if here.exists() else "pyhood"
+    # Another pyhood earlier on the PATH is a different install.
+    if here.exists() and Path(found).resolve() != here.resolve():
+        return str(here)
+    return "pyhood"
 
 
 # ── Formatting ───────────────────────────────────────────────────────
@@ -154,6 +182,7 @@ def orders(
     since: str | None = None,
     symbol: str | None = None,
     everything: bool = False,
+    open_only: bool = False,
     as_json_output: bool = False,
 ) -> int:
     """Stock and option orders, newest first."""
@@ -165,6 +194,8 @@ def orders(
     found = client.get_stock_orders(start_date=since) + client.get_option_orders(start_date=since)
     if symbol:
         found = [o for o in found if o.symbol.upper() == symbol.upper()]
+    if open_only:
+        found = [o for o in found if o.status in OPEN_STATES]
     # created_at is None only if Robinhood sent an unreadable timestamp.
     found.sort(key=lambda o: o.created_at.timestamp() if o.created_at else 0.0, reverse=True)
 
@@ -172,7 +203,8 @@ def orders(
         print(as_json(found))
         return 0
 
-    scope = "All orders" if since is None else f"Orders since {since}"
+    kind = "open orders" if open_only else "orders"
+    scope = f"All {kind}" if since is None else f"{kind.capitalize()} since {since}"
     if symbol:
         scope += f" for {symbol.upper()}"
     if not found:
@@ -187,11 +219,13 @@ def orders(
         [
             local_time(o.created_at), o.side, o.symbol, o.instrument_type, number(o.quantity),
             money(o.price), number(o.filled_quantity), money(o.average_price), o.status,
+            o.order_id,
         ]
         for o in found
     ]
     print(table(
-        ["PLACED", "SIDE", "SYMBOL", "TYPE", "ORDERED", "LIMIT", "FILLED", "AVG PRICE", "STATUS"],
+        ["PLACED", "SIDE", "SYMBOL", "TYPE", "ORDERED", "LIMIT", "FILLED", "AVG PRICE",
+         "STATUS", "ORDER ID"],
         rows, right={4, 5, 6, 7},
     ))
     print(
@@ -256,6 +290,200 @@ def quote(
     return 1 if missing else 0
 
 
+# ── Orders: preview, then confirm ────────────────────────────────────
+
+
+def confirmation_code(*parts: object) -> str:
+    """A short code tied to one exact action on one day.
+
+    A command that changes the account runs twice: once to preview, which
+    prints this code, and once with the code to act. That guarantees a
+    preview was produced before anything is sent, and that what is sent is
+    what was previewed: a different symbol, quantity or price gives a
+    different code, and so does a different day.
+
+    It is a guardrail against mistakes, not a lock. Anything that can run
+    the preview can read the code.
+    """
+    text = "|".join(str(part) for part in parts) + "|" + datetime.now().strftime("%Y-%m-%d")
+    return hashlib.sha256(text.encode()).hexdigest()[:6]
+
+
+def _wrong_code() -> int:
+    print(
+        "That confirmation code does not match this order, so nothing was sent.\n"
+        "A code belongs to one exact order on one day. Run the command without "
+        "--confirm to preview it and get its code.",
+        file=sys.stderr,
+    )
+    return 2
+
+
+def stock_order(
+    client: Any,
+    side: str,
+    symbol: str,
+    quantity: float,
+    limit: float | None = None,
+    time_in_force: str = "gfd",
+    extended_hours: bool = False,
+    confirm: str | None = None,
+    settle_seconds: float = 2.0,
+) -> int:
+    """Preview a stock order, or place it when given its confirmation code.
+
+    `limit` of None is a market order.
+    """
+    symbol = symbol.upper()
+    kind = "market" if limit is None else f"{limit:.4f}"
+    code = confirmation_code(side, symbol, f"{quantity:g}", kind, time_in_force, extended_hours)
+    command = f"{program()} {side} {symbol} {quantity:g} " + (
+        "--market" if limit is None else f"--limit {limit:g}"
+    )
+    if time_in_force != "gfd":
+        command += f" --tif {time_in_force}"
+    if extended_hours:
+        command += " --extended-hours"
+
+    # Checked before anything else, so a wrong code costs no requests.
+    if confirm is not None and confirm != code:
+        return _wrong_code()
+
+    terms = "at market" if limit is None else f"limit {money(limit)}"
+    duration = "good for day" if time_in_force == "gfd" else "good till cancelled"
+    summary = f"{side.capitalize()} {number(quantity)} {symbol}, {terms}, {duration}"
+    if extended_hours:
+        summary += ", extended hours"
+
+    if confirm is not None:
+        place = client.buy_stock if side == "buy" else client.sell_stock
+        try:
+            order = place(
+                symbol, quantity, price=limit, time_in_force=time_in_force,
+                extended_hours=extended_hours,
+            )
+        except OrderError as e:
+            print(f"Robinhood did not accept the order: {e}", file=sys.stderr)
+            return 1
+        # The first response is the order as received; a moment later it
+        # has been confirmed, filled or rejected.
+        if settle_seconds:
+            time.sleep(settle_seconds)
+        try:
+            order = client.get_order(order.order_id)
+        except PyhoodError:
+            pass
+        print(f"PLACED: {summary}")
+        print(f"  Status:    {order.status}")
+        if order.filled_quantity:
+            print(f"  Filled:    {number(order.filled_quantity)} at {money(order.average_price)}")
+        print(f"  Order ID:  {order.order_id}")
+        print(f"\nCheck it with:  {program()} orders --symbol {symbol}")
+        if order.status in OPEN_STATES:
+            print(f"Cancel it with: {program()} cancel {order.order_id}")
+        return 0
+
+    quote_now = client.get_quote(symbol)
+    reference = limit
+    if reference is None:
+        reference = (quote_now.ask if side == "buy" else quote_now.bid) or quote_now.price
+    value = quantity * reference
+
+    print("PREVIEW. Nothing has been sent.\n")
+    print(f"  {summary}")
+    label = "Estimated cost:" if side == "buy" else "Estimated proceeds:"
+    print(f"  {label:<20}{money(value)}")
+    print(f"  {symbol + ' now:':<20}{money(quote_now.price)} "
+          f"(bid {money(quote_now.bid)}, ask {money(quote_now.ask)})")
+
+    warnings = []
+    if side == "buy":
+        available = client.get_buying_power()
+        print(f"  {'Buying power:':<20}{money(available)}")
+        if value > available:
+            warnings.append(
+                "The estimated cost is more than your buying power. Robinhood is "
+                "likely to reject this order."
+            )
+    else:
+        held = sum(p.quantity for p in client.get_positions() if p.symbol.upper() == symbol)
+        print(f"  {'You hold:':<20}{number(held)} {symbol}")
+        if quantity > held:
+            warnings.append(
+                f"You hold {number(held)} {symbol}, fewer than this order sells. "
+                "Robinhood is likely to reject it."
+            )
+    print(f"  {'Market open:':<20}{'yes' if client.is_market_open() else 'no'}")
+
+    if limit is None:
+        warnings.append(
+            "A market order fills at the best price available when it arrives, "
+            "which can differ from the quote above."
+        )
+    elif quote_now.price:
+        gap = (limit - quote_now.price) / quote_now.price * 100
+        if abs(gap) >= 5:
+            warnings.append(
+                f"The limit is {abs(gap):.1f}% {'above' if gap > 0 else 'below'} "
+                f"the last price of {money(quote_now.price)}."
+            )
+    for warning in warnings:
+        print(f"\n  Note: {warning}")
+
+    print("\nTo place this order, show this preview to the user. If they say yes, run:")
+    print(f"  {command} --confirm {code}")
+    return 0
+
+
+def cancel(
+    client: Any,
+    order_id: str,
+    confirm: str | None = None,
+    settle_seconds: float = 1.0,
+    attempts: int = 5,
+) -> int:
+    """Preview cancelling an order, or cancel it when given its confirmation code."""
+    code = confirmation_code("cancel", order_id)
+    if confirm is not None and confirm != code:
+        return _wrong_code()
+
+    order = client.get_order(order_id)
+    limit = "at market" if order.price is None else f"limit {money(order.price)}"
+    summary = (
+        f"{order.side} {number(order.quantity)} {order.symbol}, {limit}, "
+        f"placed {local_time(order.created_at)}"
+    )
+    if order.status not in OPEN_STATES:
+        print(f"Order {order_id} is already {order.status}, so there is nothing to cancel.")
+        print(f"  {summary}")
+        return 1
+
+    if confirm is None:
+        print("PREVIEW. Nothing has been sent.\n")
+        print(f"  Cancel: {summary}")
+        print(f"  {'Status:':<20}{order.status}")
+        print(f"  {'Filled so far:':<20}{number(order.filled_quantity or 0)}")
+        print("\nTo cancel this order, show this preview to the user. If they say yes, run:")
+        print(f"  {program()} cancel {order_id} --confirm {code}")
+        return 0
+
+    client.cancel_order(order_id)
+    # A cancel is a request: the order takes a moment to leave the book,
+    # and can fill first.
+    for _ in range(attempts):
+        if settle_seconds:
+            time.sleep(settle_seconds)
+        order = client.get_order(order_id)
+        if order.status not in OPEN_STATES:
+            break
+    if order.status == "cancelled":
+        print(f"CANCELLED: {summary}")
+        return 0
+    print(f"Cancel requested, but the order is now {order.status}: {summary}")
+    print(f"Check it with:  {program()} orders --symbol {order.symbol}")
+    return 0 if order.status not in OPEN_STATES else 1
+
+
 # ── Running one ──────────────────────────────────────────────────────
 
 
@@ -269,7 +497,7 @@ def run(command: Callable[..., int], **kwargs: Any) -> int:
         return command(client, **kwargs)
     except AuthError as e:
         print(f"Not logged in: {e}", file=sys.stderr)
-        print("Run: pyhood setup login", file=sys.stderr)
+        print(f"Run: {program()} setup login", file=sys.stderr)
         return 1
     except PyhoodError as e:
         print(f"Robinhood request failed: {e}", file=sys.stderr)

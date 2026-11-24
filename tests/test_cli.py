@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from pyhood import cli, guide, onboarding
-from pyhood.exceptions import APIError, AuthError
+from pyhood.exceptions import APIError, AuthError, OrderError
 from pyhood.models import OptionPosition, Order, Position, Quote
 
 UTC = timezone.utc
@@ -31,6 +31,12 @@ def eastern_time(monkeypatch):
     yield
     monkeypatch.undo()
     time.tzset()
+
+
+@pytest.fixture(autouse=True)
+def on_the_path(monkeypatch):
+    """Printed commands read `pyhood ...`, as on an install that is on the PATH."""
+    monkeypatch.setattr(cli, "program", lambda: "pyhood")
 
 
 def stock_order(**fields):
@@ -180,8 +186,8 @@ class TestOrders:
 
         lines = capsys.readouterr().out.splitlines()
         cancelled = next(line for line in lines if "cancelled" in line)
-        assert cancelled.split()[-3:] == ["0", "-", "cancelled"]
-        filled = next(line for line in lines if line.endswith("filled"))
+        assert cancelled.split()[-4:] == ["0", "-", "cancelled", "order-2"]
+        filled = next(line for line in lines if line.split()[-2:] == ["filled", "order-1"])
         assert "$95.00" in filled
 
     def test_times_are_local_and_the_header_says_so(self, capsys):
@@ -330,11 +336,14 @@ class TestRun:
         (["positions"], cli.positions, {"as_json_output": False}),
         (["positions", "--json"], cli.positions, {"as_json_output": True}),
         (["orders"], cli.orders,
-         {"since": None, "symbol": None, "everything": False, "as_json_output": False}),
+         {"since": None, "symbol": None, "everything": False, "open_only": False,
+          "as_json_output": False}),
         (["orders", "--since", "2026-11-01", "--symbol", "ant", "--json"], cli.orders,
-         {"since": "2026-11-01", "symbol": "ant", "everything": False, "as_json_output": True}),
-        (["orders", "--all"], cli.orders,
-         {"since": None, "symbol": None, "everything": True, "as_json_output": False}),
+         {"since": "2026-11-01", "symbol": "ant", "everything": False, "open_only": False,
+          "as_json_output": True}),
+        (["orders", "--all", "--open"], cli.orders,
+         {"since": None, "symbol": None, "everything": True, "open_only": True,
+          "as_json_output": False}),
         (["buying-power"], cli.buying_power, {"as_json_output": False}),
         (["quote", "AAPL", "MSFT", "--fundamentals"], cli.quote,
          {"symbols": ["AAPL", "MSFT"], "fundamentals": True, "as_json_output": False}),
@@ -352,6 +361,391 @@ class TestRun:
 
         assert stop.value.code == 2
         assert "YYYY-MM-DD" in capsys.readouterr().err
+
+
+# ── buy, sell and cancel: preview, then confirm ──────────────────────
+
+
+class OrderClient(FakeClient):
+    """A client that records every call that would change the account."""
+
+    def __init__(self, *, price=350.0, bid=349.9, ask=350.1, market_open=True,
+                 reject=None, existing=None, after_cancel="cancelled", **kwargs):
+        super().__init__(**kwargs)
+        self.price, self.bid, self.ask = price, bid, ask
+        self.market_open = market_open
+        self.reject = reject
+        self.existing = existing
+        self.after_cancel = after_cancel
+        self.writes = []
+        self.reads = []
+
+    def get_quote(self, symbol):
+        self.reads.append("get_quote")
+        return Quote(symbol=symbol, price=self.price, prev_close=345.0, change_pct=1.45,
+                     bid=self.bid, ask=self.ask)
+
+    def get_buying_power(self):
+        self.reads.append("get_buying_power")
+        return self.buying_power
+
+    def is_market_open(self):
+        return self.market_open
+
+    def _place(self, side, symbol, quantity, **kwargs):
+        self.writes.append((side, symbol, quantity, kwargs))
+        if self.reject:
+            raise OrderError(self.reject)
+        self.existing = stock_order(
+            order_id="new-order", symbol=symbol, side=side, quantity=quantity,
+            price=kwargs.get("price"), status="confirmed", average_price=None,
+            filled_at=None, filled_quantity=0.0,
+        )
+        return self.existing
+
+    def buy_stock(self, symbol, quantity, **kwargs):
+        return self._place("buy", symbol, quantity, **kwargs)
+
+    def sell_stock(self, symbol, quantity, **kwargs):
+        return self._place("sell", symbol, quantity, **kwargs)
+
+    def get_order(self, order_id):
+        self.reads.append("get_order")
+        if self.existing is None:
+            raise OrderError(f"Order {order_id} not found")
+        return self.existing
+
+    def cancel_order(self, order_id):
+        self.writes.append(("cancel", order_id))
+        self.existing = stock_order(
+            order_id=order_id, status=self.after_cancel, quantity=40.0, price=90.0,
+            average_price=None, filled_at=None, filled_quantity=0.0,
+        )
+        return {}
+
+
+def code_from(output):
+    """The confirmation code a preview printed."""
+    return output.split("--confirm ")[-1].split()[0]
+
+
+class TestConfirmationCode:
+    def test_same_action_same_code(self):
+        assert cli.confirmation_code("buy", "AAPL", "10") == cli.confirmation_code(
+            "buy", "AAPL", "10",
+        )
+        assert len(cli.confirmation_code("buy", "AAPL", "10")) == 6
+
+    def test_any_difference_changes_it(self):
+        base = cli.confirmation_code("buy", "AAPL", "10", "350.0000", "gfd", False)
+        different = [
+            ("sell", "AAPL", "10", "350.0000", "gfd", False),
+            ("buy", "MSFT", "10", "350.0000", "gfd", False),
+            ("buy", "AAPL", "100", "350.0000", "gfd", False),
+            ("buy", "AAPL", "10", "35.0000", "gfd", False),
+            ("buy", "AAPL", "10", "market", "gfd", False),
+            ("buy", "AAPL", "10", "350.0000", "gtc", False),
+            ("buy", "AAPL", "10", "350.0000", "gfd", True),
+        ]
+        codes = {cli.confirmation_code(*parts) for parts in different}
+        assert base not in codes
+        assert len(codes) == len(different)
+
+    def test_a_code_does_not_work_the_next_day(self, monkeypatch):
+        today = cli.confirmation_code("buy", "AAPL", "10")
+
+        class Tomorrow(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return datetime.now(tz) + timedelta(days=1)
+
+        monkeypatch.setattr(cli, "datetime", Tomorrow)
+        assert cli.confirmation_code("buy", "AAPL", "10") != today
+
+
+class TestStockOrder:
+    def test_without_a_code_it_previews_and_sends_nothing(self, capsys):
+        client = OrderClient(buying_power=5000.0)
+
+        assert cli.stock_order(client, "buy", "aapl", 10, limit=350.0) == 0
+
+        out = capsys.readouterr().out
+        assert client.writes == []
+        assert out.startswith("PREVIEW. Nothing has been sent.")
+        assert "Buy 10 AAPL, limit $350.00, good for day" in out
+        assert "Estimated cost:     $3,500.00" in out
+        assert "Buying power:       $5,000.00" in out
+        assert "show this preview to the user" in out
+        assert f"pyhood buy AAPL 10 --limit 350 --confirm {code_from(out)}" in out
+
+    def test_the_printed_command_places_exactly_the_previewed_order(self, capsys):
+        client = OrderClient(buying_power=5000.0)
+        cli.stock_order(client, "buy", "AAPL", 10, limit=350.0, time_in_force="gtc")
+        code = code_from(capsys.readouterr().out)
+
+        result = cli.stock_order(
+            client, "buy", "AAPL", 10, limit=350.0, time_in_force="gtc",
+            confirm=code, settle_seconds=0,
+        )
+
+        assert result == 0
+        assert client.writes == [
+            ("buy", "AAPL", 10, {"price": 350.0, "time_in_force": "gtc",
+                                 "extended_hours": False}),
+        ]
+        out = capsys.readouterr().out
+        assert out.startswith("PLACED: Buy 10 AAPL, limit $350.00, good till cancelled")
+        assert "Order ID:  new-order" in out
+        assert "pyhood cancel new-order" in out
+
+    @pytest.mark.parametrize("changed", [
+        {"quantity": 100},
+        {"symbol": "MSFT"},
+        {"limit": 35.0},
+        {"limit": None},
+        {"side": "sell"},
+        {"time_in_force": "gtc"},
+        {"extended_hours": True},
+    ])
+    def test_a_code_for_one_order_will_not_place_another(self, capsys, changed):
+        """Ten shares previewed must not become a hundred placed."""
+        client = OrderClient(buying_power=5000.0)
+        order = {"side": "buy", "symbol": "AAPL", "quantity": 10, "limit": 350.0}
+        cli.stock_order(client, **order)
+        code = code_from(capsys.readouterr().out)
+        client.reads.clear()
+
+        result = cli.stock_order(client, **{**order, **changed}, confirm=code, settle_seconds=0)
+
+        assert result == 2
+        assert client.writes == []
+        assert client.reads == []  # refused before any request
+        assert "nothing was sent" in capsys.readouterr().err
+
+    def test_a_made_up_code_is_refused(self, capsys):
+        client = OrderClient()
+
+        assert cli.stock_order(client, "buy", "AAPL", 10, limit=350.0, confirm="yes") == 2
+        assert client.writes == []
+
+    def test_market_order(self, capsys):
+        client = OrderClient(buying_power=5000.0)
+
+        cli.stock_order(client, "buy", "AAPL", 2, limit=None)
+
+        out = capsys.readouterr().out
+        assert "Buy 2 AAPL, at market, good for day" in out
+        assert "Estimated cost:     $700.20" in out  # the ask, not the last price
+        assert "can differ from the quote" in out
+        assert "pyhood buy AAPL 2 --market --confirm" in out
+
+        cli.stock_order(client, "buy", "AAPL", 2, limit=None, confirm=code_from(out),
+                        settle_seconds=0)
+        assert client.writes[0][3]["price"] is None
+
+    def test_buying_more_than_buying_power_is_flagged(self, capsys):
+        cli.stock_order(OrderClient(buying_power=168.85), "buy", "AAPL", 10, limit=350.0)
+        assert "more than your buying power" in capsys.readouterr().out
+
+    def test_selling_more_than_held_is_flagged(self, capsys):
+        client = OrderClient(stocks=[Position("ANT", 95.0, 97.13, 83.0, 7885.0, -1342.0, -14.5)],
+                             price=83.0, bid=83.0, ask=83.1)
+
+        cli.stock_order(client, "sell", "ANT", 100, limit=85.0)
+
+        out = capsys.readouterr().out
+        assert "Sell 100 ANT, limit $85.00" in out
+        assert "Estimated proceeds: $8,500.00" in out
+        assert "You hold:           95 ANT" in out
+        assert "fewer than this order sells" in out
+        assert "Buying power" not in out
+
+    def test_a_limit_far_from_the_price_is_pointed_out(self, capsys):
+        cli.stock_order(OrderClient(buying_power=99999.0), "buy", "AAPL", 1, limit=35.0)
+        assert "90.0% below the last price of $350.00" in capsys.readouterr().out
+
+        cli.stock_order(OrderClient(buying_power=99999.0), "buy", "AAPL", 1, limit=351.0)
+        assert "the last price of" not in capsys.readouterr().out
+
+    def test_a_rejected_order_reports_robinhoods_reason(self, capsys):
+        client = OrderClient(reject="Order rejected: You can only purchase 41 shares")
+        cli.stock_order(client, "buy", "AAPL", 10, limit=350.0)
+        code = code_from(capsys.readouterr().out)
+
+        result = cli.stock_order(client, "buy", "AAPL", 10, limit=350.0, confirm=code,
+                                 settle_seconds=0)
+
+        captured = capsys.readouterr()
+        assert result == 1
+        assert "You can only purchase 41 shares" in captured.err
+        assert "PLACED" not in captured.out
+
+
+class TestCancel:
+    OPEN = stock_order(
+        order_id="order-9", status="confirmed", quantity=40.0, price=90.0,
+        average_price=None, filled_at=None, filled_quantity=0.0,
+    )
+
+    def test_without_a_code_it_previews_and_sends_nothing(self, capsys):
+        client = OrderClient(existing=self.OPEN)
+
+        assert cli.cancel(client, "order-9") == 0
+
+        out = capsys.readouterr().out
+        assert client.writes == []
+        assert out.startswith("PREVIEW. Nothing has been sent.")
+        assert "Cancel: buy 40 ANT, limit $90.00" in out
+        assert f"pyhood cancel order-9 --confirm {code_from(out)}" in out
+
+    def test_with_its_code_it_cancels_and_reports_the_outcome(self, capsys):
+        client = OrderClient(existing=self.OPEN)
+        cli.cancel(client, "order-9")
+        code = code_from(capsys.readouterr().out)
+
+        assert cli.cancel(client, "order-9", confirm=code, settle_seconds=0) == 0
+
+        assert client.writes == [("cancel", "order-9")]
+        assert capsys.readouterr().out.startswith("CANCELLED: buy 40 ANT")
+
+    def test_a_code_for_one_order_will_not_cancel_another(self, capsys):
+        client = OrderClient(existing=self.OPEN)
+        cli.cancel(client, "order-9")
+        code = code_from(capsys.readouterr().out)
+        client.reads.clear()
+
+        assert cli.cancel(client, "order-8", confirm=code, settle_seconds=0) == 2
+        assert client.writes == []
+        assert client.reads == []
+
+    def test_an_order_that_filled_before_the_cancel_landed_says_so(self, capsys):
+        client = OrderClient(existing=self.OPEN, after_cancel="filled")
+        cli.cancel(client, "order-9")
+        code = code_from(capsys.readouterr().out)
+
+        cli.cancel(client, "order-9", confirm=code, settle_seconds=0)
+
+        out = capsys.readouterr().out
+        assert "CANCELLED" not in out
+        assert "the order is now filled" in out
+
+    def test_a_finished_order_has_nothing_to_cancel(self, capsys):
+        client = OrderClient(existing=stock_order(order_id="order-1"))  # filled
+
+        assert cli.cancel(client, "order-1") == 1
+
+        out = capsys.readouterr().out
+        assert "already filled" in out
+        assert "--confirm" not in out
+        assert client.writes == []
+
+
+class TestOpenOrders:
+    def test_open_shows_only_orders_that_can_still_fill_with_their_ids(self, capsys):
+        waiting = stock_order(order_id="order-9", status="confirmed", average_price=None,
+                              filled_at=None, filled_quantity=0.0)
+
+        cli.orders(FakeClient(stock_orders=[stock_order(), CANCELLED, waiting]), open_only=True)
+
+        out = capsys.readouterr().out
+        assert out.startswith("Open orders since")
+        rows = out.splitlines()[2:3]
+        assert rows[0].split()[-2:] == ["confirmed", "order-9"]
+        assert "order-1" not in out and "order-2" not in out
+
+    def test_every_order_row_ends_with_its_id(self, capsys):
+        cli.orders(FakeClient(stock_orders=[stock_order()]))
+        assert capsys.readouterr().out.splitlines()[1].endswith("ORDER ID")
+
+
+class TestOrderCommandLine:
+    @pytest.mark.parametrize(("argv", "kwargs"), [
+        (["buy", "AAPL", "10", "--limit", "350"],
+         {"side": "buy", "symbol": "AAPL", "quantity": 10.0, "limit": 350.0,
+          "time_in_force": "gfd", "extended_hours": False, "confirm": None}),
+        (["sell", "ant", "0.5", "--market", "--tif", "gtc", "--extended-hours",
+          "--confirm", "abc123"],
+         {"side": "sell", "symbol": "ant", "quantity": 0.5, "limit": None,
+          "time_in_force": "gtc", "extended_hours": True, "confirm": "abc123"}),
+    ])
+    def test_buy_and_sell(self, monkeypatch, argv, kwargs):
+        seen = []
+        monkeypatch.setattr(cli, "run", lambda fn, **kw: seen.append((fn, kw)) or 0)
+
+        assert onboarding.main(argv) == 0
+        assert seen == [(cli.stock_order, kwargs)]
+
+    def test_cancel(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(cli, "run", lambda fn, **kw: seen.append((fn, kw)) or 0)
+
+        onboarding.main(["cancel", "order-9", "--confirm", "abc123"])
+        assert seen == [(cli.cancel, {"order_id": "order-9", "confirm": "abc123"})]
+
+    @pytest.mark.parametrize("argv", [
+        ["buy", "AAPL", "10"],                              # neither --limit nor --market
+        ["buy", "AAPL", "10", "--limit", "350", "--market"],  # both
+        ["buy", "AAPL", "0", "--limit", "350"],
+        ["buy", "AAPL", "-5", "--limit", "350"],
+        ["buy", "AAPL", "ten", "--limit", "350"],
+        ["buy", "AAPL", "nan", "--limit", "350"],
+        ["buy", "AAPL", "10", "--limit", "0"],
+        ["sell", "AAPL", "10", "--limit", "350", "--tif", "ioc"],
+        ["cancel"],
+    ])
+    def test_an_order_that_is_not_fully_specified_is_refused(self, argv, capsys):
+        """No price means no order, not a market order by default."""
+        with pytest.raises(SystemExit) as stop:
+            onboarding.main(argv)
+        assert stop.value.code == 2
+
+
+# ── Printed commands work where they are printed ─────────────────────
+
+
+class TestProgram:
+    """An install in its own folder is often not on the PATH. A command
+    pyhood prints for someone to run next must still work as printed."""
+
+    @pytest.fixture
+    def install(self, tmp_path, monkeypatch):
+        monkeypatch.undo()  # drop the autouse stand-in; this tests the real one
+        bin_dir = tmp_path / "pyhood" / "bin"
+        bin_dir.mkdir(parents=True)
+        (bin_dir / "python").write_text("")
+        (bin_dir / "pyhood").write_text("")
+        monkeypatch.setattr(cli.sys, "executable", str(bin_dir / "python"))
+        return bin_dir / "pyhood"
+
+    def test_on_the_path_it_is_just_pyhood(self, install, monkeypatch):
+        monkeypatch.setattr(cli.shutil, "which", lambda name: str(install))
+        assert cli.program() == "pyhood"
+
+    def test_off_the_path_it_is_the_full_path(self, install, monkeypatch):
+        monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+        assert cli.program() == str(install)
+
+    def test_a_different_install_on_the_path_does_not_count(self, install, monkeypatch, tmp_path):
+        other = tmp_path / "elsewhere" / "pyhood"
+        other.parent.mkdir()
+        other.write_text("")
+        monkeypatch.setattr(cli.shutil, "which", lambda name: str(other))
+        assert cli.program() == str(install)
+
+    def test_the_preview_prints_a_command_that_runs_here(self, install, monkeypatch, capsys):
+        monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+
+        cli.stock_order(OrderClient(buying_power=5000.0), "buy", "AAPL", 10, limit=350.0)
+
+        assert f"  {install} buy AAPL 10 --limit 350 --confirm " in capsys.readouterr().out
+
+    def test_the_guide_says_so_only_when_it_matters(self, install, monkeypatch):
+        monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+        text = guide.render()
+        assert "THE COMMAND" in text and str(install) in text
+
+        monkeypatch.setattr(cli.shutil, "which", lambda name: str(install))
+        assert "THE COMMAND" not in guide.render()
 
 
 # ── The guide's commands are real ────────────────────────────────────
@@ -376,4 +770,6 @@ def test_every_command_in_the_guide_parses(line):
 
     args = onboarding.build_parser().parse_args(argv)
 
-    assert args.command in ("positions", "orders", "buying-power", "quote")
+    assert args.command in (
+        "positions", "orders", "buying-power", "quote", "buy", "sell", "cancel",
+    )
