@@ -63,7 +63,7 @@ MODELS: tuple[str, ...] = (
     "Watchlist",
 )
 
-INTRO = """\
+COMMANDS = """\
 pyhood {version}: a Python client for Robinhood
 ==============================================
 
@@ -74,12 +74,68 @@ RULES
      not import it from a source folder.
   2. Never ask for, read or type a password or API key. Login is saved.
   3. Never place an order or move money without showing the user exactly
-     what will happen first and getting a yes. See PLACING ORDERS.
+     what will happen first and getting a yes. See PLACING ORDERS. That
+     includes deposits and withdrawals.
      Cancel an order only when the user asks you to.
-  4. Do not guess field or method names. They are all listed below.
+  4. Do not guess command, field or method names. The commands are all
+     listed below.
 
-QUICK ANSWERS (no script needed, all read-only)
-  Try these first. They cover most questions about an account.
+PLACING ORDERS (two steps, every time)
+  Step 1. Preview. This sends nothing:
+
+      pyhood buy AAPL 10 --limit 350
+      pyhood sell AAPL 10 --limit 360
+      pyhood buy AAPL 10 --market
+      pyhood buy AAPL --dollars 50 --market
+      pyhood sell AAPL 10 --stop 340 --market --tif gtc
+      pyhood buy-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 2.50
+      pyhood sell-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 3.00
+      pyhood spread AAPL --expires 2026-12-18 --leg buy:call:350 --leg sell:call:360 --contracts 1 --debit 2.50
+      pyhood crypto buy BTC 0.001 --limit 59000
+      pyhood crypto sell BTC 0.001 --market
+
+  Moving money between the user's bank and Robinhood works the same way:
+
+      pyhood withdraw 500
+      pyhood deposit 500
+
+  The preview shows the order, its cost, the current price and any
+  problem with it, and ends with the exact command that would place it,
+  including a confirmation code.
+
+  Step 2. Show the whole preview to the user and ask. Only if they say
+  yes, run the command the preview printed, unchanged.
+
+  Do not invent a code and do not change an order after previewing it: a
+  code works for one exact order on one day, and anything else is refused.
+  If the user changes their mind about quantity or price, preview again.
+  An order needs --limit PRICE or --market; there is no default.
+  Orders are good for the day unless you add --tif gtc.
+  --stop PRICE makes a stop order: it waits until the price reaches PRICE,
+  then places the --market or --limit order. A stop meant as protection
+  needs --tif gtc, or it expires at the end of the day.
+  Option prices are per share and a contract is 100 shares: --limit 2.50
+  on 1 contract is $250. A crypto quantity is in the coin, not dollars:
+  0.001 BTC is a thousandth of a bitcoin. Look up real expirations and
+  strikes with `pyhood options` first; do not guess them. buy-option opens
+  a position and sell-option closes one unless you add --to open or
+  --to close.
+  --dollars buys or sells an amount of money's worth, as a market order.
+  A spread is two to four legs, each SIDE:TYPE:STRIKE, for one net price:
+  --debit is the most to pay and --credit the least to accept, per share.
+
+CANCELLING AN ORDER (one step)
+      pyhood orders --open        the orders that can still be cancelled, with IDs
+      pyhood cancel ORDER_ID      cancels that order at once
+      pyhood crypto cancel ORDER_ID    the same for a crypto order; its IDs
+                                  are in the crypto orders list
+      pyhood cancel-transfer TRANSFER_ID    a bank transfer that is still pending
+
+  There is no preview and no code: the user asking you to cancel is the
+  yes. Cancel the order they mean and tell them what the command reported.
+  Never cancel an order they did not ask you to cancel.
+
+LOOKING THINGS UP (read-only, no preview needed)
 
     The account
       pyhood accounts             the accounts under this login: individual, IRA
@@ -89,6 +145,7 @@ QUICK ANSWERS (no script needed, all read-only)
       pyhood buying-power         cash available to trade with
       pyhood dividends            dividends paid and pending
       pyhood transfers            money moved in, out and between accounts
+      pyhood banks                the bank accounts linked for transfers
 
     The market
       pyhood quote AAPL MSFT      current prices; add --fundamentals for more
@@ -129,48 +186,23 @@ QUICK ANSWERS (no script needed, all read-only)
   watch and unwatch change a watchlist at once. No money is involved, so
   they need no preview.
 
-PLACING ORDERS (two steps, every time)
-  Step 1. Preview. This sends nothing:
+ANYTHING ELSE
+  The commands above cover most requests. For something they do not, such
+  as documents, trailing stops or a calculation over several results, write
+  a Python script. First run:
 
-      pyhood buy AAPL 10 --limit 350
-      pyhood sell AAPL 10 --limit 360
-      pyhood buy AAPL 10 --market
-      pyhood sell AAPL 10 --stop 340 --market --tif gtc
-      pyhood buy-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 2.50
-      pyhood sell-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 3.00
-      pyhood crypto buy BTC 0.001 --limit 59000
-      pyhood crypto sell BTC 0.001 --market
+      pyhood guide python
 
-  The preview shows the order, its cost, the current price and any
-  problem with it, and ends with the exact command that would place it,
-  including a confirmation code.
+  It lists the methods and the fields of what they return.
+"""
 
-  Step 2. Show the whole preview to the user and ask. Only if they say
-  yes, run the command the preview printed, unchanged.
+SCRIPTS = """\
+pyhood {version}: writing a script
+==================================
 
-  Do not invent a code and do not change an order after previewing it: a
-  code works for one exact order on one day, and anything else is refused.
-  If the user changes their mind about quantity or price, preview again.
-  An order needs --limit PRICE or --market; there is no default.
-  Orders are good for the day unless you add --tif gtc.
-  --stop PRICE makes a stop order: it waits until the price reaches PRICE,
-  then places the --market or --limit order. A stop meant as protection
-  needs --tif gtc, or it expires at the end of the day.
-  Option prices are per share and a contract is 100 shares: --limit 2.50
-  on 1 contract is $250. A crypto quantity is in the coin, not dollars:
-  0.001 BTC is a thousandth of a bitcoin. Look up real expirations and strikes with
-  `pyhood options` first; do not guess them. buy-option opens a position
-  and sell-option closes one unless you add --to open or --to close.
-
-CANCELLING AN ORDER (one step)
-      pyhood orders --open        the orders that can still be cancelled, with IDs
-      pyhood cancel ORDER_ID      cancels that order at once
-      pyhood crypto cancel ORDER_ID    the same for a crypto order; its IDs
-                                  are in the crypto orders list
-
-  There is no preview and no code: the user asking you to cancel is the
-  yes. Cancel the order they mean and tell them what the command reported.
-  Never cancel an order they did not ask you to cancel.
+For what the commands in `pyhood guide` do not cover. The rules there apply
+here too: never ask for a password, and never place an order or move money
+without showing the user what will happen and getting a yes.
 
 RUNNING A SCRIPT
   For anything the commands above do not cover, write Python and run it:
@@ -300,33 +332,37 @@ def _path_note() -> str:
     )
 
 
-def _intro(version: str) -> str:
-    """The hand-written part, with the path note ahead of the first command."""
-    # Not str.format: the examples contain f-strings, whose braces it would read.
-    text = INTRO.replace("{version}", version)
+def _with_path_note(text: str, before: str) -> str:
+    """Put the note on how to run pyhood ahead of the first command shown."""
     note = _path_note()
-    if note:
-        text = text.replace("QUICK ANSWERS", f"{note}\nQUICK ANSWERS", 1)
-    return text
+    return text.replace(before, f"{note}\n{before}", 1) if note else text
 
 
-def render() -> str:
-    """Build the guide for the installed version."""
+def render(topic: str | None = None) -> str:
+    """Build the guide for the installed version.
+
+    With no topic, the commands: what an agent needs for nearly every
+    request, and short enough to be read whole. With 'python', the
+    reference for writing a script: methods, fields and an example.
+    """
     from pyhood import __version__
 
-    return "\n".join(part for part in (
-        _intro(__version__),
-        _methods("READING (safe to call freely)", READ_METHODS),
-        _models(),
-        _methods(
-            "ORDERS FROM A SCRIPT (prefer the commands under PLACING ORDERS, which\n"
-            "preview first; these send at once, so ask the user first)",
-            WRITE_METHODS,
-        ),
-        OUTRO,
-    ) if part)
+    # Not str.format: the examples contain f-strings, whose braces it would read.
+    if topic == "python":
+        return "\n".join((
+            _with_path_note(SCRIPTS.replace("{version}", __version__), "RUNNING A SCRIPT"),
+            _methods("READING (safe to call freely)", READ_METHODS),
+            _models(),
+            _methods(
+                "ORDERS FROM A SCRIPT (prefer the commands in `pyhood guide`, which\n"
+                "preview first; these send at once, so ask the user first)",
+                WRITE_METHODS,
+            ),
+            OUTRO,
+        ))
+    return _with_path_note(COMMANDS.replace("{version}", __version__), "PLACING ORDERS (")
 
 
-def main() -> int:
-    sys.stdout.write(render())
+def main(topic: str | None = None) -> int:
+    sys.stdout.write(render(topic))
     return 0

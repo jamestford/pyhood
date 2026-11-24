@@ -143,6 +143,11 @@ class TestImportErrors:
 
 
 class TestGuide:
+    """`pyhood guide` is the commands and the rules for orders. `pyhood
+    guide python` is the reference for writing a script. They were one
+    page, which grew to 240 lines: a model that read the first hundred
+    never saw how to place a spread, and made up a Python call."""
+
     @pytest.mark.parametrize("name", guide.READ_METHODS + guide.WRITE_METHODS)
     def test_every_method_named_exists_and_is_not_retired(self, name):
         method = getattr(PyhoodClient, name)
@@ -153,10 +158,10 @@ class TestGuide:
     def test_every_model_named_exists_with_its_fields(self, name):
         cls = getattr(models, name)
         fields = ", ".join(f.name for f in dataclasses.fields(cls))
-        assert f"  {name}: {fields}" in guide.render()
+        assert f"  {name}: {fields}" in guide.render("python")
 
     def test_signatures_come_from_the_code(self):
-        text = guide.render()
+        text = guide.render("python")
         assert (
             "client.get_quote(symbol: str, include_fundamentals: bool = False) -> Quote"
             in text
@@ -165,23 +170,43 @@ class TestGuide:
 
     def test_the_example_uses_real_methods_and_fields(self):
         """Hand-written code is where a guide goes stale."""
-        for method in re.findall(r"client\.(\w+)\(", guide.INTRO):
+        for method in re.findall(r"client\.(\w+)\(", guide.SCRIPTS):
             assert hasattr(PyhoodClient, method), method
         position_fields = {f.name for f in dataclasses.fields(Position)}
         order_fields = {f.name for f in dataclasses.fields(Order)}
-        assert set(re.findall(r"\bp\.(\w+)", guide.INTRO)) <= position_fields
-        assert set(re.findall(r"\bo\.(\w+)", guide.INTRO)) <= order_fields
+        assert set(re.findall(r"\bp\.(\w+)", guide.SCRIPTS)) <= position_fields
+        assert set(re.findall(r"\bo\.(\w+)", guide.SCRIPTS)) <= order_fields
 
-    def test_it_carries_the_version_and_the_rules(self):
+    def test_the_commands_page_carries_the_version_and_the_rules(self):
         text = guide.render()
         assert f"pyhood {pyhood.__version__}" in text
-        assert "pyhood run script.py" in text
         assert "Never place an order or move money without showing the user" in text
         assert "Cancel an order only when the user asks you to." in text
         assert "Never ask for, read or type a password" in text
+        assert "pyhood guide python" in text
+
+    def test_the_commands_page_is_short_enough_to_be_read_whole(self):
+        lines = guide.render().splitlines()
+        assert len(lines) <= 150
+        # A model that reads only the first hundred lines must still get
+        # every rule for placing and cancelling an order.
+        first_hundred = "\n".join(lines[:100])
+        assert "PLACING ORDERS (two steps" in first_hundred
+        assert "CANCELLING AN ORDER" in first_hundred
+        assert first_hundred.index("PLACING ORDERS (") < first_hundred.index("LOOKING THINGS UP")
+
+    def test_the_commands_page_has_no_python_reference(self):
+        text = guide.render()
+        assert "client." not in text
+        assert "FIELDS" not in text
+
+    def test_the_python_page_says_how_to_run_a_script(self):
+        text = guide.render("python")
+        assert "pyhood run script.py" in text
+        assert "never place an order or move money" in text
 
     def test_orders_are_listed_apart_from_reads(self):
-        text = guide.render()
+        text = guide.render("python")
         reading = text[text.index("READING"):text.index("FIELDS")]
         orders = text[text.index("ORDERS FROM A SCRIPT"):]
         for name in guide.WRITE_METHODS:
@@ -189,9 +214,12 @@ class TestGuide:
             assert f"client.{name}(" in orders
         assert not set(guide.READ_METHODS) & set(guide.WRITE_METHODS)
 
-    def test_guide_command_prints_it(self, capsys):
+    def test_guide_commands_print_each_page(self, capsys):
         assert onboarding.main(["guide"]) == 0
         assert capsys.readouterr().out == guide.render()
+
+        assert onboarding.main(["guide", "python"]) == 0
+        assert capsys.readouterr().out == guide.render("python")
 
 
 # ── `pyhood run` finds the right Python ──────────────────────────────

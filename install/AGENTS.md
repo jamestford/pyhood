@@ -17,7 +17,7 @@ bin/pyhood guide
 
 On Windows the command is `Scripts\pyhood`. If `pyhood` is on the PATH, plain `pyhood guide` works too.
 
-The guide lists the commands for reading the account and placing orders, how to run a script, and the rules. It describes the version installed here.
+The guide lists the commands for reading the account and the market, and for placing orders, with the rules for each. It describes the version installed here. For the rare request the commands do not cover, `bin/pyhood guide python` explains how to write a script.
 
 ## Rules
 

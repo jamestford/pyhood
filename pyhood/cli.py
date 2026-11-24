@@ -130,6 +130,17 @@ def program() -> str:
 # ── Formatting ───────────────────────────────────────────────────────
 
 
+def plain(value: float) -> str:
+    """A number written out in full: '12345.67', '5000000', '0.00001'.
+
+    For anything that has to survive being typed back in, which is every
+    number in a command that pyhood prints and in a confirmation code. The
+    general 'g' format will not do: it keeps six significant digits, so
+    12345.67 comes out as 12345.7 and five million as 5e+06.
+    """
+    return f"{value:.8f}".rstrip("0").rstrip(".")
+
+
 def money(value: float | None) -> str:
     """'$1,234.56', '-$5.00', or '-' when the value is unknown."""
     if value is None:
@@ -772,7 +783,7 @@ def stock_order(
     client: Any,
     side: str,
     symbol: str,
-    quantity: float,
+    quantity: float | None = None,
     limit: float | None = None,
     stop: float | None = None,
     time_in_force: str = "gfd",
@@ -780,24 +791,42 @@ def stock_order(
     account: str | None = None,
     confirm: str | None = None,
     settle_seconds: float = 2.0,
+    dollars: float | None = None,
 ) -> int:
     """Preview a stock order, or place it when given its confirmation code.
 
     `limit` of None is a market order. `stop` makes it a stop order: it
     waits until the price reaches `stop`, then becomes the market or limit
-    order it describes.
+    order it describes. `dollars` in place of `quantity` buys or sells that
+    much money's worth, which is usually a fraction of a share.
     """
     symbol = symbol.upper()
-    kind = "market" if limit is None else f"{limit:.4f}"
-    trigger = "" if stop is None else f"{stop:.4f}"
+    if (quantity is None) == (dollars is None):
+        raise UsageError("Give a number of shares, or --dollars AMOUNT, but not both.")
+    if dollars is not None:
+        # Robinhood takes a fraction of a share only as a market order.
+        if limit is not None or stop is not None:
+            raise UsageError(
+                "An order by dollar amount is a market order: use --market, with no "
+                "--limit or --stop."
+            )
+        if extended_hours:
+            raise UsageError("An order by dollar amount trades in regular hours only.")
+        if dollars < 1:
+            raise UsageError("The smallest order by dollar amount is $1.")
+    kind = "market" if limit is None else plain(limit)
+    trigger = "" if stop is None else plain(stop)
     where = (account or "").strip().lower()
+    size = plain(quantity) if dollars is None else f"${dollars:.2f}"
     code = confirmation_code(
-        side, symbol, f"{quantity:g}", kind, trigger, time_in_force, extended_hours, where,
+        side, symbol, size, kind, trigger, time_in_force, extended_hours, where,
     )
-    command = f"{program()} {side} {symbol} {quantity:g} "
+    command = f"{program()} {side} {symbol} " + (
+        f"{plain(quantity)} " if dollars is None else f"--dollars {plain(dollars)} "
+    )
     if stop is not None:
-        command += f"--stop {stop:g} "
-    command += "--market" if limit is None else f"--limit {limit:g}"
+        command += f"--stop {plain(stop)} "
+    command += "--market" if limit is None else f"--limit {plain(limit)}"
     if time_in_force != "gfd":
         command += f" --tif {time_in_force}"
     if extended_hours:
@@ -815,24 +844,29 @@ def stock_order(
     if stop is not None:
         terms = f"stop {money(stop)} then {terms}"
     duration = "good for day" if time_in_force == "gfd" else "good till cancelled"
-    summary = f"{side.capitalize()} {number(quantity)} {symbol}, {terms}, {duration}"
+    what = f"{number(quantity)} {symbol}" if dollars is None else f"{money(dollars)} of {symbol}"
+    summary = f"{side.capitalize()} {what}, {terms}, {duration}"
     if extended_hours:
         summary += ", extended hours"
     if account_label:
         summary += f", in {account_label}"
 
     if confirm is not None:
-        place = client.buy_stock if side == "buy" else client.sell_stock
-        options: dict[str, Any] = {
-            "price": limit, "time_in_force": time_in_force, "extended_hours": extended_hours,
-        }
-        # Only named when used, so an ordinary order is sent exactly as before.
-        if stop is not None:
-            options["stop_price"] = stop
+        options: dict[str, Any] = {"time_in_force": time_in_force}
         if account_number:
             options["account_number"] = account_number
+        if dollars is not None:
+            place = client.buy_stock_by_price if side == "buy" else client.sell_stock_by_price
+            size_to_send: float = dollars
+        else:
+            place = client.buy_stock if side == "buy" else client.sell_stock
+            size_to_send = quantity  # type: ignore[assignment]
+            options.update(price=limit, extended_hours=extended_hours)
+            # Only named when used, so an ordinary order is sent exactly as before.
+            if stop is not None:
+                options["stop_price"] = stop
         try:
-            order = place(symbol, quantity, **options)
+            order = place(symbol, size_to_send, **options)
         except OrderError as e:
             print(f"Robinhood did not accept the order: {e}", file=sys.stderr)
             return 1
@@ -860,12 +894,18 @@ def stock_order(
     reference = limit if limit is not None else stop
     if reference is None:
         reference = (quote_now.ask if side == "buy" else quote_now.bid) or quote_now.price
-    value = quantity * reference
+    if dollars is not None:
+        value = dollars
+        quantity = dollars / reference if reference else 0.0
+    else:
+        value = quantity * reference  # type: ignore[operator]
 
     print("PREVIEW. Nothing has been sent.\n")
     print(f"  {summary}")
     label = "Estimated cost:" if side == "buy" else "Estimated proceeds:"
     print(f"  {label:<20}{money(value)}")
+    if dollars is not None:
+        print(f"  {'About:':<20}{number(round(quantity, 6))} shares at {money(reference)}")
     print(f"  {symbol + ' now:':<20}{money(quote_now.price)} "
           f"(bid {money(quote_now.bid)}, ask {money(quote_now.ask)})")
 
@@ -895,6 +935,11 @@ def stock_order(
             )
     print(f"  {'Market open:':<20}{'yes' if client.is_market_open() else 'no'}")
 
+    if dollars is None and limit is not None and quantity != int(quantity):
+        warnings.append(
+            "Robinhood takes a fraction of a share only as a market order, so it is "
+            "likely to reject this limit order."
+        )
     if stop is not None and quote_now.price:
         # A sell stop sits below the price and a buy stop above it.
         wrong_side = stop >= quote_now.price if side == "sell" else stop <= quote_now.price
@@ -954,12 +999,12 @@ def option_order(
     default_effect = "open" if side == "buy" else "close"
     effect = effect or default_effect
     code = confirmation_code(
-        "option", side, effect, symbol, expiration, f"{strike:g}", option_type, contracts,
-        f"{limit:.4f}", time_in_force, (account or "").strip().lower(),
+        "option", side, effect, symbol, expiration, plain(strike), option_type, contracts,
+        plain(limit), time_in_force, (account or "").strip().lower(),
     )
     command = (
-        f"{program()} {side}-option {symbol} --expires {expiration} --strike {strike:g} "
-        f"--{option_type} --contracts {contracts} --limit {limit:g}"
+        f"{program()} {side}-option {symbol} --expires {expiration} --strike {plain(strike)} "
+        f"--{option_type} --contracts {contracts} --limit {plain(limit)}"
     )
     if effect != default_effect:
         command += f" --to {effect}"

@@ -288,6 +288,18 @@ It is a guardrail against mistakes, not a lock: anything that can run the previe
 | `--extended-hours` | Allow the order to trade outside regular hours |
 | `--confirm CODE` | Act, using the code from the preview |
 
+### Orders by dollar amount
+
+`--dollars AMOUNT` in place of a number of shares buys or sells that much money's worth, which is usually a fraction of a share.
+
+```bash
+pyhood buy AAPL --dollars 50 --market
+```
+
+It is always a market order, in regular hours, of at least $1: Robinhood takes a fraction of a share no other way. The preview shows roughly how many shares the amount comes to.
+
+pyhood has not placed an order by dollar amount against Robinhood. A market order cannot be tested without trading, so this path is covered by tests only.
+
 ### Stop orders
 
 `--stop PRICE` makes an order wait. Nothing happens until the stock reaches the stop price; then the `--market` or `--limit` order is placed.
@@ -341,6 +353,38 @@ The preview checks that the contract exists and names the nearest expirations or
 - a limit 20% or more from the contract's mark, which catches a price typed per contract in place of per share
 - a contract that expires today
 
+### Spreads
+
+`pyhood spread` places two to four option contracts as one order, for one net price.
+
+```text
+$ pyhood spread F --expires 2026-12-11 --leg buy:call:12 --leg sell:call:13 --contracts 1 --debit 0.25
+PREVIEW. Nothing has been sent.
+
+  Open 1 F spread for a debit of $0.25 per share, good for day
+    buy  $12.00 call 2026-12-11   mark $0.31 (bid $0.29, ask $0.33)
+    sell $13.00 call 2026-12-11   mark $0.04 (bid $0.02, ask $0.06)
+  Estimated cost:     $25.00 (1 spread x 100 shares x $0.25)
+  Spread now:         about $0.27 debit at the marks, $0.31 debit to trade at once
+  F now:              $11.95
+```
+
+| Option | Effect |
+|---|---|
+| `--expires YYYY-MM-DD` | The expiration of every leg that does not name its own. Required |
+| `--leg SIDE:TYPE:STRIKE` | One contract: `buy:call:350`, `sell:put:340`. Give it two to four times. Add `:YYYY-MM-DD` for a leg with its own expiration |
+| `--contracts N` | How many spreads. Required |
+| `--debit PRICE` or `--credit PRICE` | The most to pay, or the least to accept, per share. One is required |
+| `--to open` or `--to close` | Opening is the default |
+| `--tif`, `--account` | As for other orders |
+
+The preview checks that every leg is a real contract, and prices the spread from its legs. It points out:
+
+- **legs the wrong way round.** If you ask for a debit but the legs as written pay a credit, the bought and sold legs are probably swapped.
+- **a price 20% or more from what the spread is worth** at the marks.
+
+pyhood has not placed a spread against Robinhood. The order is built the way other clients build it and is covered by tests, but start with one contract.
+
 ### Cancelling an order
 
 ```text
@@ -357,7 +401,31 @@ CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share, placed
 - An order that has already finished is left alone, and the command says so.
 - A cancel is a request. If the order filled before it landed, the command reports that in place of `CANCELLED`, and any part that had already filled is not undone.
 
-These cover stock orders, stop orders and single-leg option orders, in any of your accounts, and crypto orders. Option spreads, trailing stops, orders by dollar amount and futures orders are placed from Python.
+These cover stock orders by shares or by dollar amount, stop orders, single-leg option orders and spreads, in any of your accounts, and crypto orders. Trailing stops and futures orders are placed from Python.
+
+## Moving money
+
+`pyhood deposit` and `pyhood withdraw` move money between a linked bank account and Robinhood. They work in two steps, as orders do.
+
+```text
+$ pyhood withdraw 500
+PREVIEW. Nothing has been sent.
+
+  Withdraw $500.00 from Robinhood to Savings …1234 (Rainy day)
+  Withdrawable cash:  $1,250.00
+
+  Note: A bank transfer takes a few business days to arrive.
+
+To make this transfer, show this preview to the user. If they say yes, run:
+  pyhood withdraw 500 --confirm 98fafd
+```
+
+- **The code is tied to the direction, the amount and the bank.** A code for $50 will not move $500, and a code for a withdrawal will not make a deposit.
+- **`pyhood banks`** lists your linked banks by nickname, type and last four digits. With one bank linked there is nothing to choose. With more, add `--bank` and part of a nickname, a type, or the last four digits.
+- **A withdrawal of more than your withdrawable cash is pointed out.** Money from a recent sale or deposit takes time to become withdrawable.
+- **`pyhood cancel-transfer TRANSFER_ID`** cancels a transfer that has not gone through, at once. The ID is printed when the transfer is made.
+
+pyhood has not made a transfer against Robinhood through these commands. Previews have been run live; the step that sends has only been tested against a stand-in.
 
 ## Setup and checks
 
@@ -375,7 +443,8 @@ These cover stock orders, stop orders and single-leg option orders, in any of yo
 | Command | What it does |
 |---|---|
 | `pyhood run script.py` | Runs a script with the Python pyhood is installed in, so `import pyhood` works however pyhood was installed. `pyhood run -c "..."` works too |
-| `pyhood guide` | Prints how to use pyhood, written for an AI agent: these commands, how to log in, the main methods and the fields they return |
+| `pyhood guide` | Prints how to use pyhood, written for an AI agent: these commands and the rules for placing orders. Short enough to be read whole |
+| `pyhood guide python` | The reference for writing a script: how to log in, the main methods, and the fields of what they return |
 
 ## When a command fails
 

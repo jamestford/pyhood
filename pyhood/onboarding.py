@@ -538,7 +538,15 @@ def build_parser() -> argparse.ArgumentParser:
         )
         order.add_argument("symbol", metavar="SYMBOL", help="the stock's ticker")
         order.add_argument(
-            "quantity", type=_positive, metavar="QUANTITY", help="number of shares",
+            "quantity", type=_positive, nargs="?", metavar="QUANTITY",
+            help="number of shares; leave out when using --dollars",
+        )
+        order.add_argument(
+            "--dollars", type=_positive, metavar="AMOUNT",
+            help=(
+                f"{side} this many dollars' worth in place of a number of shares; "
+                "a market order, usually for a fraction of a share"
+            ),
         )
         price = order.add_mutually_exclusive_group(required=True)
         price.add_argument(
@@ -705,6 +713,88 @@ def build_parser() -> argparse.ArgumentParser:
             "--list", dest="list_name", default="My First List", metavar="NAME",
             help="which watchlist (default: 'My First List')",
         )
+    spread = commands.add_parser(
+        "spread",
+        parents=[in_account],
+        help="preview an option spread, then place it with --confirm",
+        description=(
+            "Places two to four option contracts as one order, for one net price."
+            + two_steps
+        ),
+    )
+    spread.add_argument("symbol", metavar="SYMBOL", help="the underlying stock's ticker")
+    spread.add_argument(
+        "--expires", type=_date, required=True, metavar="YYYY-MM-DD",
+        help="the expiration of every leg that does not name its own",
+    )
+    spread.add_argument(
+        "--leg", dest="legs", type=_spread_leg, action="append", required=True,
+        metavar="SIDE:TYPE:STRIKE",
+        help=(
+            "one contract of the spread, as in buy:call:350 or sell:put:340. Give it "
+            "two to four times. Add :YYYY-MM-DD for a leg with its own expiration"
+        ),
+    )
+    spread.add_argument(
+        "--contracts", type=_count, required=True, metavar="N", help="how many spreads",
+    )
+    net = spread.add_mutually_exclusive_group(required=True)
+    net.add_argument(
+        "--debit", type=_positive, metavar="PRICE",
+        help="the most to pay for the spread, per share: 2.50 is $250 a spread",
+    )
+    net.add_argument(
+        "--credit", type=_positive, metavar="PRICE",
+        help="the least to accept for the spread, per share",
+    )
+    spread.add_argument(
+        "--to", dest="effect", choices=("open", "close"), default="open",
+        help="open a position (default) or close one",
+    )
+    spread.add_argument(
+        "--tif", choices=("gfd", "gtc"), default="gfd",
+        help="gfd (default): good for day. gtc: good till cancelled",
+    )
+    spread.add_argument(
+        "--confirm", metavar="CODE",
+        help="the code a preview of this exact spread printed; places the order",
+    )
+
+    commands.add_parser(
+        "banks", parents=[as_json],
+        help="show the bank accounts linked to Robinhood (read-only)",
+        description="Shows linked bank accounts by nickname, type and last four digits.",
+    )
+    for direction, sense in (
+        ("deposit", "from your bank into Robinhood"),
+        ("withdraw", "from Robinhood to your bank"),
+    ):
+        move = commands.add_parser(
+            direction,
+            help=f"preview moving money {sense}, then do it with --confirm",
+            description=f"Moves money {sense}." + two_steps,
+        )
+        move.add_argument("amount", type=_positive, metavar="AMOUNT", help="dollars")
+        move.add_argument(
+            "--bank", metavar="WHICH",
+            help=(
+                "which linked bank: part of its nickname or type, or its last four "
+                "digits. Needed only if more than one is linked. See `pyhood banks`"
+            ),
+        )
+        move.add_argument(
+            "--confirm", metavar="CODE",
+            help="the code a preview of this exact transfer printed; makes the transfer",
+        )
+    cancel_transfer = commands.add_parser(
+        "cancel-transfer",
+        help="cancel a bank transfer that has not gone through yet",
+        description="Cancels a pending deposit or withdrawal, at once.",
+    )
+    cancel_transfer.add_argument(
+        "transfer_id", metavar="TRANSFER_ID", help="printed when the transfer was made",
+    )
+
     crypto = commands.add_parser(
         "crypto",
         help="crypto prices, holdings and orders, through Robinhood's Crypto API",
@@ -811,13 +901,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--fundamentals", action="store_true",
         help="add volume, P/E, market cap and the 52-week range (one more request)",
     )
-    commands.add_parser(
+    guide = commands.add_parser(
         "guide",
         help="print how to use pyhood, written for an AI agent",
         description=(
-            "Prints how to run pyhood, how to log in, the main methods and "
-            "the fields of what they return, for the installed version."
+            "Prints the commands an agent uses and the rules for orders, for the "
+            "installed version. `pyhood guide python` prints the reference for "
+            "writing a script: methods, and the fields of what they return."
         ),
+    )
+    guide.add_argument(
+        "topic", nargs="?", choices=("python",),
+        help="python: the reference for writing a script",
     )
     run = commands.add_parser(
         "run",
@@ -843,6 +938,13 @@ def _positive(value: str) -> float:
     if not number > 0 or number == float("inf"):
         raise argparse.ArgumentTypeError(f"{value!r} must be greater than zero")
     return number
+
+
+def _spread_leg(value: str) -> dict:
+    """An argparse type: one leg of a spread. Parsed in pyhood.cli_spreads."""
+    from pyhood.cli_spreads import leg
+
+    return leg(value)
 
 
 def _count(value: str) -> int:
@@ -904,7 +1006,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "guide":
         from pyhood import guide
 
-        return guide.main()
+        return guide.main(args.topic)
     simple = {
         "accounts": lambda a: {},
         "earnings": lambda a: {"symbols": a.symbols, "days": a.days},
@@ -922,6 +1024,26 @@ def main(argv: list[str] | None = None) -> int:
         return cli.run(
             getattr(cli, args.command), **simple[args.command](args),
             as_json_output=args.json,
+        )
+    if args.command == "spread":
+        from pyhood import cli, cli_spreads
+
+        return cli.run(
+            cli_spreads.spread, symbol=args.symbol, expires=args.expires, legs=args.legs,
+            contracts=args.contracts, debit=args.debit, credit=args.credit,
+            effect=args.effect, time_in_force=args.tif, account=args.account,
+            confirm=args.confirm,
+        )
+    if args.command in ("banks", "deposit", "withdraw", "cancel-transfer"):
+        from pyhood import cli, cli_transfers
+
+        if args.command == "banks":
+            return cli.run(cli_transfers.banks, as_json_output=args.json)
+        if args.command == "cancel-transfer":
+            return cli.run(cli_transfers.cancel_transfer, transfer_id=args.transfer_id)
+        return cli.run(
+            cli_transfers.transfer, direction=args.command, amount=args.amount,
+            bank=args.bank, confirm=args.confirm,
         )
     if args.command == "crypto":
         from pyhood import cli_markets as markets
@@ -991,6 +1113,7 @@ def main(argv: list[str] | None = None) -> int:
             cli.stock_order, side=args.command, symbol=args.symbol, quantity=args.quantity,
             limit=args.limit, stop=args.stop, time_in_force=args.tif,
             extended_hours=args.extended_hours, account=args.account, confirm=args.confirm,
+            dollars=args.dollars,
         )
     if args.command in ("positions", "orders", "buying-power", "quote"):
         from pyhood import cli
