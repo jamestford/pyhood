@@ -3,7 +3,7 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/jamestford/pyhood/main/assets/logo-tight.png" alt="pyhood logo" width="200">
 
-**A modern Python client for the Robinhood API, built for scripts that need to stay authenticated.**
+**Let your AI agent work your Robinhood account, with a preview before every order.**
 </div>
 
 [![CI](https://github.com/jamestford/pyhood/actions/workflows/ci.yml/badge.svg)](https://github.com/jamestford/pyhood/actions/workflows/ci.yml)
@@ -12,219 +12,212 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/jamestford/pyhood/blob/main/LICENSE)
 [![Security](https://github.com/jamestford/pyhood/actions/workflows/security.yml/badge.svg)](https://github.com/jamestford/pyhood/actions/workflows/security.yml)
-[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-pyhood is a modern, typed, maintained Python client for Robinhood. It supports stocks, options, retirement accounts, futures, banking, documents, research endpoints, and Robinhood's official Crypto Trading API. It is built for automation: authenticate once, persist a session safely, and renew it later without a password, device approval prompt, or human in the loop.
+pyhood lets an AI agent read your Robinhood account and place orders for you. You ask in plain language. The agent runs pyhood. Before anything is sent to Robinhood, you see exactly what it will be and say yes or no.
+
+It works with any agent that can run commands on your computer.
 
 > pyhood is an unofficial client and is not affiliated with Robinhood. Use responsibly. This project is not financial advice.
 
-## Install
+## What you can ask
 
-pyhood installs into a folder of its own, and that folder is also where you work from. With [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS):
+Once it is set up, talk to your agent the way you would to a person:
 
-```bash
-uv venv --managed-python --python 3.14 ~/pyhood
-uv pip install --python ~/pyhood/bin/python pyhood
+| You say | What happens |
+|---|---|
+| "What do I own, and how is it doing?" | It lists your positions with cost, value and profit or loss |
+| "What did I buy this month?" | It lists your orders, with what filled and at what price |
+| "How much can I spend?" | It reads your buying power |
+| "Show me AAPL calls expiring next month" | It shows the contracts near the stock's price, with bid, ask and delta |
+| "Buy 10 shares of AAPL at $350 or better" | It shows you a preview and waits for your yes |
+| "Buy one of those $350 calls for $2.50" | It shows you a preview and waits for your yes |
+| "Cancel that order" | It cancels it and tells you what happened |
+
+## Get started
+
+There are three steps. Your agent does the first, you do the second.
+
+### 1. Ask your agent to install it
+
+Paste this into your agent:
+
+```text
+Install pyhood for me. Follow the install steps in https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md
 ```
 
-That creates `~/pyhood`, holding pyhood, its own copy of Python, and an `AGENTS.md` that tells an AI agent what to do there. The command is `~/pyhood/bin/pyhood`. To type just `pyhood` from any folder, link it into a folder on your PATH:
-
-```bash
-ln -s ~/pyhood/bin/pyhood ~/.local/bin/pyhood
-```
-
-The rest of this page writes `pyhood`. If you skipped the link, type `~/pyhood/bin/pyhood`.
-
-`--managed-python` tells uv to use a Python it downloads and keeps for itself. Without it uv may borrow your system's or Homebrew's Python, and the install breaks when that one is upgraded or removed.
-
-Upgrade later with `uv pip install --python ~/pyhood/bin/python --upgrade pyhood`.
+That file is written for AI agents. It tells yours to put pyhood in a folder of its own, `~/pyhood`, to stop and hand you the login, and not to install anything else.
 
 <details>
-<summary><strong>Installing with pip instead</strong></summary>
+<summary><strong>What the file tells your agent to do</strong></summary>
 
-pyhood needs **Python 3.10 or newer**.
+1. If `~/pyhood/bin/pyhood` already exists, say so and skip the install.
+2. Check that [uv](https://docs.astral.sh/uv/getting-started/installation/) is installed, and stop to ask you if it is not.
+3. Run `uv venv --managed-python --python 3.14 ~/pyhood`
+4. Run `uv pip install --python ~/pyhood/bin/python pyhood`
+5. Run `~/pyhood/bin/pyhood version` to check it.
+6. Ask you to log in yourself. It must never ask for your password or type it.
+7. Run `~/pyhood/bin/pyhood verify`, which reads live prices and changes nothing.
+8. Read `~/pyhood/AGENTS.md`, the instructions that came with the install.
 
-```bash
-python3.14 -m venv ~/pyhood
-~/pyhood/bin/python -m pip install --upgrade pip
-~/pyhood/bin/python -m pip install pyhood
-```
-
-Substitute whichever interpreter you have; 3.10 through 3.14 are tested. On Windows the commands are in `pyhood\Scripts` rather than `pyhood/bin`.
-
-Two things to know about this route:
-
-- **Name the version explicitly.** `python3` on macOS is still 3.9, and an environment built from it cannot install pyhood. The error reads `no matching distribution found`, which looks like the package is missing rather than a version problem.
-- **The environment depends on the Python that created it.** If that Python is later removed, as Homebrew does when it retires a version, the environment stops working and has to be rebuilt.
-
-To add pyhood to a project that already has its own environment, `pip install pyhood` there as usual.
+It is also told not to use `pip`, `sudo` or `--break-system-packages`, and not to install anything but pyhood. You can [read the file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) yourself, or follow the same steps [by hand](https://jamestford.github.io/pyhood/getting-started/).
 
 </details>
 
-## Set Up Stocks, Options and Futures
+The install creates one folder, `~/pyhood`, with pyhood in it. uv is a free tool for installing Python programs (`brew install uv` on macOS). It also downloads a copy of Python for pyhood to run on, which it keeps in its own folder. Nothing is installed system-wide, and your other Python setups are not touched.
+
+### 2. Log in yourself
+
+Your agent will stop and ask you to run this in your own terminal:
 
 ```bash
-pyhood setup login   # store a session
-pyhood verify        # confirm it works
+~/pyhood/bin/pyhood setup login
 ```
 
-`setup login` prompts for your username and password, then waits for you to approve the device in the Robinhood mobile app. The password is read without echoing and is never stored. Only the resulting tokens are saved, to `~/.pyhood/session.json`, readable only by you.
+It asks for your Robinhood username and password, then waits for you to approve the login in the Robinhood app on your phone. Your password is not stored and your agent never sees it. What is saved is a session, in `~/.pyhood/session.json`, readable only by you. pyhood renews that session on its own, so you should rarely need to log in again.
 
-`pyhood verify` is a read-only check: if it prints prices, you are authenticated and working.
+Then tell your agent you are logged in.
 
-## Set Up Crypto
+### 3. Open your agent in the pyhood folder
 
-```bash
-pyhood setup crypto    # generate and register a key pair
-pyhood verify crypto   # confirm it works
-```
-
-Robinhood does not issue you a key pair for the Crypto Trading API. You generate one and register the public half. `setup crypto` runs that exchange, writes both parts to `~/.pyhood/crypto.env` at mode `0600`, and then makes one signed read-only call to confirm Robinhood accepts them. The private key goes straight from generation to disk and is never displayed.
-
-`pyhood verify crypto` re-runs that check any time, and reports which source your credentials resolve from, which is useful when a stale `export` is shadowing the file.
-
-Run `pyhood setup` at any time to see what is configured. See [Setup](#setup) for the full walkthrough.
-
-## From the Command Line
-
-The questions asked most often need no code:
-
-```bash
-pyhood positions             # what you hold, with profit and loss
-pyhood orders                # orders from the last 30 days, newest first
-pyhood orders --since 2026-01-01 --symbol AAPL
-pyhood buying-power          # cash available to trade with
-pyhood quote AAPL MSFT       # current prices; add --fundamentals for more
-pyhood options AAPL          # option expirations; add --expires DATE for contracts
-```
-
-```text
-Orders since 2026-10-25 (times are EST; today is 2026-11-24)
-PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT  FILLED  AVG PRICE  STATUS
-2026-11-19 12:36 EST  buy   AAPL    stock       10  $350.00      10    $349.80  filled
-2026-11-19 11:31 EST  buy   AAPL    stock       10  $340.00       0          -  cancelled
-```
-
-Those are read-only. Each prints a table with times in your own time zone, and takes `--json` for exact values.
-
-### Placing orders
-
-`pyhood buy` and `pyhood sell` work in two steps. Run once, a command only previews:
-
-```text
-$ pyhood buy AAPL 10 --limit 350
-PREVIEW. Nothing has been sent.
-
-  Buy 10 AAPL, limit $350.00, good for day
-  Estimated cost:     $3,500.00
-  AAPL now:           $352.01 (bid $351.99, ask $352.01)
-  Buying power:       $5,000.00
-  Market open:        yes
-
-To place this order, show this preview to the user. If they say yes, run:
-  pyhood buy AAPL 10 --limit 350 --confirm 98dee3
-```
-
-Option orders work the same way, with every term of the contract named:
-
-```bash
-pyhood buy-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 2.50
-```
-
-Run again with the code it printed, and the order is placed. The code belongs to that exact order on that day: change the symbol, quantity or price and it is refused, so what is placed is always what was previewed. An order needs `--limit PRICE` or `--market`; there is no default.
-
-The code is a guardrail against mistakes, not a lock. Anything that can run the preview can read the code.
-
-`pyhood cancel ORDER_ID` cancels an order in one step. A cancel names one order and can only remove it, and when you want out of an order a second step is time in which it can fill.
-
-## Use It With an AI Agent
-
-pyhood is built to be driven by an AI agent. Open your agent in the install folder:
+From now on, start your agent in `~/pyhood`:
 
 ```bash
 cd ~/pyhood
 ```
 
-The install put an `AGENTS.md` there, which agents that follow that convention read when they start. It tells the agent to run `pyhood guide`, and the guide gives it the rest: the commands, how to run a script, and the rules for placing orders. There is nothing to set up by hand.
+The install put a file called `AGENTS.md` in that folder. Many agents read a file of that name when they start, and this one tells them how to use pyhood. There is nothing else to configure.
 
-To use pyhood from some other folder, put one line in that folder's `AGENTS.md` (or `CLAUDE.md`):
+If your agent reads a different file, such as `CLAUDE.md`, or you want to work from another folder, put this one line in the file it does read:
 
 ```text
-pyhood is installed on this machine. Run `pyhood guide` before using it.
+pyhood is installed at ~/pyhood. Run `~/pyhood/bin/pyhood guide` before using it.
 ```
 
-Without either, an agent has to find pyhood for itself. In testing, a model given no instructions took 15 to 19 commands to answer a question it answers in 2 or 3 with them, and along the way printed the saved session file to look at it.
+## What an order looks like
 
-What makes this dependable:
+```text
+You:    buy 1 share of F with a limit price of $5
 
-- **Orders are previewed before they are placed.** `pyhood buy` shows the order, its cost and any problem with it, and places nothing until it is run again with the code the preview printed. The guide tells the agent to show you the preview and wait for a yes.
-- **The commands above answer most questions with no script.** An agent asked what you bought runs `pyhood orders` and reads a table. Left to write a script, models trip on the same things: formatting the price of an order that never filled, which is `None`, and reading UTC timestamps as local time.
-- **`pyhood run script.py`** runs a script with the Python pyhood is installed in. An agent does not have to find the right Python.
-- **Errors say what to do.** A wrong field name lists the real ones. An unsupported Python, or running from a source folder, says so instead of failing somewhere unrelated.
+Agent:  Here is the preview:
 
-An agent with your session can place real orders. The guide tells it to preview, show you, and wait for a yes, and the confirmation code makes it preview first. But those are an instruction and a guardrail, not a lock. Give session access only to an agent you would trust with the account.
+          Buy 1 F, limit $5.00, good for day
+          Estimated cost:  $5.00
+          F now:           $11.95 (bid $11.92, ask $11.95)
+          Buying power:    $500.00
 
-## Quick Start
+        Your limit is 58% below the current price, so this is unlikely
+        to fill. Want me to place it?
 
-Once `pyhood setup login` has stored a session, no credentials appear in your code at all:
+You:    yes
+
+Agent:  Placed. Buy 1 F at a $5.00 limit, status: queued.
+
+You:    cancel that order
+
+Agent:  Cancelled: buy 1 F, limit $5.00.
+```
+
+The agent did not work that preview out for itself. pyhood produced it, from your live account, and the agent passed it on.
+
+## How you stay in control
+
+**Every order is previewed first.** When the agent asks pyhood to buy or sell, pyhood sends nothing. It replies with what the order would be, what it would cost, the current price, and anything that looks wrong: a cost above your buying power, a sale of more than you hold, or a price far from the market.
+
+**An order can only be placed with a code from its preview.** The preview ends with a short code. The order goes through only when the agent repeats the same request with that code. The code belongs to that exact order: change the stock, the amount or the price, and it stops working. So what gets placed is what you were shown.
+
+**Nothing is assumed.** An order needs a price, or an explicit instruction to buy at the market. Options need every term spelled out. Orders last for the day unless you say otherwise.
+
+**You log in, not the agent.** The agent never needs your password.
+
+**Cancelling is immediate.** When you say cancel, it cancels. Getting out of an order should not take two steps.
+
+### What this does not protect against
+
+These are guardrails against mistakes. They are not a lock.
+
+- **An agent that ignores its instructions can still place an order.** The code makes it produce a preview first. It does not force the agent to show you the preview or to wait for your answer. That part depends on the agent following the instructions pyhood gives it.
+- **Your saved login is a file on your computer.** An agent that can run commands can read it. In testing, a model that had been given no instructions printed that file to look at it.
+
+So give this only to an agent you would trust with the account, and start with small orders.
+
+## What it covers
+
+| | From your agent or the command line | From Python |
+|---|---|---|
+| Positions, orders, buying power, quotes | Yes | Yes |
+| Option expirations and contracts | Yes | Yes |
+| Buy and sell stock | Yes, with a preview | Yes |
+| Buy and sell single options | Yes, with a preview | Yes |
+| Cancel an order | Yes | Yes |
+| Option spreads, stop orders | | Yes |
+| IRA and other accounts | | Yes |
+| Crypto, through Robinhood's official Crypto API | | Yes |
+| Futures quotes, orders and profit and loss | | Yes |
+| Transfers, dividends, documents, news, ratings | | Yes |
+
+For anything in the Python column only, the agent writes a short script and runs it. `pyhood guide` tells it how.
+
+**What has been run against Robinhood for real:** buying stock with a limit, buying an option to open, and cancelling both. Selling and market orders go through the same code, but those commands have not yet been run live. Option spreads have never been placed.
+
+**What it has been tested with:** a local model, Qwen3.6 35B, running in the [Pi](https://github.com/earendil-works/pi) agent. Given the one-line install request above and nothing else, it fetched the instructions and installed pyhood with no errors. Asked to buy, it previewed and waited.
+
+## Using it without an agent
+
+Everything the agent does, you can do yourself. To type `pyhood` instead of `~/pyhood/bin/pyhood`, link it into a folder on your PATH:
+
+```bash
+ln -s ~/pyhood/bin/pyhood ~/.local/bin/pyhood
+```
+
+```bash
+pyhood positions             # what you hold, with profit and loss
+pyhood orders                # orders from the last 30 days
+pyhood buying-power          # cash available to trade with
+pyhood quote AAPL MSFT       # current prices
+pyhood options AAPL          # option expiration dates
+pyhood buy AAPL 10 --limit 350    # preview; add the code it prints to place it
+pyhood cancel ORDER_ID       # cancel an open order
+```
+
+Add `--json` to any of the first five for exact values. The [command line page](https://jamestford.github.io/pyhood/cli/) covers every command and option.
+
+To upgrade pyhood later:
+
+```bash
+uv pip install --python ~/pyhood/bin/python --upgrade pyhood
+```
+
+## For developers
+
+pyhood is also a typed Python library, and the command line is a thin layer over it.
 
 ```python
 import pyhood
 from pyhood.client import PyhoodClient
 
-# Reuses the stored session, refreshing it if the access token has expired.
-session = pyhood.login()
-
-client = PyhoodClient(session)
+client = PyhoodClient(pyhood.login())  # uses the saved session; no credentials in code
 
 quote = client.get_quote("AAPL")
 print(f"AAPL: ${quote.price:.2f} ({quote.change_pct:+.1f}%)")
 
-positions = client.get_positions()
-buying_power = client.get_buying_power()
+for position in client.get_positions():
+    print(position.symbol, position.quantity, position.unrealized_pl)
 ```
 
-Save that as `script.py` and run it with `pyhood run script.py`.
+Save that as `script.py` and run it with `pyhood run script.py`, which uses the Python pyhood is installed in. To add pyhood to a project that has its own environment, `pip install pyhood` there. It needs Python 3.10 or newer.
 
-`login()` with no arguments tries the cached session, then the refresh token. To force a refresh explicitly:
+What sets it apart from other Robinhood libraries:
 
-```python
-session = pyhood.refresh()
-```
+- **It stays logged in.** After the first approved login, pyhood renews the session with a refresh token: no password, no approval prompt, nobody at the keyboard. Unattended scripts do not die when a session expires.
+- **Typed results.** Methods return dataclasses, not raw dictionaries. A value Robinhood does not send is `None`, never a made-up `0`. A wrong field name raises an error that lists the right ones.
+- **Checked against the live API.** The tests mock Robinhood, so a script in the repository also runs every parser against a real account and reports any field Robinhood does not send. That audit has found and fixed more than a dozen fields that were silently empty.
+- **Session stored as JSON, owner-only,** not as a pickle.
 
-## Why pyhood exists
-
-pyhood began with a specific problem: unattended Robinhood scripts should not die just because a session expired.
-
-The original Python Robinhood client, [robin_stocks](https://github.com/jmfernandes/robin_stocks), made Robinhood automation accessible to a large community and remains the best-known library in this space. But Robinhood's authentication flow has changed over time, and many users now run into the same failure mode: a script works for a few days, the session expires, and the next login waits for a device approval no one is there to tap. pyhood fixes that workflow. After the first approved login, pyhood stores refresh-token session data as JSON and can renew the session with:
-
-```python
-session = pyhood.refresh()
-```
-
-No username. No password. No device approval prompt.
-
-That makes pyhood a better fit for cron jobs, scheduled portfolio scripts, dashboards, and automated trading systems that need to keep running without a human nearby.
-
-## Why use pyhood?
-
-- **Silent session refresh** - renew Robinhood sessions without credentials or device approval after the first login.
-- **Typed responses** - dataclass responses and type hints instead of guessing through raw dictionaries.
-- **Retirement accounts** - discover and trade in Traditional and Roth IRA accounts.
-- **Official crypto API** - use Robinhood's official Crypto Trading API with API keys.
-- **Futures support** - futures contracts, quotes, orders, positions, and P&L helpers.
-- **Options-first coverage** - equity and index options, chains, Greeks, volume, open interest, and order helpers.
-- **Safer session storage** - JSON session persistence instead of `pickle`.
-- **Rate limiting and retries** - request throttling and retry behavior built in.
-- **Clear auth errors** - explicit exceptions for timeouts, MFA, expired tokens, and device approval failures.
-- **Maintained test suite** - 360 tests, CI across Python 3.10 through 3.14.
-
-## How pyhood compares
-
-Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and the actively maintained fork [robin_stocks_v2](https://github.com/DhruvaBansal00/robin_stocks_v2):
+Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and its maintained fork [robin_stocks_v2](https://github.com/DhruvaBansal00/robin_stocks_v2):
 
 | Capability | pyhood | robin_stocks | robin_stocks_v2 |
 |---|---:|---:|---:|
+| Command line an AI agent can drive, with order previews | Yes | No | No |
 | Silent session refresh without credentials | Yes | No | No |
 | JSON session storage | Yes | No, uses pickle | Yes |
 | IRA / retirement accounts | Yes | No | No |
@@ -234,261 +227,33 @@ Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and the acti
 | IPO access | Yes | No | Yes |
 | Typed dataclass responses | Yes | No | Partial |
 | Index options: SPX, NDX, VIX, RUT, XSP | Yes | Partial | Yes |
-| Order history date filtering | Yes | Yes | Yes |
 | Minimum Python version | 3.10 | 3.9 | 3.10 |
 
-Migrating from `robin_stocks`? See the [migration guide](https://github.com/jamestford/pyhood/blob/main/docs/migrating-from-robin-stocks.md) for a function-by-function map. Coming from [pyrh](https://github.com/robinhood-unofficial/pyrh), which has not been updated since August 2024? There is a [pyrh guide](https://github.com/jamestford/pyhood/blob/main/docs/migrating-from-pyrh.md) too.
-
-## Setup
-
-pyhood uses two unrelated kinds of credential, and `pyhood setup` configures either one.
-
-| Command | Credential | Stored at |
-|---|---|---|
-| `pyhood setup login` | Session tokens for the main API — stocks, options, futures | `~/.pyhood/session.json` |
-| `pyhood setup crypto` | Ed25519 key pair for the Crypto Trading API | `~/.pyhood/crypto.env` |
-| `pyhood setup` | — | reports what is configured |
-
-Both files are created `0600` inside a `0700` directory, with the mode applied at creation so the contents are never briefly readable by others.
-
-**`setup login`** tries the stored session first — a valid or refreshable one needs no password at all. Only when that fails does it prompt for your username and password, handling MFA and device approval. The password is read without echoing and is never stored; only the resulting tokens are written.
-
-**`setup crypto`** generates an Ed25519 key pair on your machine, prints only the public half for you to register with Robinhood, then reads the API key Robinhood issues and writes both to disk. The private key goes straight from generation to file — it is never displayed. Afterwards it makes one signed read-only call to confirm Robinhood actually accepts the pair, which is the step that catches a mistyped or placeholder key immediately rather than at your first order.
-
-**`setup`** with no target reports what is configured — where credentials came from, file permissions, and whether the private key is a real Ed25519 key. It shows lengths and validity, never values, and makes no network calls.
-
-```
-$ pyhood setup
-Session (main API — stocks, options, futures)
-    /Users/you/.pyhood/session.json (refreshable, saved 1.2h ago)
-
-Crypto API (official Crypto Trading API)
-    source: file
-    /Users/you/.pyhood/crypto.env
-    api key: 43 chars
-    private key: valid Ed25519, 32 bytes
-```
-
-Secrets are only ever read interactively. There are deliberately no `--password` or `--api-key` options: arguments are visible to every process on the machine via `ps` and are recorded by your shell.
-
-## Authentication
-
-Robinhood requires device approval on first login. After that, pyhood keeps the session alive automatically.
-
-### First Login
-
-Run `pyhood setup login` and approve the device prompt in the Robinhood mobile app when it appears. The session is saved to `~/.pyhood/session.json`.
-
-To log in from code instead:
-
-```python
-import pyhood
-
-session = pyhood.login(
-    username="you@email.com",
-    password="your_password",
-    timeout=90,
-)
-```
-
-Prefer the setup command where you can — a password written into a script tends to end up committed.
-
-### Staying Authenticated
-
-```python
-# Reuses cached session data.
-session = pyhood.login(username="you@email.com", password="your_password")
-
-# Or refresh explicitly with no credentials.
-session = pyhood.refresh()
-```
-
-Access sessions have been observed to last several days. When the access token expires, pyhood refreshes it using the stored refresh token.
-
-Device approval is only needed again if the refresh token itself expires or Robinhood invalidates the session.
-
-### Error Handling
-
-```python
-from pyhood.exceptions import (
-    AuthError,
-    DeviceApprovalRequiredError,
-    LoginTimeoutError,
-    MFARequiredError,
-    TokenExpiredError,
-)
-
-try:
-    session = pyhood.login(username="...", password="...", timeout=90)
-except LoginTimeoutError:
-    print("Open Robinhood and approve the device, then try again.")
-except MFARequiredError:
-    code = input("Enter the code from SMS/email: ")
-    session = pyhood.login(username="...", password="...", mfa_code=code)
-except AuthError as e:
-    print(f"Login failed: {e}")
-```
-
-### Rate Limits
-
-Robinhood aggressively rate-limits authentication attempts.
-
-If login fails:
-
-- Do not retry immediately.
-- Wait at least 5 minutes.
-- Multiple failed attempts can temporarily lock API access.
-- Each new login attempt may generate a new device approval request.
-
-See the [rate limits documentation](https://jamestford.github.io/pyhood/rate-limits/) for details.
-
-## Common Examples
-
-### Options Chain
-
-```python
-chain = client.get_options_chain("SPX", expiration="2026-04-17")
-
-for option in chain.calls:
-    print(
-        option.strike,
-        option.iv,
-        option.delta,
-        option.open_interest,
-    )
-```
-
-### IRA Trading
-
-```python
-accounts = client.get_all_accounts()
-
-order = client.buy_option(
-    symbol="NKE",
-    strike=55.0,
-    expiration="2026-04-02",
-    option_type="call",
-    quantity=3,
-    price=1.60,
-    account_number="YOUR_IRA_ACCOUNT",
-)
-```
-
-See the [account documentation](https://jamestford.github.io/pyhood/account/) for IRA account discovery and limitations.
-
-### Crypto Trading
-
-```python
-from pyhood.crypto import CryptoClient
-
-# Credentials are read from ~/.pyhood/crypto.env or the environment
-crypto = CryptoClient()
-
-quotes = crypto.get_best_bid_ask("BTC-USD", "ETH-USD")
-account = crypto.get_account()
-
-order = crypto.place_order(
-    account_number=account.account_number,
-    side="buy",
-    order_type="market",
-    symbol="BTC-USD",
-    order_config={"asset_quantity": "0.001"},
-)
-```
-
-**Getting API keys.** Robinhood does not issue you a key pair — you generate one and register only the public half. The setup command walks through it:
-
-```bash
-pyhood setup crypto
-```
-
-It generates the key pair, shows you the **public** key to paste at [robinhood.com/account/crypto](https://robinhood.com/account/crypto) → API Trading → Add key, reads the **API key** Robinhood issues back, writes both to `~/.pyhood/crypto.env` at mode `0600`, and then makes one signed read-only call to confirm the pair works. The private key is never displayed.
-
-If you would rather do it by hand, the file is a plain env file:
-
-```
-# ~/.pyhood/crypto.env  (chmod 600)
-RH_CRYPTO_API_KEY=the-key-robinhood-issued
-RH_CRYPTO_PRIVATE_KEY=the-private-key-you-generated
-```
-
-The private key is the credential — anyone holding it can trade your crypto, and unlike a session token it cannot be refreshed, only revoked. Environment variables take precedence over this file, so a stale export will silently shadow it; `pyhood setup` reports which source is in use.
-
-Only pairs with `api_tradable` set can be ordered through the API — a pair can be tradable in the app but not here. See the [crypto documentation](https://jamestford.github.io/pyhood/crypto/) for details.
-
-### Futures
-
-```python
-contract = client.get_futures_contract("ESH26")
-quote = client.get_futures_quote("ESH26")
-pnl = client.calculate_futures_pnl()
-
-print(contract.name, quote.last_price, pnl)
-```
-
-See the [futures documentation](https://jamestford.github.io/pyhood/futures/) for details.
-
-### Portfolio and Documents
-
-```python
-performance = client.get_portfolio_performance()
-
-docs = client.get_documents(doc_type="account_statement")
-```
-
-`get_portfolio_historicals()` raises `APIError` — Robinhood retired that endpoint. `get_portfolio_performance()` returns the chart view model that replaced it, unmapped, since its y values are returns rather than equity.
-
-## Feature Status
-
-| Area | Status |
-|---|---|
-| Stocks and options market data | Functional |
-| Equity and index options | Functional |
-| Stock and option order management | Functional |
-| Authentication with automatic refresh | Functional |
-| Official crypto trading API | Functional |
-| Futures contracts, quotes, orders, and P&L | Functional |
-| IRA / retirement accounts | Functional |
-| Banking, ACH transfers, and dividends | Functional |
-| Watchlists | Functional |
-| Markets and trading hours | Functional |
-| Research, news, ratings, and movers | Functional |
-| Option historicals and portfolio performance | Functional |
-| Guided credential setup (`pyhood setup`) | Functional |
-| Documents and statements | Functional |
-| Day trades, margin calls, and deposit schedules | Functional |
+Moving from another library? There are function-by-function guides for [robin_stocks](https://github.com/jamestford/pyhood/blob/main/docs/migrating-from-robin-stocks.md) and [pyrh](https://github.com/jamestford/pyhood/blob/main/docs/migrating-from-pyrh.md).
 
 ## Documentation
 
-- [Full documentation](https://jamestford.github.io/pyhood)
-- [Migration guide: robin_stocks](https://github.com/jamestford/pyhood/blob/main/docs/migrating-from-robin-stocks.md)
-- [Migration guide: pyrh](https://github.com/jamestford/pyhood/blob/main/docs/migrating-from-pyrh.md)
-- [Account documentation](https://jamestford.github.io/pyhood/account/)
-- [Crypto documentation](https://jamestford.github.io/pyhood/crypto/)
-- [Futures documentation](https://jamestford.github.io/pyhood/futures/)
+- [Getting started](https://jamestford.github.io/pyhood/getting-started/): installing by hand, with uv or pip
+- [Command line](https://jamestford.github.io/pyhood/cli/): every command and option
+- [Setup](https://jamestford.github.io/pyhood/setup/): logging in, and the key pair for crypto
+- [Authentication](https://jamestford.github.io/pyhood/authentication/): how sessions are kept alive, and what the errors mean
+- [Options](https://jamestford.github.io/pyhood/options/), [crypto](https://jamestford.github.io/pyhood/crypto/), [futures](https://jamestford.github.io/pyhood/futures/) and [accounts](https://jamestford.github.io/pyhood/account/), including IRAs
 - [Rate limits](https://jamestford.github.io/pyhood/rate-limits/)
+- [Changelog](https://github.com/jamestford/pyhood/blob/main/CHANGELOG.md)
 
 ## Contributing
 
-Contributions are welcome, especially:
+Contributions are welcome, especially reports of how pyhood behaves with different agents and models, endpoint coverage, and tests for behaviour verified against the live API.
 
-- endpoint coverage
-- typed response models
-- migration examples from `robin_stocks`
-- documentation improvements
-- tests for live-verified behavior
-
-Please avoid opening pull requests that place real trades in tests.
+Please do not open pull requests whose tests place real trades.
 
 ## Acknowledgments
 
-pyhood stands on the shoulders of the community that mapped Robinhood's unofficial API:
+pyhood stands on the work of the community that mapped Robinhood's unofficial API:
 
 - [robin_stocks](https://github.com/jmfernandes/robin_stocks) by [Josh Fernandes](https://github.com/jmfernandes), the most widely used Python Robinhood library.
 - [pyrh](https://github.com/robinhood-unofficial/pyrh), an early client that helped establish OAuth token refresh patterns.
 - [Robinhood](https://github.com/sanko/Robinhood) by [Sanko](https://github.com/sanko), early unofficial endpoint documentation.
-
-Those projects made Robinhood accessible to Python developers. pyhood continues that work with a focus on reliability, typed interfaces, and unattended automation.
 
 ## License
 

@@ -248,8 +248,9 @@ class TestVerify:
 
 
 # Words that follow "pyhood" inside a code span without being a command,
-# as in the line users paste into an agent's instructions.
-NOT_COMMANDS = {"is"}
+# as in the lines users paste into an agent: "pyhood is installed at ..."
+# and "Install pyhood for me."
+NOT_COMMANDS = {"is", "for"}
 
 
 def documented_commands():
@@ -303,11 +304,54 @@ class TestInstallFolder:
         installed = (ROOT / "install" / "AGENTS.md").read_text(encoding="utf-8")
         source = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         assert "is installed in this folder" in installed
-        assert "Do not run pyhood from this folder" in source
-        assert "Do not run pyhood from this folder" not in installed
+        assert "Do not run pyhood from a copy of this repository" in source
+        assert "Do not run pyhood from a copy of this repository" not in installed
+
+
+class TestInstallByAgent:
+    """The README's install step is one line that sends an agent to the
+    repository's AGENTS.md, so that file has to hold the steps."""
+
+    URL = "https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md"
+
+    def test_the_readme_and_getting_started_point_at_the_file(self):
+        for path in ("README.md", "docs/getting-started.md"):
+            text = (ROOT / path).read_text(encoding="utf-8")
+            assert f"Follow the install steps in {self.URL}" in text, path
+
+    def test_the_file_has_the_install_steps(self):
+        text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        steps = text[text.index("## If you were asked to install pyhood"):
+                     text.index("## If you want to use pyhood")]
+        assert "uv venv --managed-python --python 3.14 ~/pyhood" in steps
+        assert "uv pip install --python ~/pyhood/bin/python pyhood" in steps
+        assert "~/pyhood/bin/pyhood verify" in steps
+        assert "Read `~/pyhood/AGENTS.md`" in steps
+
+    def test_the_agent_is_told_what_not_to_do(self):
+        text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        steps = text[text.index("## If you were asked to install pyhood"):
+                     text.index("## If you want to use pyhood")]
+        assert "If one fails, stop" in steps
+        assert "already installed" in steps
+        assert "Never ask for, read or type their password" in steps
+        assert "Do not run it for them" in steps
+        assert "Do not use `pip`, `sudo` or `--break-system-packages`" in steps
+
+    def test_the_readme_summary_matches_the_file(self):
+        """The folded-away list is a promise about what the file says."""
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        steps = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        for command in (
+            "uv venv --managed-python --python 3.14 ~/pyhood",
+            "uv pip install --python ~/pyhood/bin/python pyhood",
+            "~/pyhood/bin/pyhood version",
+            "~/pyhood/bin/pyhood verify",
+        ):
+            assert command in readme and command in steps, command
 
 
 def test_agents_file_sends_agents_to_the_guide():
     text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
     assert "pyhood guide" in text
-    assert "Do not run pyhood from this folder" in text
+    assert "Do not run pyhood from a copy of this repository" in text

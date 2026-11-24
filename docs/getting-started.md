@@ -2,7 +2,23 @@
 
 ## Installation
 
-pyhood installs into a folder of its own, and that folder is also where you work from. With [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS):
+### Have your AI agent do it
+
+pyhood is built to be driven by an AI agent, so the quickest install is to hand it the job. Paste this into your agent:
+
+```text
+Install pyhood for me. Follow the install steps in https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md
+```
+
+[That file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) is written for AI agents. It has the same steps as [By hand](#by-hand) below, plus the rules that keep an agent from improvising: stop if a step fails, do not use `pip` or `sudo`, and do not install anything else.
+
+The agent stops when it reaches the login. That needs your password and an approval on your phone, so that part is yours. See [First Login](#first-login).
+
+It needs [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS).
+
+### By hand
+
+The same steps, typed yourself. pyhood installs into a folder of its own, and that folder is also where you work from:
 
 ```bash
 uv venv --managed-python --python 3.14 ~/pyhood
@@ -14,7 +30,7 @@ That creates `~/pyhood`:
 | In `~/pyhood` | What it is |
 |---|---|
 | `bin/pyhood` | The command |
-| `bin/python` | The Python pyhood runs on |
+| `bin/python` | A link to the Python pyhood runs on, which uv keeps in its own folder |
 | `lib/` | pyhood and what it depends on |
 | `AGENTS.md` | Instructions an AI agent reads when it starts in this folder |
 

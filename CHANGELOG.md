@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Breaking: `Order.side` is `'buy'` or `'sell'` on option orders, where it was `'debit'` or `'credit'`.** `get_option_orders()` and `get_order()` passed on Robinhood's `direction` as the side, so option orders had sides that no other order has and that `buy_option()` itself never returned. A single-leg order now takes its leg's side. A spread has a leg each way, so it goes by direction: a debit is a buy and a credit a sell. `order_option_spread()` returns `'buy'` or `'sell'` as well. Code that compares `side` to `'debit'` or `'credit'` needs changing.
 - **`pyhood orders` and `pyhood cancel` describe an option order in plain terms.** An order that read `debit ... option` now reads `buy to open ... $12.00 call 2026-12-11`, and a cancel reports `CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share`. A spread shows as `2-leg option`.
+- **The README is rewritten for people who use pyhood with an AI agent.** It opens with what you can ask the agent and how you stay in control, where it opened with session refresh and the Python API. It is about half the length: the setup walkthrough, authentication errors, rate limits and per-feature examples it repeated are on the docs site, and it links to them.
+- **Installing is one line to your agent:** "Install pyhood for me. Follow the install steps in" and a link to the repository's `AGENTS.md`. That file now has the install steps, written for an agent: check whether pyhood is already there, install into `~/pyhood` with uv, stop and hand the login to the user, and never use `pip`, `sudo` or `--break-system-packages`. A local model given that one line and nothing else fetched the file and installed pyhood with no errors. The README lists what the file says, folded away, and the by-hand steps are still in Getting Started.
+- The README says what has been run against Robinhood for real and what has not, in place of a table that called every feature "Functional".
+
+### Fixed
+- The README claimed 360 tests, showed example orders without the order ID column, and used option and futures contracts that had expired.
+- The install docs said `~/pyhood` holds its own copy of Python. It holds a link to one, which uv keeps in its own folder.
+
 
 ## [0.18.0] - 2026-11-24
 
