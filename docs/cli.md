@@ -40,6 +40,8 @@ PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT  FILLED  AVG PRICE  
 
 The last column is the order ID, which `pyhood cancel` takes.
 
+An option order reads as a trade in a contract: `buy to open` under `SIDE`, and the contract, such as `$12.00 call 2026-12-11`, under `TYPE`. A spread shows as `2-leg option`.
+
 `ORDERED` is what was asked for and `FILLED` is what actually traded. They differ on a partial fill, such as an IPO Access allocation. An order that never filled shows `0` and `-`.
 
 ### `pyhood buying-power`
@@ -200,6 +202,9 @@ The preview checks that the contract exists and names the nearest expirations or
 ```text
 $ pyhood cancel 1a2b3c4d-...
 CANCELLED: buy 10 AAPL, limit $350.00, placed 2026-11-24 16:54 EST
+
+$ pyhood cancel 5e6f7a8b-...
+CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share, placed 2026-11-24 17:17 EST
 ```
 
 `pyhood cancel ORDER_ID` acts at once, for stock and option orders alike. There is no preview and no code. A cancel names one order and can only remove it, so there is no symbol, quantity or price to get wrong, and when you want out of an order a second step is time in which it can fill.

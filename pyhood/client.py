@@ -1946,6 +1946,11 @@ class PyhoodClient:
             time_in_force=time_in_force,
             trigger="immediate",
             instrument_type="option",
+            leg_count=1,
+            position_effect=position_effect,
+            option_type=option_type,
+            strike=float(strike),
+            expiration=expiration,
         )
 
     def order_option_spread(
@@ -2035,7 +2040,7 @@ class PyhoodClient:
         return Order(
             order_id=data.get("id", ""),
             symbol=symbol.upper(),
-            side=direction,
+            side={"debit": "buy", "credit": "sell"}.get(direction, direction),
             order_type="limit",
             quantity=float(quantity),
             price=price,
@@ -2044,6 +2049,7 @@ class PyhoodClient:
             time_in_force=time_in_force,
             trigger="immediate",
             instrument_type="option",
+            leg_count=len(legs),
         )
 
     def buy_stock_by_price(
@@ -2263,7 +2269,7 @@ class PyhoodClient:
         return Order(
             order_id=item.get("id", ""),
             symbol=symbol.upper(),
-            side=item.get("direction", ""),  # options use 'direction' not 'side'
+            side=_option_side(item, legs),
             order_type=item.get("type", ""),
             quantity=float(item.get("quantity", 0)),
             price=_safe_float(item.get("price")),
@@ -2279,6 +2285,7 @@ class PyhoodClient:
             average_price=_average_execution_price(executions) if len(legs) == 1 else None,
             fees=_option_fees(item),
             filled_quantity=filled_quantity,
+            **_option_contract(legs),
         )
 
     def cancel_order(self, order_id: str) -> dict:
@@ -3119,6 +3126,37 @@ def _quote(item: dict, symbol: str, fundamentals: dict | None = None) -> Quote:
         low_52w=_safe_float(fundamentals.get("low_52_weeks")),
         timestamp=_parse_time(item.get("updated_at")),
     )
+
+
+def _option_side(item: dict, legs: list[dict]) -> str:
+    """'buy' or 'sell' for an option order.
+
+    Robinhood gives the order a `direction` of 'debit' or 'credit', and
+    only the legs a side. One leg's side is the order's. A spread has a
+    leg each way, so it goes by direction: paying a debit is buying it.
+    """
+    if len(legs) == 1 and legs[0].get("side"):
+        return legs[0]["side"]
+    direction = item.get("direction", "")
+    return {"debit": "buy", "credit": "sell"}.get(direction, direction)
+
+
+def _option_contract(legs: list[dict]) -> dict[str, Any]:
+    """The Order fields that describe an option order's legs."""
+    if not legs:
+        return {}
+    effects = {leg.get("position_effect") for leg in legs}
+    fields: dict[str, Any] = {
+        "leg_count": len(legs),
+        "position_effect": effects.pop() if len(effects) == 1 else None,
+    }
+    if len(legs) == 1:
+        fields.update(
+            option_type=legs[0].get("option_type"),
+            strike=_safe_float(legs[0].get("strike_price")),
+            expiration=legs[0].get("expiration_date"),
+        )
+    return fields
 
 
 def _option_fees(item: dict) -> float | None:

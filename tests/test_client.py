@@ -1066,6 +1066,11 @@ class TestOptionOrders:
         assert order.quantity == 2
         assert order.price == 5.50
         assert order.status == "pending"
+        # The order handed back names its contract, as a fetched one does.
+        assert (order.leg_count, order.position_effect) == (1, "open")
+        assert (order.option_type, order.strike, order.expiration) == (
+            "call", 150.0, "2024-12-20",
+        )
         assert order.instrument_type == "option"
 
     @responses.activate
@@ -1114,6 +1119,7 @@ class TestOptionOrders:
         assert order.quantity == 1
         assert order.price == 3.25
         assert order.status == "pending"
+        assert (order.position_effect, order.option_type) == ("close", "put")
         assert order.instrument_type == "option"
 
 
@@ -1346,12 +1352,117 @@ class TestOrderManagement:
 class TestOptionOrderParsing:
     """Field names as the options orders endpoint sends them."""
 
-    def _leg(self, price, qty, ts="2026-11-01T14:00:00Z", option="opt-1"):
+    def _leg(self, price, qty, ts="2026-11-01T14:00:00Z", option="opt-1", side="buy",
+             effect="open", strike="65.0000", kind="call"):
+        """A leg with the keys the options orders endpoint sent on 2026-11-24."""
         return {
+            "id": f"leg-{option}",
             "option": f"{urls.OPTIONS_INSTRUMENTS}{option}/",
-            "side": "buy",
+            "side": side,
+            "position_effect": effect,
+            "option_type": kind,
+            "strike_price": strike,
+            "expiration_date": "2026-12-18",
+            "ratio_quantity": 1,
             "executions": [{"price": price, "quantity": qty, "timestamp": ts}],
         }
+
+    @responses.activate
+    def test_side_is_buy_or_sell_not_debit_or_credit(self, client):
+        """Robinhood gives an option order a `direction`, and the parser
+        passed it on as `side`, so option orders had sides no other order
+        has and that order_option() itself never returns."""
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json={"results": [
+                {"id": "bought", "chain_symbol": "NKE", "direction": "debit", "quantity": "1",
+                 "state": "filled", "legs": [self._leg("1.22", "1")]},
+                {"id": "written", "chain_symbol": "SOFI", "direction": "credit",
+                 "quantity": "1", "state": "filled",
+                 "legs": [self._leg("0.89", "1", side="sell", kind="put", strike="15.5000")]},
+            ], "next": None},
+            status=200,
+        )
+
+        bought, written = client.get_option_orders()
+
+        assert (bought.side, bought.position_effect) == ("buy", "open")
+        assert (written.side, written.position_effect) == ("sell", "open")
+
+    @responses.activate
+    def test_a_single_leg_order_carries_its_contract(self, client):
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json={"results": [{
+                "id": "o", "chain_symbol": "SOFI", "direction": "credit", "quantity": "1",
+                "state": "filled",
+                "legs": [self._leg("0.89", "1", side="sell", kind="put", strike="15.5000")],
+            }], "next": None},
+            status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.leg_count == 1
+        assert order.option_type == "put"
+        assert order.strike == 15.5
+        assert order.expiration == "2026-12-18"
+
+    @responses.activate
+    def test_a_spread_goes_by_direction_and_has_no_single_contract(self, client):
+        """Its legs point both ways, so no leg's side is the order's."""
+        legs = [
+            self._leg("0.50", "1", side="sell", option="opt-2", strike="70.0000"),
+            self._leg("2.00", "1", side="buy", strike="65.0000"),
+        ]
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json={"results": [
+                {"id": "debit-spread", "chain_symbol": "AAPL", "direction": "debit",
+                 "quantity": "1", "state": "cancelled", "legs": legs},
+                {"id": "credit-spread", "chain_symbol": "AAPL", "direction": "credit",
+                 "quantity": "1", "state": "cancelled", "legs": legs},
+            ], "next": None},
+            status=200,
+        )
+
+        paid, received = client.get_option_orders()
+
+        assert paid.side == "buy" and received.side == "sell"
+        assert paid.leg_count == 2
+        assert paid.position_effect == "open"  # both legs open
+        assert (paid.strike, paid.option_type, paid.expiration) == (None, None, None)
+
+    @responses.activate
+    def test_legs_with_different_effects_have_no_single_effect(self, client):
+        legs = [
+            self._leg("0.50", "1", side="sell", effect="close", option="opt-2"),
+            self._leg("2.00", "1", side="buy", effect="open"),
+        ]
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json={"results": [{"id": "roll", "chain_symbol": "AAPL", "direction": "debit",
+                               "quantity": "1", "state": "filled", "legs": legs}],
+                  "next": None},
+            status=200,
+        )
+
+        (order,) = client.get_option_orders()
+
+        assert order.position_effect is None
+
+    @responses.activate
+    def test_stock_orders_have_none_of_the_option_fields(self, client):
+        responses.add(
+            responses.GET, urls.ORDERS,
+            json={"results": [{"id": "s", "side": "buy", "quantity": "1", "state": "filled",
+                               "instrument": ""}], "next": None},
+            status=200,
+        )
+
+        (order,) = client.get_stock_orders()
+
+        assert (order.leg_count, order.position_effect, order.strike) == (None, None, None)
 
     @responses.activate
     def test_single_leg_fill(self, client):
