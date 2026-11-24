@@ -50,6 +50,31 @@ The cash available to trade with in the main account.
 
 Price, change, previous close, bid and ask for each symbol. Add `--fundamentals` for volume, P/E, market cap and the 52-week range, at the cost of one more request.
 
+### `pyhood options SYMBOL`
+
+With only a symbol, the expiration dates of its options. With `--expires`, the contracts for that date nearest the stock's price:
+
+```text
+$ pyhood options F --expires 2026-12-11 --strikes 4
+F is at $11.95. Options expiring 2026-12-11 (17 days).
+Prices are per share. One contract is 100 shares, so $2.50 costs $250.
+
+CALLS, the 4 strikes nearest the price
+STRIKE    BID    ASK   MARK   DELTA     IV  VOLUME  OPEN INT
+$11.00  $0.89  $1.12  $1.01  +0.901  31.3%     117       209
+$11.50  $0.60  $0.66  $0.63  +0.721  34.1%     253     1,558
+$12.00  $0.28  $0.33  $0.31  +0.500  31.4%     560     3,547
+$12.50  $0.11  $0.14  $0.13  +0.272  31.3%   1,171     1,467
+```
+
+| Option | Effect |
+|---|---|
+| `--expires YYYY-MM-DD` | Show the contracts for that expiration |
+| `--call` or `--put` | Show one side only |
+| `--strikes N` | How many strikes nearest the price to show. The default is 10 |
+
+Delta and IV print as `-` when Robinhood publishes none, as on a contract's expiration day.
+
 ### `--json`
 
 Each account command takes `--json` to print exact values in place of the table:
@@ -132,7 +157,48 @@ It is a guardrail against mistakes, not a lock: anything that can run the previe
 | `--extended-hours` | Allow the order to trade outside regular hours |
 | `--confirm CODE` | Act, using the code from the preview |
 
-These cover stock orders in your main account. Stop orders, option orders and orders in other accounts are placed from Python.
+### Option orders
+
+`pyhood buy-option` and `pyhood sell-option` work in the same two steps. Every term of the contract is named, and none has a default:
+
+```text
+$ pyhood buy-option F --expires 2026-12-11 --strike 12 --call --contracts 1 --limit 0.30
+PREVIEW. Nothing has been sent.
+
+  Buy to open 1 contract of F $12.00 call expiring 2026-12-11, limit $0.30 per share, good for day
+  Estimated cost:     $30.00 (1 contract x 100 shares x $0.30)
+  Contract now:       mark $0.31 (bid $0.28, ask $0.33)
+  F now:              $11.95
+  Delta, IV:          +0.500, 31.4%
+  Expires:            2026-12-11 (17 days)
+  Buying power:       $500.00
+  Market open:        yes
+
+To place this order, show this preview to the user. If they say yes, run:
+  pyhood buy-option F --expires 2026-12-11 --strike 12 --call --contracts 1 --limit 0.3 --confirm fdf2a6
+```
+
+| Option | Effect |
+|---|---|
+| `--expires YYYY-MM-DD` | The contract's expiration. Required |
+| `--strike PRICE` | The contract's strike. Required |
+| `--call` or `--put` | Required |
+| `--contracts N` | How many contracts, each 100 shares. Required |
+| `--limit PRICE` | Per share, as option prices are quoted: `2.50` is $250 a contract. Required; there are no market orders for options |
+| `--to open` or `--to close` | Whether the order opens a position or closes one. A buy opens and a sell closes unless you say otherwise |
+| `--tif gfd` or `--tif gtc` | Good for day (the default) or good till cancelled |
+
+The preview checks that the contract exists and names the nearest expirations or strikes if it does not. It also points out:
+
+- a cost of more than your buying power
+- a sell to close of more contracts than you hold
+- a sell to open, which writes a contract and takes on its obligation
+- a limit 20% or more from the contract's mark, which catches a price typed per contract in place of per share
+- a contract that expires today
+
+`pyhood cancel` cancels an option order the same way it cancels a stock order.
+
+These cover stock orders and single-leg option orders in your main account. Stop orders, option spreads and orders in other accounts are placed from Python.
 
 ## Setup and checks
 

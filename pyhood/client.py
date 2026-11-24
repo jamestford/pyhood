@@ -1778,7 +1778,9 @@ class PyhoodClient:
             expiration: Expiration date (YYYY-MM-DD).
             option_type: 'call' or 'put'.
             quantity: Number of contracts.
-            price: Limit price per contract.
+            price: Limit price per share, which is how option prices are
+                quoted. One contract is 100 shares, so a price of 1.60
+                is $160 per contract.
             position_effect: 'open' or 'close'.
             time_in_force: 'gtc' (good till cancelled), 'gfd' (good for day), 'ioc', 'fok'.
             account_number: Specific account (e.g. IRA). None = default.
@@ -1819,7 +1821,9 @@ class PyhoodClient:
             expiration: Expiration date (YYYY-MM-DD).
             option_type: 'call' or 'put'.
             quantity: Number of contracts.
-            price: Limit price per contract.
+            price: Limit price per share, which is how option prices are
+                quoted. One contract is 100 shares, so a price of 1.60
+                is $160 per contract.
             position_effect: 'open' or 'close'.
             time_in_force: 'gtc' (good till cancelled), 'gfd' (good for day), 'ioc', 'fok'.
             account_number: Specific account (e.g. IRA). None = default.
@@ -1862,7 +1866,9 @@ class PyhoodClient:
             expiration: Expiration date (YYYY-MM-DD).
             option_type: 'call' or 'put'.
             quantity: Number of contracts.
-            price: Limit price per contract.
+            price: Limit price per share, which is how option prices are
+                quoted. One contract is 100 shares, so a price of 1.60
+                is $160 per contract.
             side: 'buy' or 'sell'.
             position_effect: 'open' or 'close'.
             credit_or_debit: 'debit' or 'credit'. Auto-determined from

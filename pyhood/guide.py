@@ -86,6 +86,8 @@ QUICK ANSWERS (no script needed, all read-only)
       pyhood orders --since 2026-01-01    or --all, or --symbol AAPL
       pyhood buying-power         cash available to trade with
       pyhood quote AAPL MSFT      current prices; add --fundamentals for more
+      pyhood options AAPL         the expiration dates of AAPL's options
+      pyhood options AAPL --expires 2026-12-18    the contracts for that date
 
   Each prints a table. Add --json for exact values. Times in the tables
   are local; in --json and in scripts they are UTC.
@@ -96,6 +98,8 @@ PLACING ORDERS (two steps, every time)
       pyhood buy AAPL 10 --limit 350
       pyhood sell AAPL 10 --limit 360
       pyhood buy AAPL 10 --market
+      pyhood buy-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 2.50
+      pyhood sell-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 3.00
       pyhood cancel ORDER_ID
 
   The preview shows the order, its cost, the current price and any
@@ -110,6 +114,10 @@ PLACING ORDERS (two steps, every time)
   If the user changes their mind about quantity or price, preview again.
   An order needs --limit PRICE or --market; there is no default.
   Orders are good for the day unless you add --tif gtc.
+  Option prices are per share and a contract is 100 shares: --limit 2.50
+  on 1 contract is $250. Look up real expirations and strikes with
+  `pyhood options` first; do not guess them. buy-option opens a position
+  and sell-option closes one unless you add --to open or --to close.
   Find the ID of an order to cancel with: pyhood orders --open
 
 RUNNING A SCRIPT
