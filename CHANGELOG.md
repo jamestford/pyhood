@@ -5,6 +5,23 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+After 0.15.0 the same local model was given the same prompt twice more. It read `pyhood guide` and went from about ten failed commands to one. Both times the one failure was the same, and both times its answer had the same second flaw. These changes are for those two.
+
+### Added
+- **Read-only account commands**, so the common questions need no script:
+  - `pyhood positions` shows the stocks and options you hold, with cost, value and unrealized profit or loss.
+  - `pyhood orders` shows stock and option orders, newest first, for the last 30 days. `--since YYYY-MM-DD`, `--all` and `--symbol` change what is covered. It shows what was ordered beside what actually filled.
+  - `pyhood buying-power` shows the cash available to trade with.
+  - `pyhood quote AAPL MSFT` shows current prices, and `--fundamentals` adds volume, P/E, market cap and the 52-week range.
+  - Each prints a table and takes `--json` for exact values. The tables show times in the computer's time zone and print `-` for a value that is unknown. `--json` keeps UTC times and `null`.
+- A Command Line page in the docs.
+
+### Changed
+- **`pyhood guide` leads with the commands** and tells an agent to try them before writing a script.
+- **The guide's example and notes cover the two things the model got wrong.** Its script formatted `average_price` on a cancelled order, where it is `None`, and raised `TypeError`. Its answer then reported order times as local when they are UTC, and called orders from five days earlier "today". The example now skips orders that never filled and formats the price, and the notes say that formatting `None` fails, which `Order` fields are `None` until a fill, and that times are UTC.
+
 ## [0.15.0] - 2026-11-24
 
 These changes come from watching a local AI model use pyhood with no help. It got the right answer after ten failed commands: it ran pyhood from the source folder with the wrong Python, installed dependencies into the system Python, and guessed a field name that does not exist.

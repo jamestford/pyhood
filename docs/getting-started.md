@@ -128,7 +128,7 @@ pyhood is built to be driven by an AI agent that writes and runs Python. Put one
 pyhood is installed on this machine. Run `pyhood guide` before using it.
 ```
 
-`pyhood guide` prints how to run a script, how to log in, the main methods with their arguments, and the fields of what they return, all for the installed version. `pyhood run script.py` then runs the agent's script with the right Python.
+`pyhood guide` prints the read-only commands (`pyhood positions`, `pyhood orders` and so on), how to run a script, how to log in, the main methods with their arguments, and the fields of what they return, all for the installed version. For anything the commands do not cover, `pyhood run script.py` runs the agent's script with the right Python. See [Command Line](cli.md).
 
 An agent with your session can place real orders. The guide tells it to show you the exact call and wait for a yes first, but that is an instruction, not a lock.
 

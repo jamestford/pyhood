@@ -253,9 +253,11 @@ NOT_COMMANDS = {"is"}
 
 def documented_commands():
     """Every `pyhood <word>` written in the docs an agent or user follows."""
-    pattern = re.compile(r"(?<![\w/.-])pyhood (\w+)")
+    pattern = re.compile(r"(?<![\w/.-])pyhood ([\w-]+)")
     found = set()
-    for path in ("README.md", "AGENTS.md", "docs/getting-started.md", "docs/setup.md"):
+    for path in (
+        "README.md", "AGENTS.md", "docs/getting-started.md", "docs/setup.md", "docs/cli.md",
+    ):
         text = (ROOT / path).read_text(encoding="utf-8")
         # Commands appear in code spans and code blocks, not in prose.
         for code in re.findall(r"```.*?```|`[^`\n]+`", text, flags=re.S):

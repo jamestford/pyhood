@@ -42,6 +42,7 @@ nav:
   - Migrating from pyrh: migrating-from-pyrh.md
   - Authentication: authentication.md
   - Usage:
+    - Command Line: cli.md
     - Stock Quotes: quotes.md
     - Options Chains: options.md
     - Futures Trading: futures.md
