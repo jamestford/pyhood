@@ -479,9 +479,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true",
         help="print exact values as JSON instead of a table",
     )
+    in_account = argparse.ArgumentParser(add_help=False)
+    in_account.add_argument(
+        "--account", metavar="WHICH",
+        help=(
+            "which account: part of its type, such as roth, ira or individual, or the "
+            "last four characters of its number. See `pyhood accounts`. "
+            "Default: the first account"
+        ),
+    )
+    commands.add_parser(
+        "accounts",
+        parents=[as_json],
+        help="show your accounts and what each is worth (read-only)",
+        description=(
+            "Lists the accounts under this login, such as an individual account and an "
+            "IRA, with value, cash and buying power. Account numbers are shown by their "
+            "last four characters; --json gives them in full."
+        ),
+    )
     commands.add_parser(
         "positions",
-        parents=[as_json],
+        parents=[as_json, in_account],
         help="show the stocks and options you hold (read-only)",
         description="Shows open stock and option positions with cost and unrealized profit.",
     )
@@ -513,6 +532,7 @@ def build_parser() -> argparse.ArgumentParser:
     for side in ("buy", "sell"):
         order = commands.add_parser(
             side,
+            parents=[in_account],
             help=f"preview a stock {side} order, then place it with --confirm",
             description=f"Places an order to {side} a stock." + two_steps,
         )
@@ -528,6 +548,13 @@ def build_parser() -> argparse.ArgumentParser:
         price.add_argument(
             "--market", action="store_true",
             help=f"{side} at the best price available, whatever it is",
+        )
+        order.add_argument(
+            "--stop", type=_positive, metavar="PRICE",
+            help=(
+                "make it a stop order: wait until the price reaches this, then "
+                "place the --market or --limit order"
+            ),
         )
         order.add_argument(
             "--tif", choices=("gfd", "gtc"), default="gfd",
@@ -566,6 +593,7 @@ def build_parser() -> argparse.ArgumentParser:
         usual = "open" if side == "buy" else "close"
         option = commands.add_parser(
             f"{side}-option",
+            parents=[in_account],
             help=f"preview an order to {side} option contracts, then place it with --confirm",
             description=(
                 f"Places a limit order to {side} contracts of one option." + two_steps
@@ -606,6 +634,77 @@ def build_parser() -> argparse.ArgumentParser:
             "--confirm", metavar="CODE",
             help="the code a preview of this exact order printed; places the order",
         )
+    earnings = commands.add_parser(
+        "earnings", parents=[as_json],
+        help="show when companies next report earnings (read-only)",
+        description="Shows each symbol's next earnings date, with the estimate.",
+    )
+    earnings.add_argument("symbols", nargs="+", metavar="SYMBOL")
+    earnings.add_argument(
+        "--days", type=_count, default=90, metavar="N",
+        help="how far ahead to look (default 90)",
+    )
+    ratings = commands.add_parser(
+        "ratings", parents=[as_json],
+        help="show analyst ratings and price targets (read-only)",
+        description="Shows analysts' buy, hold and sell counts and their price targets.",
+    )
+    ratings.add_argument("symbols", nargs="+", metavar="SYMBOL")
+    news = commands.add_parser(
+        "news", parents=[as_json],
+        help="show recent headlines for a stock (read-only)",
+        description="Shows recent headlines for a symbol, newest first, with links.",
+    )
+    news.add_argument("symbol", metavar="SYMBOL")
+    news.add_argument(
+        "--count", type=_count, default=5, metavar="N", help="how many headlines (default 5)",
+    )
+    movers = commands.add_parser(
+        "movers", parents=[as_json],
+        help="show the S&P 500's biggest moves today (read-only)",
+        description="Shows the S&P 500 stocks that have risen most today, or fallen most.",
+    )
+    movers.add_argument("--down", action="store_true", help="show the biggest falls")
+    history = commands.add_parser(
+        "history", parents=[as_json],
+        help="show a stock's past prices (read-only)",
+        description=(
+            "Shows open, high, low, close and volume: one row a day for a week, a "
+            "month or three months, one a week for a year or five."
+        ),
+    )
+    history.add_argument("symbol", metavar="SYMBOL")
+    history.add_argument(
+        "--span", choices=("week", "month", "3month", "year", "5year"), default="month",
+        help="how far back (default month)",
+    )
+    dividends = commands.add_parser(
+        "dividends", parents=[as_json],
+        help="show dividends paid and pending (read-only)",
+        description="Shows dividends, newest first, and the total paid.",
+    )
+    dividends.add_argument("--symbol", help="show dividends for one symbol only")
+    commands.add_parser(
+        "transfers", parents=[as_json],
+        help="show money moved in, out and between accounts (read-only)",
+        description="Shows transfers, newest first. It cannot make one.",
+    )
+    commands.add_parser(
+        "watchlists", parents=[as_json],
+        help="show your watchlists (read-only)",
+        description="Shows the lists you created and the Robinhood lists you follow.",
+    )
+    for name, verb in (("watch", "Adds stocks to"), ("unwatch", "Takes stocks off")):
+        change = commands.add_parser(
+            name,
+            help=f"{verb.lower()} a watchlist",
+            description=f"{verb} a watchlist, at once. No money is involved.",
+        )
+        change.add_argument("symbols", nargs="+", metavar="SYMBOL")
+        change.add_argument(
+            "--list", dest="list_name", default="My First List", metavar="NAME",
+            help="which watchlist (default: 'My First List')",
+        )
     cancel = commands.add_parser(
         "cancel",
         help="cancel an open order",
@@ -617,7 +716,7 @@ def build_parser() -> argparse.ArgumentParser:
     cancel.add_argument("order_id", metavar="ORDER_ID", help="from `pyhood orders --open`")
     commands.add_parser(
         "buying-power",
-        parents=[as_json],
+        parents=[as_json, in_account],
         help="show the cash available to trade with (read-only)",
         description="Shows the buying power of the main account.",
     )
@@ -726,6 +825,31 @@ def main(argv: list[str] | None = None) -> int:
         from pyhood import guide
 
         return guide.main()
+    simple = {
+        "accounts": lambda a: {},
+        "earnings": lambda a: {"symbols": a.symbols, "days": a.days},
+        "ratings": lambda a: {"symbols": a.symbols},
+        "news": lambda a: {"symbol": a.symbol, "count": a.count},
+        "movers": lambda a: {"down": a.down},
+        "history": lambda a: {"symbol": a.symbol, "span": a.span},
+        "dividends": lambda a: {"symbol": a.symbol},
+        "transfers": lambda a: {},
+        "watchlists": lambda a: {},
+    }
+    if args.command in simple:
+        from pyhood import cli
+
+        return cli.run(
+            getattr(cli, args.command), **simple[args.command](args),
+            as_json_output=args.json,
+        )
+    if args.command in ("watch", "unwatch"):
+        from pyhood import cli
+
+        return cli.run(
+            cli.watch, symbols=args.symbols, list_name=args.list_name,
+            remove=args.command == "unwatch",
+        )
     if args.command in ("buy-option", "sell-option"):
         from pyhood import cli
 
@@ -733,7 +857,7 @@ def main(argv: list[str] | None = None) -> int:
             cli.option_order, side=args.command.split("-")[0], symbol=args.symbol,
             expiration=args.expires, strike=args.strike, option_type=args.option_type,
             contracts=args.contracts, limit=args.limit, effect=args.effect,
-            time_in_force=args.tif, confirm=args.confirm,
+            time_in_force=args.tif, account=args.account, confirm=args.confirm,
         )
     if args.command == "options":
         from pyhood import cli
@@ -749,21 +873,21 @@ def main(argv: list[str] | None = None) -> int:
             return cli.run(cli.cancel, order_id=args.order_id)
         return cli.run(
             cli.stock_order, side=args.command, symbol=args.symbol, quantity=args.quantity,
-            limit=args.limit, time_in_force=args.tif, extended_hours=args.extended_hours,
-            confirm=args.confirm,
+            limit=args.limit, stop=args.stop, time_in_force=args.tif,
+            extended_hours=args.extended_hours, account=args.account, confirm=args.confirm,
         )
     if args.command in ("positions", "orders", "buying-power", "quote"):
         from pyhood import cli
 
         if args.command == "positions":
-            return cli.run(cli.positions, as_json_output=args.json)
+            return cli.run(cli.positions, account=args.account, as_json_output=args.json)
         if args.command == "orders":
             return cli.run(
                 cli.orders, since=args.since, symbol=args.symbol,
                 everything=args.all, open_only=args.open, as_json_output=args.json,
             )
         if args.command == "buying-power":
-            return cli.run(cli.buying_power, as_json_output=args.json)
+            return cli.run(cli.buying_power, account=args.account, as_json_output=args.json)
         return cli.run(
             cli.quote, symbols=args.symbols, fundamentals=args.fundamentals,
             as_json_output=args.json,

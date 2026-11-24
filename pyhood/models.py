@@ -345,7 +345,11 @@ class Rating(Model):
     num_buy: int = 0
     num_hold: int = 0
     num_sell: int = 0
-    published_at: str = ""
+    published_at: str = ""  # when the ratings were published, ISO-8601
+    # Analysts' price targets, None when Robinhood publishes none.
+    price_target_high: float | None = None
+    price_target_low: float | None = None
+    price_target_mean: float | None = None
 
     @property
     def total(self) -> int:
@@ -371,9 +375,12 @@ class NewsArticle(Model):
 class Mover(Model):
     """S&P 500 mover."""
     symbol: str
-    price_change: float = 0.0
+    # The move in dollars. Robinhood sends the percentage and the last
+    # price, so this is worked out from those, and None without a price.
+    price_change: float | None = None
     price_change_pct: float = 0.0
     instrument_url: str = ""
+    price: float | None = None  # last price in regular hours
 
 
 @dataclass(frozen=True)

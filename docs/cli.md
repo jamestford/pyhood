@@ -6,6 +6,29 @@ The account commands are **read-only**. The order commands change your account. 
 
 ## Account commands
 
+### `pyhood accounts`
+
+The accounts under your login, such as an individual account and an IRA, with what each is worth.
+
+```text
+ACCOUNT     NUMBER      VALUE       CASH  BUYING POWER
+Individual  …2223   $7,785.45    $168.85       $168.85
+Roth IRA    …5556   $7,000.00  $7,000.00     $7,000.00
+```
+
+Account numbers show only their last four characters. `--json` gives them in full.
+
+### `--account`
+
+Commands use the first account unless told otherwise. To use another, add `--account` with something that identifies it: part of its type, such as `roth`, `ira` or `individual`, or the last four characters of its number.
+
+```bash
+pyhood positions --account roth
+pyhood buy AAPL 10 --limit 350 --account roth
+```
+
+It works on `positions`, `buying-power`, `buy`, `sell`, `buy-option` and `sell-option`. If what you type fits no account, or more than one, the command stops and lists your accounts. It does not guess.
+
 ### `pyhood positions`
 
 What the account holds: stocks, then options, with cost, value and unrealized profit or loss.
@@ -51,6 +74,49 @@ The cash available to trade with in the main account.
 ### `pyhood quote SYMBOL [SYMBOL ...]`
 
 Price, change, previous close, bid and ask for each symbol. Add `--fundamentals` for volume, P/E, market cap and the 52-week range, at the cost of one more request.
+
+### `pyhood dividends`
+
+Dividends paid and pending, newest first, with the total paid. `--symbol KO` shows one stock's.
+
+### `pyhood transfers`
+
+Money moved in, out and between your accounts, newest first. It cannot make a transfer. The direction, type and account columns are Robinhood's own terms, shown as sent.
+
+## Market commands
+
+### `pyhood history SYMBOL`
+
+Past prices: open, high, low, close and volume, with the change over the period. `--span` takes `week`, `month` (the default), `3month`, `year` or `5year`. The first three give one row a day, the last two one a week.
+
+### `pyhood earnings SYMBOL [SYMBOL ...]`
+
+When each company next reports, whether before the open or after the close, and the estimate. `--days N` sets how far ahead to look; the default is 90.
+
+### `pyhood ratings SYMBOL [SYMBOL ...]`
+
+Analysts' buy, hold and sell counts, and their low, mean and high price targets.
+
+### `pyhood news SYMBOL`
+
+Recent headlines with their source, time and link. `--count N` sets how many; the default is 5.
+
+### `pyhood movers`
+
+The S&P 500 stocks that have risen most today, with price and change. `--down` shows the biggest falls.
+
+## Watchlists
+
+```bash
+pyhood watchlists              # your lists and what is on them
+pyhood watch F GM              # add to 'My First List'
+pyhood watch NVDA --list Tech  # add to another list
+pyhood unwatch F               # take off
+```
+
+`watch` and `unwatch` act at once. No money is involved, so there is no preview. Each reads the list back afterwards and tells you if a symbol did not take.
+
+## Options
 
 ### `pyhood options SYMBOL`
 
@@ -153,10 +219,26 @@ It is a guardrail against mistakes, not a lock: anything that can run the previe
 | Option | Effect |
 |---|---|
 | `--limit PRICE` or `--market` | One is required. There is no default |
+| `--stop PRICE` | Make it a stop order. See below |
+| `--account WHICH` | Place it in another account, such as `roth` |
 | `--tif gfd` | Good for day. The default |
 | `--tif gtc` | Good till cancelled |
 | `--extended-hours` | Allow the order to trade outside regular hours |
 | `--confirm CODE` | Act, using the code from the preview |
+
+### Stop orders
+
+`--stop PRICE` makes an order wait. Nothing happens until the stock reaches the stop price; then the `--market` or `--limit` order is placed.
+
+```bash
+pyhood sell AAPL 10 --stop 340 --market --tif gtc   # sell if it falls to $340
+pyhood sell AAPL 10 --stop 340 --limit 338 --tif gtc   # ... but not below $338
+```
+
+The preview points out two things that catch people:
+
+- **A stop that would trigger at once.** A sell stop belongs below the current price and a buy stop above it.
+- **A stop that lasts only for today.** Orders are good for the day by default, and a stop meant as protection is no use once it has expired. Add `--tif gtc`.
 
 ### Option orders
 
@@ -213,7 +295,7 @@ CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share, placed
 - An order that has already finished is left alone, and the command says so.
 - A cancel is a request. If the order filled before it landed, the command reports that in place of `CANCELLED`, and any part that had already filled is not undone.
 
-These cover stock orders and single-leg option orders in your main account. Stop orders, option spreads and orders in other accounts are placed from Python.
+These cover stock orders, stop orders and single-leg option orders, in any of your accounts. Option spreads, trailing stops and orders by dollar amount are placed from Python.
 
 ## Setup and checks
 

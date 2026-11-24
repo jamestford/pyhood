@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Accounts.** `pyhood accounts` lists the accounts under your login, such as an individual account and an IRA, with value, cash and buying power. `--account` on `positions`, `buying-power`, `buy`, `sell`, `buy-option` and `sell-option` picks one by part of its type (`roth`, `ira`, `individual`) or the last four characters of its number. If what is typed fits no account, or more than one, the command stops and lists them. The account is part of an order's confirmation code, so a code for one account will not place an order in another.
+- **Stop orders.** `--stop PRICE` on `pyhood buy` and `pyhood sell` makes the order wait until the price reaches the stop, then places the `--market` or `--limit` order. The preview points out a stop that would trigger at once, and one that is good only for today, since a stop meant as protection is no use once it has expired.
+- **Market commands**, all read-only: `pyhood history` for past prices, `pyhood earnings` for the next report date, `pyhood ratings` for analyst counts and price targets, `pyhood news` for headlines, and `pyhood movers` for the S&P 500's biggest moves today.
+- **`pyhood dividends`** and **`pyhood transfers`**, read-only. Transfers shows Robinhood's own direction and account terms as sent, and does not interpret them.
+- **Watchlists.** `pyhood watchlists` shows your lists, and `pyhood watch` and `pyhood unwatch` add and remove stocks. Those two act at once, since no money is involved, and read the list back to confirm.
+- `Rating` has `price_target_high`, `price_target_low` and `price_target_mean`. `Mover` has `price`.
 - `Order` has five fields for option orders: `leg_count`, `position_effect` (`'open'` or `'close'`), `option_type`, `strike` and `expiration`. On a single-leg order they describe the contract. On a spread the legs differ, so `strike`, `expiration` and `option_type` are `None`, and `position_effect` is set only if every leg shares it. All five are `None` on stock orders. `buy_option()`, `sell_option()` and `order_option()` set them on the order they return too.
 
 ### Changed
@@ -18,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The README says what has been run against Robinhood for real and what has not, in place of a table that called every feature "Functional".
 
 ### Fixed
+- **`Rating.published_at` held the instrument's ID.** `get_ratings()` read it from `instrument_id`. It is now read from `ratings_published_at`. The wrong key exists in the response, so the field audit, which looks for keys that are missing, did not catch it.
+- **`Mover.price_change` held the percentage change.** Robinhood sends no dollar change for a mover, only the percentage and the last price, so it is now worked out from those, and is `None` when there is no price. This is breaking for code that read it as a percentage: use `price_change_pct`.
+- `get_movers()` looked up every mover's instrument to find a symbol the mover already carries. It now makes one request, not eleven.
+- A table with a missing value, such as a transfer with no description, raised `TypeError`. A missing value prints as `-`.
 - The README claimed 360 tests, showed example orders without the order ID column, and used option and futures contracts that had expired.
 - The install docs said `~/pyhood` holds its own copy of Python. It holds a link to one, which uv keeps in its own folder.
 
