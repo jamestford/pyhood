@@ -608,15 +608,13 @@ def build_parser() -> argparse.ArgumentParser:
         )
     cancel = commands.add_parser(
         "cancel",
-        help="preview cancelling an open order, then cancel it with --confirm",
-        description="Cancels an order that has not finished filling." + two_steps
-        + " Find order IDs with `pyhood orders --open`.",
+        help="cancel an open order",
+        description=(
+            "Cancels an order that has not finished filling, at once, and "
+            "reports what became of it. Find order IDs with `pyhood orders --open`."
+        ),
     )
     cancel.add_argument("order_id", metavar="ORDER_ID", help="from `pyhood orders --open`")
-    cancel.add_argument(
-        "--confirm", metavar="CODE",
-        help="the code a preview of this cancellation printed; cancels the order",
-    )
     commands.add_parser(
         "buying-power",
         parents=[as_json],
@@ -748,7 +746,7 @@ def main(argv: list[str] | None = None) -> int:
         from pyhood import cli
 
         if args.command == "cancel":
-            return cli.run(cli.cancel, order_id=args.order_id, confirm=args.confirm)
+            return cli.run(cli.cancel, order_id=args.order_id)
         return cli.run(
             cli.stock_order, side=args.command, symbol=args.symbol, quantity=args.quantity,
             limit=args.limit, time_in_force=args.tif, extended_hours=args.extended_hours,

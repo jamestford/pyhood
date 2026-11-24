@@ -109,7 +109,7 @@ Those are read-only. Each prints a table with times in your own time zone, and t
 
 ### Placing orders
 
-`pyhood buy`, `pyhood sell` and `pyhood cancel` work in two steps. Run once, a command only previews:
+`pyhood buy` and `pyhood sell` work in two steps. Run once, a command only previews:
 
 ```text
 $ pyhood buy AAPL 10 --limit 350
@@ -134,6 +134,8 @@ pyhood buy-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --
 Run again with the code it printed, and the order is placed. The code belongs to that exact order on that day: change the symbol, quantity or price and it is refused, so what is placed is always what was previewed. An order needs `--limit PRICE` or `--market`; there is no default.
 
 The code is a guardrail against mistakes, not a lock. Anything that can run the preview can read the code.
+
+`pyhood cancel ORDER_ID` cancels an order in one step. A cancel names one order and can only remove it, and when you want out of an order a second step is time in which it can fill.
 
 ## Use It With an AI Agent
 

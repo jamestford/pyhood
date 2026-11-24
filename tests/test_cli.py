@@ -589,61 +589,73 @@ class TestStockOrder:
 
 
 class TestCancel:
+    """A cancel is one step. It names one order and can only remove it, and
+    someone who wants out of an order should not wait on a second command."""
+
     OPEN = stock_order(
         order_id="order-9", status="confirmed", quantity=40.0, price=90.0,
         average_price=None, filled_at=None, filled_quantity=0.0,
     )
 
-    def test_without_a_code_it_previews_and_sends_nothing(self, capsys):
+    def test_it_cancels_at_once_and_says_what_it_cancelled(self, capsys):
         client = OrderClient(existing=self.OPEN)
 
-        assert cli.cancel(client, "order-9") == 0
-
-        out = capsys.readouterr().out
-        assert client.writes == []
-        assert out.startswith("PREVIEW. Nothing has been sent.")
-        assert "Cancel: buy 40 ANT, limit $90.00" in out
-        assert f"pyhood cancel order-9 --confirm {code_from(out)}" in out
-
-    def test_with_its_code_it_cancels_and_reports_the_outcome(self, capsys):
-        client = OrderClient(existing=self.OPEN)
-        cli.cancel(client, "order-9")
-        code = code_from(capsys.readouterr().out)
-
-        assert cli.cancel(client, "order-9", confirm=code, settle_seconds=0) == 0
+        assert cli.cancel(client, "order-9", settle_seconds=0) == 0
 
         assert client.writes == [("cancel", "order-9")]
-        assert capsys.readouterr().out.startswith("CANCELLED: buy 40 ANT")
-
-    def test_a_code_for_one_order_will_not_cancel_another(self, capsys):
-        client = OrderClient(existing=self.OPEN)
-        cli.cancel(client, "order-9")
-        code = code_from(capsys.readouterr().out)
-        client.reads.clear()
-
-        assert cli.cancel(client, "order-8", confirm=code, settle_seconds=0) == 2
-        assert client.writes == []
-        assert client.reads == []
+        out = capsys.readouterr().out
+        assert out.startswith("CANCELLED: buy 40 ANT, limit $90.00, placed 2026-11-19")
+        assert "PREVIEW" not in out and "--confirm" not in out
 
     def test_an_order_that_filled_before_the_cancel_landed_says_so(self, capsys):
         client = OrderClient(existing=self.OPEN, after_cancel="filled")
-        cli.cancel(client, "order-9")
-        code = code_from(capsys.readouterr().out)
 
-        cli.cancel(client, "order-9", confirm=code, settle_seconds=0)
+        cli.cancel(client, "order-9", settle_seconds=0)
 
         out = capsys.readouterr().out
         assert "CANCELLED" not in out
         assert "the order is now filled" in out
+        assert "pyhood orders --symbol ANT" in out
 
-    def test_a_finished_order_has_nothing_to_cancel(self, capsys):
-        client = OrderClient(existing=stock_order(order_id="order-1"))  # filled
+    def test_a_part_that_already_filled_is_reported_as_not_undone(self, capsys):
+        part_filled = stock_order(
+            order_id="order-9", status="partially_filled", quantity=40.0, price=90.0,
+            average_price=89.5, filled_quantity=15.0,
+        )
+        client = OrderClient(existing=part_filled)
+        client.cancel_order = lambda order_id: (
+            client.writes.append(("cancel", order_id)),
+            setattr(client, "existing", stock_order(
+                order_id="order-9", status="cancelled", quantity=40.0, price=90.0,
+                average_price=89.5, filled_quantity=15.0,
+            )),
+        )
 
-        assert cli.cancel(client, "order-1") == 1
+        assert cli.cancel(client, "order-9", settle_seconds=0) == 0
 
         out = capsys.readouterr().out
-        assert "already filled" in out
-        assert "--confirm" not in out
+        assert out.startswith("CANCELLED: buy 40 ANT")
+        assert "15 had already filled at $89.50 and is not undone" in out
+
+    def test_a_finished_order_is_left_alone(self, capsys):
+        client = OrderClient(existing=stock_order(order_id="order-1"))  # filled
+
+        assert cli.cancel(client, "order-1", settle_seconds=0) == 1
+
+        assert "already filled, so there is nothing to cancel" in capsys.readouterr().out
+        assert client.writes == []
+
+    def test_an_order_that_stays_open_is_a_failure(self, capsys):
+        client = OrderClient(existing=self.OPEN, after_cancel="confirmed")
+
+        assert cli.cancel(client, "order-9", settle_seconds=0, attempts=2) == 1
+        assert "Cancel requested, but the order is now confirmed" in capsys.readouterr().out
+
+    def test_an_unknown_order_id_changes_nothing(self):
+        client = OrderClient(existing=None)
+
+        with pytest.raises(OrderError, match="not found"):
+            cli.cancel(client, "no-such-order", settle_seconds=0)
         assert client.writes == []
 
 
@@ -686,8 +698,14 @@ class TestOrderCommandLine:
         seen = []
         monkeypatch.setattr(cli, "run", lambda fn, **kw: seen.append((fn, kw)) or 0)
 
-        onboarding.main(["cancel", "order-9", "--confirm", "abc123"])
-        assert seen == [(cli.cancel, {"order_id": "order-9", "confirm": "abc123"})]
+        onboarding.main(["cancel", "order-9"])
+        assert seen == [(cli.cancel, {"order_id": "order-9"})]
+
+    def test_cancel_takes_no_confirmation_code(self):
+        """It did in 0.17.0. A cancel is now one step."""
+        with pytest.raises(SystemExit) as stop:
+            onboarding.main(["cancel", "order-9", "--confirm", "abc123"])
+        assert stop.value.code == 2
 
     @pytest.mark.parametrize("argv", [
         ["buy", "AAPL", "10"],                              # neither --limit nor --market
@@ -961,9 +979,10 @@ class TestOptionOrder:
             instrument_type="option",
         )
 
-        cli.cancel(OptionClient(existing=waiting), "option-order")
+        cli.cancel(OptionClient(existing=waiting), "option-order", settle_seconds=0)
 
-        assert "Cancel: debit 2 F option contracts, limit $0.30" in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert out.startswith("CANCELLED: debit 2 F option contracts, limit $0.30")
 
 
 class TestOptionCommandLine:

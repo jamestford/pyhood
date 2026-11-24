@@ -8,10 +8,10 @@ ways, by formatting a price that is None on an unfilled order, or by
 reading a UTC timestamp as local time. Here those are handled once. Each
 takes `--json` for exact values in place of the table.
 
-The rest change the account, so they work in two steps.
-Run once, a command only describes what it would do and prints a
-confirmation code. Run again with that code, it does it. See
-`confirmation_code`.
+The commands that place an order work in two steps. Run once, a command
+only describes what it would do and prints a confirmation code. Run again
+with that code, it does it. See `confirmation_code`. `cancel` acts at
+once: it can only remove one named order.
 """
 
 from __future__ import annotations
@@ -690,15 +690,16 @@ def option_order(
 def cancel(
     client: Any,
     order_id: str,
-    confirm: str | None = None,
     settle_seconds: float = 1.0,
     attempts: int = 5,
 ) -> int:
-    """Preview cancelling an order, or cancel it when given its confirmation code."""
-    code = confirmation_code("cancel", order_id)
-    if confirm is not None and confirm != code:
-        return _wrong_code()
+    """Cancel an open order, and say what became of it.
 
+    One step, unlike placing an order. A cancel names one order and can
+    only remove it: there is no symbol, quantity or price to get wrong,
+    and when someone wants out of an order a second step is time in which
+    it can fill.
+    """
     order = client.get_order(order_id)
     limit = "at market" if order.price is None else f"limit {money(order.price)}"
     what = order.symbol
@@ -713,15 +714,6 @@ def cancel(
         print(f"  {summary}")
         return 1
 
-    if confirm is None:
-        print("PREVIEW. Nothing has been sent.\n")
-        print(f"  Cancel: {summary}")
-        print(f"  {'Status:':<20}{order.status}")
-        print(f"  {'Filled so far:':<20}{number(order.filled_quantity or 0)}")
-        print("\nTo cancel this order, show this preview to the user. If they say yes, run:")
-        print(f"  {program()} cancel {order_id} --confirm {code}")
-        return 0
-
     client.cancel_order(order_id)
     # A cancel is a request: the order takes a moment to leave the book,
     # and can fill first.
@@ -733,8 +725,15 @@ def cancel(
             break
     if order.status == "cancelled":
         print(f"CANCELLED: {summary}")
+        if order.filled_quantity:
+            print(
+                f"  {number(order.filled_quantity)} had already filled at "
+                f"{money(order.average_price)} and is not undone."
+            )
         return 0
     print(f"Cancel requested, but the order is now {order.status}: {summary}")
+    if order.filled_quantity:
+        print(f"  Filled: {number(order.filled_quantity)} at {money(order.average_price)}")
     print(f"Check it with:  {program()} orders --symbol {order.symbol}")
     return 0 if order.status not in OPEN_STATES else 1
 

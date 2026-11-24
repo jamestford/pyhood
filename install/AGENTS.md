@@ -19,5 +19,6 @@ The guide lists the commands for reading the account and placing orders, how to 
 - **Do not install anything.** pyhood and everything it needs are already here.
 - **Leave `bin/`, `lib/` and `include/` alone.** They are the install. Do not read through them to learn how pyhood works; the guide tells you.
 - **Never ask for, read or type a password or API key.** The login is already saved. Do not open the files in `~/.pyhood/`.
-- **Never place, change or cancel an order without the user's yes.** `pyhood buy`, `pyhood sell` and `pyhood cancel` preview first. Show the preview, wait for a yes, then run the command the preview printed, unchanged.
+- **Never place an order without the user's yes.** `pyhood buy`, `pyhood sell`, `pyhood buy-option` and `pyhood sell-option` preview first. Show the preview, wait for a yes, then run the command the preview printed, unchanged.
+- **Cancel an order only when the user asks you to.** `pyhood cancel` acts at once.
 - **Put any script you write in `scripts/`**, creating the folder if needed, and run it with `bin/pyhood run scripts/name.py`.

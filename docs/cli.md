@@ -2,7 +2,7 @@
 
 The `pyhood` command answers the most common questions about an account without any code, and sets up and checks your login.
 
-The account commands are **read-only**. The order commands change your account, and work in two steps: a preview, then a confirmation.
+The account commands are **read-only**. The order commands change your account. Placing an order takes two steps: a preview, then a confirmation. Cancelling one takes a single step.
 
 ## Account commands
 
@@ -90,7 +90,7 @@ Two differences from the tables:
 
 ## Order commands
 
-`pyhood buy`, `pyhood sell` and `pyhood cancel` never act the first time they are run.
+`pyhood buy` and `pyhood sell` never act the first time they are run.
 
 ### Step 1: preview
 
@@ -147,7 +147,6 @@ It is a guardrail against mistakes, not a lock: anything that can run the previe
 | `pyhood buy SYMBOL QUANTITY --market` | Buy at the best price available |
 | `pyhood sell SYMBOL QUANTITY --limit PRICE` | Sell at that price or better |
 | `pyhood sell SYMBOL QUANTITY --market` | Sell at the best price available |
-| `pyhood cancel ORDER_ID` | Cancel an order that has not finished filling |
 
 | Option | Effect |
 |---|---|
@@ -196,7 +195,18 @@ The preview checks that the contract exists and names the nearest expirations or
 - a limit 20% or more from the contract's mark, which catches a price typed per contract in place of per share
 - a contract that expires today
 
-`pyhood cancel` cancels an option order the same way it cancels a stock order.
+### Cancelling an order
+
+```text
+$ pyhood cancel 1a2b3c4d-...
+CANCELLED: buy 10 AAPL, limit $350.00, placed 2026-11-24 16:54 EST
+```
+
+`pyhood cancel ORDER_ID` acts at once, for stock and option orders alike. There is no preview and no code. A cancel names one order and can only remove it, so there is no symbol, quantity or price to get wrong, and when you want out of an order a second step is time in which it can fill.
+
+- Find the ID with `pyhood orders --open`.
+- An order that has already finished is left alone, and the command says so.
+- A cancel is a request. If the order filled before it landed, the command reports that in place of `CANCELLED`, and any part that had already filled is not undone.
 
 These cover stock orders and single-leg option orders in your main account. Stop orders, option spreads and orders in other accounts are placed from Python.
 

@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The preview points out a limit 20% or more from the contract's mark. That catches a price typed per contract where per share was meant, which is a hundred times too high.
 - `pyhood cancel` describes an option order as one.
 
+### Changed
+- **`pyhood cancel ORDER_ID` cancels in one step.** In 0.17.0 it previewed and needed a confirmation code, like placing an order. A cancel names one order and can only remove it: there is no symbol, quantity or price to get wrong. And when you want out of an order because the price is moving toward it, a second step is time in which it can fill. It still needs a specific order ID, leaves a finished order alone, and reports if the order filled before the cancel landed. `--confirm` is no longer accepted on `cancel`.
+- `pyhood guide` tells an agent to cancel when the user asks, without asking again, and never on its own initiative.
+
 ### Fixed
 - **The option order docstrings said the price is "per contract". It is per share.** `buy_option()`, `sell_option()` and `order_option()` send the price as option prices are quoted, so `price=1.60` is $160 a contract. Read as written, the docstring would have someone pass `160` for that order.
 
