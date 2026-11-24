@@ -256,7 +256,8 @@ def documented_commands():
     pattern = re.compile(r"(?<![\w/.-])pyhood ([\w-]+)")
     found = set()
     for path in (
-        "README.md", "AGENTS.md", "docs/getting-started.md", "docs/setup.md", "docs/cli.md",
+        "README.md", "AGENTS.md", "install/AGENTS.md", "docs/getting-started.md",
+        "docs/setup.md", "docs/cli.md",
     ):
         text = (ROOT / path).read_text(encoding="utf-8")
         # Commands appear in code spans and code blocks, not in prose.
@@ -274,6 +275,34 @@ def test_documented_commands_exist(path, command):
         action.choices for action in parser._actions if getattr(action, "choices", None)
     )
     assert command in subcommands, f"{path} mentions `pyhood {command}`"
+
+
+class TestInstallFolder:
+    """An install carries its own AGENTS.md, so an agent started in the
+    install folder is told what to do with nothing set up by hand."""
+
+    def test_the_wheel_puts_agents_md_at_the_top_of_the_environment(self):
+        config = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        assert "[tool.hatch.build.targets.wheel.shared-data]" in config
+        assert '"install/AGENTS.md" = "AGENTS.md"' in config
+        # The wheel is built from the sdist, so the sdist must carry the file.
+        assert '"/install",' in config
+        assert (ROOT / "install" / "AGENTS.md").is_file()
+
+    def test_it_points_at_the_guide_by_a_path_that_works_in_that_folder(self):
+        text = (ROOT / "install" / "AGENTS.md").read_text(encoding="utf-8")
+        assert "bin/pyhood guide" in text
+        assert "Do not install anything" in text
+        assert "~/.pyhood/" in text
+        assert "Never place, change or cancel an order" in text
+
+    def test_it_is_not_the_file_for_the_source_folder(self):
+        """One says pyhood is installed here; the other says it is not."""
+        installed = (ROOT / "install" / "AGENTS.md").read_text(encoding="utf-8")
+        source = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        assert "is installed in this folder" in installed
+        assert "Do not run pyhood from this folder" in source
+        assert "Do not run pyhood from this folder" not in installed
 
 
 def test_agents_file_sends_agents_to_the_guide():

@@ -33,6 +33,12 @@ def eastern_time(monkeypatch):
     time.tzset()
 
 
+@pytest.fixture(autouse=True)
+def on_the_path(monkeypatch):
+    """Printed commands read `pyhood ...`, as on an install that is on the PATH."""
+    monkeypatch.setattr(cli, "program", lambda: "pyhood")
+
+
 def stock_order(**fields):
     base = dict(
         order_id="order-1", symbol="ANT", side="buy", order_type="limit", quantity=41.0,
@@ -692,6 +698,54 @@ class TestOrderCommandLine:
         with pytest.raises(SystemExit) as stop:
             onboarding.main(argv)
         assert stop.value.code == 2
+
+
+# ── Printed commands work where they are printed ─────────────────────
+
+
+class TestProgram:
+    """An install in its own folder is often not on the PATH. A command
+    pyhood prints for someone to run next must still work as printed."""
+
+    @pytest.fixture
+    def install(self, tmp_path, monkeypatch):
+        monkeypatch.undo()  # drop the autouse stand-in; this tests the real one
+        bin_dir = tmp_path / "pyhood" / "bin"
+        bin_dir.mkdir(parents=True)
+        (bin_dir / "python").write_text("")
+        (bin_dir / "pyhood").write_text("")
+        monkeypatch.setattr(cli.sys, "executable", str(bin_dir / "python"))
+        return bin_dir / "pyhood"
+
+    def test_on_the_path_it_is_just_pyhood(self, install, monkeypatch):
+        monkeypatch.setattr(cli.shutil, "which", lambda name: str(install))
+        assert cli.program() == "pyhood"
+
+    def test_off_the_path_it_is_the_full_path(self, install, monkeypatch):
+        monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+        assert cli.program() == str(install)
+
+    def test_a_different_install_on_the_path_does_not_count(self, install, monkeypatch, tmp_path):
+        other = tmp_path / "elsewhere" / "pyhood"
+        other.parent.mkdir()
+        other.write_text("")
+        monkeypatch.setattr(cli.shutil, "which", lambda name: str(other))
+        assert cli.program() == str(install)
+
+    def test_the_preview_prints_a_command_that_runs_here(self, install, monkeypatch, capsys):
+        monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+
+        cli.stock_order(OrderClient(buying_power=5000.0), "buy", "AAPL", 10, limit=350.0)
+
+        assert f"  {install} buy AAPL 10 --limit 350 --confirm " in capsys.readouterr().out
+
+    def test_the_guide_says_so_only_when_it_matters(self, install, monkeypatch):
+        monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+        text = guide.render()
+        assert "THE COMMAND" in text and str(install) in text
+
+        monkeypatch.setattr(cli.shutil, "which", lambda name: str(install))
+        assert "THE COMMAND" not in guide.render()
 
 
 # ── The guide's commands are real ────────────────────────────────────

@@ -17,7 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - These cover stock orders in the main account. Stop orders, option orders and other accounts are still placed from Python.
 - `pyhood orders --open` shows only orders that can still fill, and every row of `pyhood orders` now ends with the order ID, which `pyhood cancel` takes.
 
+- **An install carries its own `AGENTS.md`.** It lands at the top of the environment pyhood is installed into, beside `bin/` and `lib/`, and tells an AI agent started in that folder to run `bin/pyhood guide`. With no instructions at all, a local model took 15 to 19 commands to answer a question it answers in 2 or 3 with them, and printed the saved session file along the way. Until now the instructions had to be written by hand.
+
 ### Changed
+- **Install instructions put pyhood in a folder of its own, `~/pyhood`, which is also where you work from.** `uv venv --managed-python --python 3.14 ~/pyhood`, then `uv pip install --python ~/pyhood/bin/python pyhood`. Open an agent in that folder and it reads the `AGENTS.md` there. This replaces `uv tool install`, which hides the install where there is nowhere to work from.
+- **Commands that pyhood prints for you to run next use its full path when `pyhood` alone would not reach this install,** as when the install folder is not on the PATH. `pyhood guide` says so at the top in that case.
 - `pyhood guide` has a PLACING ORDERS section: preview, show the user, and only on a yes run the command the preview printed. The Python order methods stay listed, marked as sending at once.
 
 ## [0.16.0] - 2026-11-24

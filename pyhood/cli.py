@@ -19,10 +19,12 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import shutil
 import sys
 import time
 from collections.abc import Callable
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from pyhood.exceptions import AuthError, OrderError, PyhoodError
@@ -31,6 +33,23 @@ DEFAULT_ORDER_DAYS = 30
 
 # States in which an order can still fill, and so can still be cancelled.
 OPEN_STATES = frozenset({"queued", "unconfirmed", "confirmed", "partially_filled"})
+
+
+def program() -> str:
+    """How to run pyhood from a shell here: `pyhood`, or its full path.
+
+    The commands that pyhood prints for someone to run next have to work as
+    printed. An install in its own folder is often not on the PATH, and
+    there `pyhood buy ...` would be "command not found".
+    """
+    here = Path(sys.executable).with_name("pyhood")
+    found = shutil.which("pyhood")
+    if found is None:
+        return str(here) if here.exists() else "pyhood"
+    # Another pyhood earlier on the PATH is a different install.
+    if here.exists() and Path(found).resolve() != here.resolve():
+        return str(here)
+    return "pyhood"
 
 
 # ── Formatting ───────────────────────────────────────────────────────
@@ -318,7 +337,7 @@ def stock_order(
     symbol = symbol.upper()
     kind = "market" if limit is None else f"{limit:.4f}"
     code = confirmation_code(side, symbol, f"{quantity:g}", kind, time_in_force, extended_hours)
-    command = f"pyhood {side} {symbol} {quantity:g} " + (
+    command = f"{program()} {side} {symbol} {quantity:g} " + (
         "--market" if limit is None else f"--limit {limit:g}"
     )
     if time_in_force != "gfd":
@@ -359,9 +378,9 @@ def stock_order(
         if order.filled_quantity:
             print(f"  Filled:    {number(order.filled_quantity)} at {money(order.average_price)}")
         print(f"  Order ID:  {order.order_id}")
-        print(f"\nCheck it with:  pyhood orders --symbol {symbol}")
+        print(f"\nCheck it with:  {program()} orders --symbol {symbol}")
         if order.status in OPEN_STATES:
-            print(f"Cancel it with: pyhood cancel {order.order_id}")
+            print(f"Cancel it with: {program()} cancel {order.order_id}")
         return 0
 
     quote_now = client.get_quote(symbol)
@@ -445,7 +464,7 @@ def cancel(
         print(f"  {'Status:':<20}{order.status}")
         print(f"  {'Filled so far:':<20}{number(order.filled_quantity or 0)}")
         print("\nTo cancel this order, show this preview to the user. If they say yes, run:")
-        print(f"  pyhood cancel {order_id} --confirm {code}")
+        print(f"  {program()} cancel {order_id} --confirm {code}")
         return 0
 
     client.cancel_order(order_id)
@@ -461,7 +480,7 @@ def cancel(
         print(f"CANCELLED: {summary}")
         return 0
     print(f"Cancel requested, but the order is now {order.status}: {summary}")
-    print(f"Check it with:  pyhood orders --symbol {order.symbol}")
+    print(f"Check it with:  {program()} orders --symbol {order.symbol}")
     return 0 if order.status not in OPEN_STATES else 1
 
 
@@ -478,7 +497,7 @@ def run(command: Callable[..., int], **kwargs: Any) -> int:
         return command(client, **kwargs)
     except AuthError as e:
         print(f"Not logged in: {e}", file=sys.stderr)
-        print("Run: pyhood setup login", file=sys.stderr)
+        print(f"Run: {program()} setup login", file=sys.stderr)
         return 1
     except PyhoodError as e:
         print(f"Robinhood request failed: {e}", file=sys.stderr)

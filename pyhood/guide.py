@@ -225,13 +225,37 @@ def _models() -> str:
     return "\n".join(lines) + "\n"
 
 
+def _path_note() -> str:
+    """Say how to run pyhood when the bare command would not reach it."""
+    from pyhood.cli import program
+
+    command = program()
+    if command == "pyhood":
+        return ""
+    return (
+        "THE COMMAND\n"
+        "  `pyhood` on its own does not run this install from here. Wherever\n"
+        "  this guide says `pyhood`, type this instead:\n\n"
+        f"      {command}\n"
+    )
+
+
+def _intro(version: str) -> str:
+    """The hand-written part, with the path note ahead of the first command."""
+    # Not str.format: the examples contain f-strings, whose braces it would read.
+    text = INTRO.replace("{version}", version)
+    note = _path_note()
+    if note:
+        text = text.replace("QUICK ANSWERS", f"{note}\nQUICK ANSWERS", 1)
+    return text
+
+
 def render() -> str:
     """Build the guide for the installed version."""
     from pyhood import __version__
 
-    return "\n".join((
-        # Not str.format: the examples contain f-strings, whose braces it would read.
-        INTRO.replace("{version}", __version__),
+    return "\n".join(part for part in (
+        _intro(__version__),
         _methods("READING (safe to call freely)", READ_METHODS),
         _models(),
         _methods(
@@ -240,7 +264,7 @@ def render() -> str:
             WRITE_METHODS,
         ),
         OUTRO,
-    ))
+    ) if part)
 
 
 def main() -> int:
