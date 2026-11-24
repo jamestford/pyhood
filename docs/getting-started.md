@@ -2,7 +2,31 @@
 
 ## Installation
 
-pyhood installs into a folder of its own, and that folder is also where you work from. With [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS):
+### Have your AI agent do it
+
+pyhood is built to be driven by an AI agent, so the quickest install is to hand it the job. Paste this into your agent:
+
+```text
+Install pyhood, a Robinhood client, on this computer. Do these steps in order and stop if one fails.
+
+1. Run `uv --version`. If uv is not installed, stop and tell me. Do not install it without asking.
+2. Run `uv venv --managed-python --python 3.14 ~/pyhood`
+3. Run `uv pip install --python ~/pyhood/bin/python pyhood`
+4. Run `~/pyhood/bin/pyhood version`. It should print a version number.
+5. Do not log in for me, and never ask for my password. Tell me to run `~/pyhood/bin/pyhood setup login` myself, in my own terminal, and to tell you when I have.
+6. When I say I am logged in, run `~/pyhood/bin/pyhood verify`.
+7. Then read `~/pyhood/AGENTS.md` and follow it from now on.
+
+Do not use pip, do not use sudo, and do not install anything else.
+```
+
+The steps are written out so that you can see what you are asking for. The agent stops at step 5: logging in needs your password and an approval on your phone, and that part is yours. See [First Login](#first-login).
+
+It needs [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS). On Windows, replace `~/pyhood/bin/` with `~\pyhood\Scripts\`.
+
+### By hand
+
+The same steps, typed yourself. pyhood installs into a folder of its own, and that folder is also where you work from:
 
 ```bash
 uv venv --managed-python --python 3.14 ~/pyhood
@@ -14,7 +38,7 @@ That creates `~/pyhood`:
 | In `~/pyhood` | What it is |
 |---|---|
 | `bin/pyhood` | The command |
-| `bin/python` | The Python pyhood runs on |
+| `bin/python` | A link to the Python pyhood runs on, which uv keeps in its own folder |
 | `lib/` | pyhood and what it depends on |
 | `AGENTS.md` | Instructions an AI agent reads when it starts in this folder |
 

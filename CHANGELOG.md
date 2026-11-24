@@ -5,6 +5,17 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **The README is rewritten for people who use pyhood with an AI agent.** It opens with what you can ask the agent and how you stay in control, where it opened with session refresh and the Python API. It is about half the length: the setup walkthrough, authentication errors, rate limits and per-feature examples it repeated are on the docs site, and it links to them.
+- **Installing starts with a block to paste into your agent.** The steps are written out in the block, so you can see what you are asking for. The agent installs pyhood into `~/pyhood` and stops at the login, which needs your password and is yours to do. A local model given the block installed pyhood in four commands and stopped there. The by-hand steps are still in Getting Started.
+- The README says what has been run against Robinhood for real and what has not, in place of a table that called every feature "Functional".
+
+### Fixed
+- The README claimed 360 tests, showed example orders without the order ID column, and used option and futures contracts that had expired.
+- The install docs said `~/pyhood` holds its own copy of Python. It holds a link to one, which uv keeps in its own folder.
+
 ## [0.18.0] - 2026-11-24
 
 ### Added
