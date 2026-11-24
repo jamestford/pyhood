@@ -5,7 +5,7 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.15.0] - 2026-11-24
 
 These changes come from watching a local AI model use pyhood with no help. It got the right answer after ten failed commands: it ran pyhood from the source folder with the wrong Python, installed dependencies into the system Python, and guessed a field name that does not exist.
 
