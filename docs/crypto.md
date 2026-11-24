@@ -68,7 +68,7 @@ print(f"Fee: ${price.fee:.2f}")
 pairs = crypto.get_trading_pairs("BTC-USD", "ETH-USD")
 
 for pair in pairs:
-    print(f"{pair.symbol}: min={pair.min_order_size} max={pair.max_order_size}")
+    print(f"{pair.symbol}: min=${pair.min_order_amount} max={pair.max_order_size}")
 ```
 
 ## Account & Holdings

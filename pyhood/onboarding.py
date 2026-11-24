@@ -705,6 +705,86 @@ def build_parser() -> argparse.ArgumentParser:
             "--list", dest="list_name", default="My First List", metavar="NAME",
             help="which watchlist (default: 'My First List')",
         )
+    crypto = commands.add_parser(
+        "crypto",
+        help="crypto prices, holdings and orders, through Robinhood's Crypto API",
+        description=(
+            "Crypto, through Robinhood's official Crypto Trading API. It has its own "
+            "credentials: set them up with `pyhood setup crypto`. Symbols may be "
+            "written BTC or BTC-USD."
+        ),
+    )
+    crypto_commands = crypto.add_subparsers(dest="crypto_command", required=True)
+    crypto_quote = crypto_commands.add_parser(
+        "quote", parents=[as_json], help="best bid and ask for coins (read-only)",
+    )
+    crypto_quote.add_argument("symbols", nargs="+", metavar="SYMBOL")
+    crypto_commands.add_parser(
+        "holdings", parents=[as_json],
+        help="the coins you hold and your crypto buying power (read-only)",
+    )
+    crypto_orders = crypto_commands.add_parser(
+        "orders", parents=[as_json], help="crypto orders, newest first (read-only)",
+    )
+    crypto_orders.add_argument(
+        "--open", action="store_true", help="show only orders that can still fill",
+    )
+    for side in ("buy", "sell"):
+        trade = crypto_commands.add_parser(
+            side,
+            help=f"preview a crypto {side} order, then place it with --confirm",
+            description=f"Places an order to {side} a coin." + two_steps,
+        )
+        trade.add_argument("symbol", metavar="SYMBOL", help="the coin, such as BTC")
+        trade.add_argument(
+            "quantity", type=_positive, metavar="QUANTITY",
+            help="how much of the coin, not dollars: 0.001 is a thousandth of a bitcoin",
+        )
+        price = trade.add_mutually_exclusive_group(required=True)
+        price.add_argument(
+            "--limit", type=_positive, metavar="PRICE",
+            help=f"{side} at this price per coin or better",
+        )
+        price.add_argument(
+            "--market", action="store_true",
+            help=f"{side} at the best price available, whatever it is",
+        )
+        trade.add_argument(
+            "--confirm", metavar="CODE",
+            help="the code a preview of this exact order printed; places the order",
+        )
+    crypto_cancel = crypto_commands.add_parser(
+        "cancel", help="cancel an open crypto order, at once",
+    )
+    crypto_cancel.add_argument(
+        "order_id", metavar="ORDER_ID", help="from `pyhood crypto orders --open`",
+    )
+
+    futures = commands.add_parser(
+        "futures",
+        help="futures quotes, contracts, orders and profit and loss (read-only)",
+        description=(
+            "Futures, read-only. Name a product, such as ES for the E-mini S&P 500, "
+            "and the nearest contract is used. Or name a contract by product, month "
+            "and year: ESZ26 is ES for December 2026."
+        ),
+    )
+    futures_commands = futures.add_subparsers(dest="futures_command", required=True)
+    futures_quote = futures_commands.add_parser(
+        "quote", parents=[as_json], help="quotes for futures contracts",
+    )
+    futures_quote.add_argument("symbols", nargs="+", metavar="PRODUCT_OR_CONTRACT")
+    futures_contract = futures_commands.add_parser(
+        "contract", parents=[as_json],
+        help="a contract's size, tick and expiration, or a product's contracts",
+    )
+    futures_contract.add_argument("symbol", metavar="PRODUCT_OR_CONTRACT")
+    futures_commands.add_parser(
+        "orders", parents=[as_json], help="futures orders, with realized profit and loss",
+    )
+    futures_commands.add_parser(
+        "positions", parents=[as_json], help="open futures positions, as Robinhood sends them",
+    )
     cancel = commands.add_parser(
         "cancel",
         help="cancel an open order",
@@ -843,6 +923,42 @@ def main(argv: list[str] | None = None) -> int:
             getattr(cli, args.command), **simple[args.command](args),
             as_json_output=args.json,
         )
+    if args.command == "crypto":
+        from pyhood import cli_markets as markets
+
+        which = args.crypto_command
+        if which == "quote":
+            return markets.run_crypto(
+                markets.crypto_quote, symbols=args.symbols, as_json_output=args.json,
+            )
+        if which == "holdings":
+            return markets.run_crypto(markets.crypto_holdings, as_json_output=args.json)
+        if which == "orders":
+            return markets.run_crypto(
+                markets.crypto_orders, open_only=args.open, as_json_output=args.json,
+            )
+        if which == "cancel":
+            return markets.run_crypto(markets.crypto_cancel, order_id=args.order_id)
+        return markets.run_crypto(
+            markets.crypto_order, side=which, symbol=args.symbol, quantity=args.quantity,
+            limit=args.limit, confirm=args.confirm,
+        )
+    if args.command == "futures":
+        from pyhood import cli
+        from pyhood import cli_markets as markets
+
+        which = args.futures_command
+        if which == "quote":
+            return cli.run(
+                markets.futures_quote, symbols=args.symbols, as_json_output=args.json,
+            )
+        if which == "contract":
+            return cli.run(
+                markets.futures_contract, symbol=args.symbol, as_json_output=args.json,
+            )
+        if which == "orders":
+            return cli.run(markets.futures_orders, as_json_output=args.json)
+        return cli.run(markets.futures_positions, as_json_output=args.json)
     if args.command in ("watch", "unwatch"):
         from pyhood import cli
 

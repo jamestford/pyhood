@@ -2753,6 +2753,55 @@ class PyhoodClient:
             .removeprefix("RHD_PRODUCT_GROUP_").lower(),
         )
 
+    def get_futures_product_contracts(self, product: str) -> list[FuturesContract]:
+        """Get the active contracts of a futures product, nearest expiration first.
+
+        A product is the thing traded, such as 'ES' for the E-mini S&P 500.
+        A contract is one delivery month of it, such as 'ESZ26'. The first
+        contract returned is the front month, which is the one a quote for
+        "the S&P futures" usually means.
+
+        Args:
+            product: Product symbol, with or without the slash: 'ES' or '/ES'.
+
+        Returns:
+            The product's active contracts, each with the product's tick
+            size, underlying and asset class filled in.
+
+        Raises:
+            SymbolNotFound: If Robinhood lists no such product.
+        """
+        self._set_futures_header()
+        wanted = product.upper().lstrip("/")
+        data = self._session.get(urls.FUTURES_PRODUCTS)
+        listed = data.get("results", data.get("result", [])) if isinstance(data, dict) else data
+        record = next(
+            (p for p in listed or [] if self._clean_futures_symbol(p, "") == wanted), None,
+        )
+        if record is None:
+            raise SymbolNotFound(f"No futures product {wanted}")
+
+        data = self._session.get(urls.FUTURES_CONTRACTS, params={"productIds": record["id"]})
+        items = data.get("results", data.get("result", [])) if isinstance(data, dict) else data
+        contracts = [
+            FuturesContract(
+                symbol=self._clean_futures_symbol(item, ""),
+                name=item.get("description", ""),
+                contract_id=item.get("id", ""),
+                expiration=item.get("expiration", ""),
+                tick_size=_safe_float(record.get("priceIncrements")),
+                multiplier=float(item.get("multiplier", 0) or 0),
+                status=self._clean_futures_state(item.get("state", "")),
+                underlying=wanted,
+                asset_class=record.get("rhdProductGroup", "")
+                .removeprefix("RHD_PRODUCT_GROUP_").lower(),
+            )
+            for item in items or []
+        ]
+        return sorted(
+            (c for c in contracts if c.status == "active"), key=lambda c: c.expiration,
+        )
+
     def _futures_contract_item(self, symbol: str) -> dict:
         """Fetch the raw contract record for a futures symbol.
 

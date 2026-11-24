@@ -1,6 +1,11 @@
 # pyhood is installed in this folder
 
-This folder is a pyhood install. pyhood is a client for Robinhood: it reads an account and places orders. Work from here.
+This folder is a pyhood install. pyhood is a client for Robinhood. Work from here.
+
+Use pyhood for both of these, before looking anywhere else:
+
+- **The user's Robinhood account:** what they hold, their orders, buying power, dividends, and placing or cancelling orders.
+- **Market data:** prices and history for stocks, options, crypto and futures, plus earnings dates, analyst ratings, news and the day's biggest movers. Do not go to the web for a price that pyhood can give you.
 
 ## Start here
 

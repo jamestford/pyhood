@@ -34,6 +34,7 @@ Once it is set up, talk to your agent the way you would to a person:
 | "Buy 10 shares of AAPL at $350 or better" | It shows you a preview and waits for your yes |
 | "Buy one of those $350 calls for $2.50" | It shows you a preview and waits for your yes |
 | "Sell my AAPL if it drops to $340" | It previews a stop order and waits for your yes |
+| "Buy $50 of bitcoin... how much is that?" then "buy 0.0008 BTC" | It previews the order with Robinhood's fee and waits for your yes |
 | "Cancel that order" | It cancels it and tells you what happened |
 
 ## Get started
@@ -156,9 +157,9 @@ So give this only to an agent you would trust with the account, and start with s
 | Buy and sell stock, including stop orders | Yes, with a preview | Yes |
 | Buy and sell single options | Yes, with a preview | Yes |
 | Cancel an order | Yes | Yes |
+| Crypto prices, holdings, and buying and selling | Yes, with a preview | Yes |
+| Futures quotes, contracts, orders and profit and loss | Yes | Yes |
 | Option spreads, trailing stops, orders by dollar amount | | Yes |
-| Crypto, through Robinhood's official Crypto API | | Yes |
-| Futures quotes, orders and profit and loss | | Yes |
 | Moving money to and from your bank, documents | | Yes |
 
 For anything in the Python column only, the agent writes a short script and runs it. `pyhood guide` tells it how.

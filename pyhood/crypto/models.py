@@ -53,7 +53,10 @@ class TradingPair(Model):
     """
     symbol: str
     tradable: bool
-    min_order_size: float
+    # Robinhood sends the smallest order as a value in the quote currency,
+    # min_order_amount below, and no smallest quantity of the coin. So
+    # this is None unless a response carries one.
+    min_order_size: float | None
     max_order_size: float
     price_increment: float
     quantity_increment: float
@@ -61,6 +64,7 @@ class TradingPair(Model):
     quote_currency: str
     api_tradable: bool = False
     status: str = ""
+    min_order_amount: float | None = None  # smallest order, in the quote currency
 
 
 @dataclass(frozen=True)

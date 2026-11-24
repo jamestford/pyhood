@@ -338,11 +338,19 @@ class CryptoClient:
             List of TradingPair objects
         """
         path = CRYPTO_TRADING_PAIRS.replace(CRYPTO_BASE, '')
-        params = {}
+        # As with best_bid_ask, the filter is `symbol`, repeated. A
+        # comma-joined `symbols` is ignored, and every pair comes back.
+        params: dict[str, Any] = {}
         if symbols:
-            params['symbols'] = ','.join(symbols)
+            params['symbol'] = list(symbols)
 
         items = self._paginate(path, params)
+
+        def optional(value: Any) -> float | None:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
 
         trading_pairs = []
         for item in items:
@@ -353,7 +361,10 @@ class CryptoClient:
                 tradable=item.get('status', '') == 'tradable',
                 api_tradable=bool(item.get('is_api_tradable', False)),
                 status=item.get('status', ''),
-                min_order_size=float(item.get('min_order_size', 0) or 0),
+                # The API sends the minimum as a value in the quote currency,
+                # `min_order_amount`, and no minimum in the coin.
+                min_order_size=optional(item.get('min_order_size')),
+                min_order_amount=optional(item.get('min_order_amount')),
                 max_order_size=float(item.get('max_order_size', 0) or 0),
                 price_increment=float(item.get('quote_increment', 0) or 0),
                 quantity_increment=float(item.get('asset_increment', 0) or 0),

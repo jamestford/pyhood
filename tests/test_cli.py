@@ -1618,7 +1618,7 @@ def test_every_command_in_the_guide_parses(line):
 COMMANDS_IN_THE_GUIDE = {
     "accounts", "positions", "orders", "buying-power", "quote", "options", "earnings",
     "ratings", "news", "movers", "history", "dividends", "transfers", "watchlists", "watch",
-    "unwatch", "buy", "sell", "buy-option", "sell-option", "cancel",
+    "unwatch", "buy", "sell", "buy-option", "sell-option", "cancel", "crypto", "futures",
 }
 
 

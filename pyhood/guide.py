@@ -95,10 +95,25 @@ QUICK ANSWERS (no script needed, all read-only)
       pyhood history AAPL         past prices; --span week, month, 3month, year, 5year
       pyhood options AAPL         the expiration dates of AAPL's options
       pyhood options AAPL --expires 2026-12-18    the contracts for that date
-      pyhood earnings AAPL MSFT   when each next reports earnings
+      pyhood earnings AAPL MSFT    when each next reports earnings
       pyhood ratings AAPL         analyst buy, hold and sell counts, price targets
       pyhood news AAPL            recent headlines, with links
       pyhood movers               the S&P 500's biggest rises today; --down for falls
+
+    Crypto (its own login: if it is not set up, tell the user to run
+    `pyhood setup crypto` themselves)
+      pyhood crypto quote BTC ETH    best bid and ask
+      pyhood crypto holdings      the coins held, and crypto buying power
+      pyhood crypto orders        crypto orders; --open for those still open
+
+    Futures (read-only). Name the product, such as ES for the S&P 500, NQ
+    for the Nasdaq, CL for crude oil or GC for gold, and pyhood finds the
+    current contract. Do not guess contract codes like ESZ26.
+      pyhood futures quote ES     last, bid, ask and the session's range
+      pyhood futures contract ES    the product's contracts and their dates
+      pyhood futures contract ESZ26    what one point and one tick are worth
+      pyhood futures orders       futures orders, with realized profit and loss
+      pyhood futures positions    open futures positions
 
     Watchlists
       pyhood watchlists           your watchlists and what is on them
@@ -123,6 +138,8 @@ PLACING ORDERS (two steps, every time)
       pyhood sell AAPL 10 --stop 340 --market --tif gtc
       pyhood buy-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 2.50
       pyhood sell-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 3.00
+      pyhood crypto buy BTC 0.001 --limit 59000
+      pyhood crypto sell BTC 0.001 --market
 
   The preview shows the order, its cost, the current price and any
   problem with it, and ends with the exact command that would place it,
@@ -140,13 +157,16 @@ PLACING ORDERS (two steps, every time)
   then places the --market or --limit order. A stop meant as protection
   needs --tif gtc, or it expires at the end of the day.
   Option prices are per share and a contract is 100 shares: --limit 2.50
-  on 1 contract is $250. Look up real expirations and strikes with
+  on 1 contract is $250. A crypto quantity is in the coin, not dollars:
+  0.001 BTC is a thousandth of a bitcoin. Look up real expirations and strikes with
   `pyhood options` first; do not guess them. buy-option opens a position
   and sell-option closes one unless you add --to open or --to close.
 
 CANCELLING AN ORDER (one step)
       pyhood orders --open        the orders that can still be cancelled, with IDs
       pyhood cancel ORDER_ID      cancels that order at once
+      pyhood crypto cancel ORDER_ID    the same for a crypto order; its IDs
+                                  are in the crypto orders list
 
   There is no preview and no code: the user asking you to cancel is the
   yes. Cancel the order they mean and tell them what the command reported.
