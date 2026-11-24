@@ -57,6 +57,17 @@ def stock_order(**fields):
     return Order(**{**base, **fields})
 
 
+def option_order_row(**fields):
+    """A single-leg option order as the parser now returns it."""
+    base = dict(
+        order_id="order-3", symbol="NKE", side="buy", instrument_type="option",
+        quantity=1.0, price=1.2, average_price=1.22, filled_quantity=1.0,
+        leg_count=1, position_effect="open", option_type="call", strike=65.0,
+        expiration="2026-12-18",
+    )
+    return stock_order(**{**base, **fields})
+
+
 CANCELLED = stock_order(
     order_id="order-2", quantity=40.0, price=90.0, status="cancelled",
     created_at=datetime(2026, 11, 19, 16, 31, 52, tzinfo=UTC),
@@ -222,17 +233,40 @@ class TestOrders:
         assert client.calls[0] == ("get_stock_orders", None)
 
     def test_stock_and_option_orders_are_merged_newest_first(self, capsys):
-        option = stock_order(
-            order_id="order-3", symbol="NKE", side="debit", instrument_type="option",
-            quantity=1.0, price=1.2, average_price=1.22, filled_quantity=1.0,
-            created_at=datetime(2026, 11, 19, 17, 0, tzinfo=UTC),
+        option = option_order_row(
+            order_id="order-3", created_at=datetime(2026, 11, 19, 17, 0, tzinfo=UTC),
         )
 
         cli.orders(FakeClient(stock_orders=[CANCELLED, stock_order()], option_orders=[option]))
 
         rows = capsys.readouterr().out.splitlines()[2:5]
-        assert [row.split()[4] for row in rows] == ["ANT", "NKE", "ANT"]
-        assert [row.split()[5] for row in rows] == ["stock", "option", "stock"]
+        assert [row.split()[-1] for row in rows] == ["order-1", "order-3", "order-2"]
+        assert ["stock" in row for row in rows] == [True, False, True]
+
+    def test_an_option_order_reads_as_a_trade_in_a_contract(self, capsys):
+        """Robinhood calls it a 'debit' of an 'option'. It is a buy to open
+        of a particular call."""
+        cli.orders(FakeClient(option_orders=[option_order_row()]))
+
+        row = capsys.readouterr().out.splitlines()[2]
+        assert "  buy to open  NKE     $65.00 call 2026-12-18  " in row
+        assert "debit" not in row and "credit" not in row
+
+    def test_a_spread_is_named_by_its_legs(self, capsys):
+        spread = option_order_row(
+            leg_count=2, strike=None, option_type=None, expiration=None,
+        )
+
+        cli.orders(FakeClient(option_orders=[spread]))
+
+        assert "  buy to open  NKE     2-leg option  " in capsys.readouterr().out
+
+    def test_an_option_order_with_no_leg_detail_still_prints(self, capsys):
+        bare = stock_order(order_id="order-3", symbol="NKE", instrument_type="option")
+
+        cli.orders(FakeClient(option_orders=[bare]))
+
+        assert "  buy   NKE     option  " in capsys.readouterr().out
 
     def test_symbol_filter(self, capsys):
         other = stock_order(order_id="order-4", symbol="AAPL")
@@ -761,10 +795,11 @@ class OptionClient(OrderClient):
         self.writes.append((side, args, kwargs))
         if self.reject:
             raise OrderError(self.reject)
-        self.existing = stock_order(
+        self.existing = option_order_row(
             order_id="option-order", symbol=args[0], side=side, quantity=float(args[4]),
             price=args[5], status="queued", average_price=None, filled_at=None,
-            filled_quantity=0.0, instrument_type="option",
+            filled_quantity=0.0, position_effect=kwargs.get("position_effect"),
+            option_type=args[3], strike=args[1], expiration=args[2],
         )
         return self.existing
 
@@ -973,16 +1008,18 @@ class TestOptionOrder:
         assert "not approved" in capsys.readouterr().err
 
     def test_cancelling_an_option_order_says_it_is_one(self, capsys):
-        waiting = stock_order(
-            order_id="option-order", symbol="F", side="debit", quantity=2.0, price=0.30,
-            status="queued", average_price=None, filled_at=None, filled_quantity=0.0,
-            instrument_type="option",
+        waiting = option_order_row(
+            order_id="option-order", symbol="F", quantity=2.0, price=0.30, status="queued",
+            average_price=None, filled_at=None, filled_quantity=0.0, strike=12.0,
+            expiration="2026-12-11",
         )
 
         cli.cancel(OptionClient(existing=waiting), "option-order", settle_seconds=0)
 
         out = capsys.readouterr().out
-        assert out.startswith("CANCELLED: debit 2 F option contracts, limit $0.30")
+        assert out.startswith(
+            "CANCELLED: buy to open 2 F $12.00 call 2026-12-11, limit $0.30 per share, placed"
+        )
 
 
 class TestOptionCommandLine:

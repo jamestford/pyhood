@@ -5,6 +5,15 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `Order` has five fields for option orders: `leg_count`, `position_effect` (`'open'` or `'close'`), `option_type`, `strike` and `expiration`. On a single-leg order they describe the contract. On a spread the legs differ, so `strike`, `expiration` and `option_type` are `None`, and `position_effect` is set only if every leg shares it. All five are `None` on stock orders. `buy_option()`, `sell_option()` and `order_option()` set them on the order they return too.
+
+### Changed
+- **Breaking: `Order.side` is `'buy'` or `'sell'` on option orders, where it was `'debit'` or `'credit'`.** `get_option_orders()` and `get_order()` passed on Robinhood's `direction` as the side, so option orders had sides that no other order has and that `buy_option()` itself never returned. A single-leg order now takes its leg's side. A spread has a leg each way, so it goes by direction: a debit is a buy and a credit a sell. `order_option_spread()` returns `'buy'` or `'sell'` as well. Code that compares `side` to `'debit'` or `'credit'` needs changing.
+- **`pyhood orders` and `pyhood cancel` describe an option order in plain terms.** An order that read `debit ... option` now reads `buy to open ... $12.00 call 2026-12-11`, and a cancel reports `CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share`. A spread shows as `2-leg option`.
+
 ## [0.18.0] - 2026-11-24
 
 ### Added
