@@ -5,7 +5,7 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.17.0] - 2026-11-24
 
 ### Added
 - **`pyhood buy`, `pyhood sell` and `pyhood cancel`**, which work in two steps so that an order is always previewed before it is placed.
