@@ -5,9 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from pyhood._model import Model
+
 
 @dataclass(frozen=True)
-class CryptoQuote:
+class CryptoQuote(Model):
     """Crypto quote data with best bid/ask."""
     symbol: str
     bid: float
@@ -16,7 +18,7 @@ class CryptoQuote:
 
 
 @dataclass(frozen=True)
-class CryptoHolding:
+class CryptoHolding(Model):
     """Crypto asset holding information."""
     asset_code: str
     quantity: float
@@ -24,7 +26,7 @@ class CryptoHolding:
 
 
 @dataclass(frozen=True)
-class CryptoAccount:
+class CryptoAccount(Model):
     """Crypto trading account information.
 
     Fee information arrives as a `fee_tier_status` object rather than a tier
@@ -42,7 +44,7 @@ class CryptoAccount:
 
 
 @dataclass(frozen=True)
-class TradingPair:
+class TradingPair(Model):
     """Trading pair configuration and limits.
 
     `tradable` reflects Robinhood's `status`; `api_tradable` reflects
@@ -62,7 +64,7 @@ class TradingPair:
 
 
 @dataclass(frozen=True)
-class EstimatedPrice:
+class EstimatedPrice(Model):
     """Estimated price for a crypto trade."""
     symbol: str
     side: str  # 'buy' or 'sell'
@@ -73,7 +75,7 @@ class EstimatedPrice:
 
 
 @dataclass(frozen=True)
-class CryptoCandle:
+class CryptoCandle(Model):
     """Single OHLCV price candle for a crypto asset."""
     symbol: str
     begins_at: str
@@ -85,7 +87,7 @@ class CryptoCandle:
 
 
 @dataclass(frozen=True)
-class CryptoOrder:
+class CryptoOrder(Model):
     """Crypto order information."""
     order_id: str
     client_order_id: str | None
