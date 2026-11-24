@@ -5,7 +5,7 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.16.0] - 2026-11-24
 
 After 0.15.0 the same local model was given the same prompt twice more. It read `pyhood guide` and went from about ten failed commands to one. Both times the one failure was the same, and both times its answer had the same second flaw. These changes are for those two.
 
