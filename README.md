@@ -37,27 +37,33 @@ Once it is set up, talk to your agent the way you would to a person:
 
 There are three steps. Your agent does the first, you do the second.
 
-### 1. Have your agent install it
+### 1. Ask your agent to install it
 
 Paste this into your agent:
 
 ```text
-Install pyhood, a Robinhood client, on this computer. Do these steps in order and stop if one fails.
-
-1. Run `uv --version`. If uv is not installed, stop and tell me. Do not install it without asking.
-2. Run `uv venv --managed-python --python 3.14 ~/pyhood`
-3. Run `uv pip install --python ~/pyhood/bin/python pyhood`
-4. Run `~/pyhood/bin/pyhood version`. It should print a version number.
-5. Do not log in for me, and never ask for my password. Tell me to run `~/pyhood/bin/pyhood setup login` myself, in my own terminal, and to tell you when I have.
-6. When I say I am logged in, run `~/pyhood/bin/pyhood verify`.
-7. Then read `~/pyhood/AGENTS.md` and follow it from now on.
-
-Do not use pip, do not use sudo, and do not install anything else.
+Install pyhood for me. Follow the install steps in https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md
 ```
 
-That creates one folder, `~/pyhood`, with pyhood in it. uv also downloads a copy of Python for pyhood to run on, which it keeps in its own folder. Nothing is installed system-wide, and your other Python setups are not touched.
+That file is written for AI agents. It tells yours to put pyhood in a folder of its own, `~/pyhood`, to stop and hand you the login, and not to install anything else.
 
-It needs [uv](https://docs.astral.sh/uv/getting-started/installation/), a free tool for installing Python programs (`brew install uv` on macOS). On Windows, replace `~/pyhood/bin/` with `~\pyhood\Scripts\` throughout.
+<details>
+<summary><strong>What the file tells your agent to do</strong></summary>
+
+1. If `~/pyhood/bin/pyhood` already exists, say so and skip the install.
+2. Check that [uv](https://docs.astral.sh/uv/getting-started/installation/) is installed, and stop to ask you if it is not.
+3. Run `uv venv --managed-python --python 3.14 ~/pyhood`
+4. Run `uv pip install --python ~/pyhood/bin/python pyhood`
+5. Run `~/pyhood/bin/pyhood version` to check it.
+6. Ask you to log in yourself. It must never ask for your password or type it.
+7. Run `~/pyhood/bin/pyhood verify`, which reads live prices and changes nothing.
+8. Read `~/pyhood/AGENTS.md`, the instructions that came with the install.
+
+It is also told not to use `pip`, `sudo` or `--break-system-packages`, and not to install anything but pyhood. You can [read the file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) yourself, or follow the same steps [by hand](https://jamestford.github.io/pyhood/getting-started/).
+
+</details>
+
+The install creates one folder, `~/pyhood`, with pyhood in it. uv is a free tool for installing Python programs (`brew install uv` on macOS). It also downloads a copy of Python for pyhood to run on, which it keeps in its own folder. Nothing is installed system-wide, and your other Python setups are not touched.
 
 ### 2. Log in yourself
 
@@ -153,7 +159,7 @@ For anything in the Python column only, the agent writes a short script and runs
 
 **What has been run against Robinhood for real:** buying stock with a limit, buying an option to open, and cancelling both. Selling and market orders go through the same code, but those commands have not yet been run live. Option spreads have never been placed.
 
-**What it has been tested with:** a local model, Qwen3.6 35B, running in the [Pi](https://github.com/earendil-works/pi) agent. Given the install prompt above, it installed pyhood in four commands and stopped for the login. Asked to buy, it previewed and waited.
+**What it has been tested with:** a local model, Qwen3.6 35B, running in the [Pi](https://github.com/earendil-works/pi) agent. Given the one-line install request above and nothing else, it fetched the instructions and installed pyhood with no errors. Asked to buy, it previewed and waited.
 
 ## Using it without an agent
 

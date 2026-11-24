@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **The README is rewritten for people who use pyhood with an AI agent.** It opens with what you can ask the agent and how you stay in control, where it opened with session refresh and the Python API. It is about half the length: the setup walkthrough, authentication errors, rate limits and per-feature examples it repeated are on the docs site, and it links to them.
-- **Installing starts with a block to paste into your agent.** The steps are written out in the block, so you can see what you are asking for. The agent installs pyhood into `~/pyhood` and stops at the login, which needs your password and is yours to do. A local model given the block installed pyhood in four commands and stopped there. The by-hand steps are still in Getting Started.
+- **Installing is one line to your agent:** "Install pyhood for me. Follow the install steps in" and a link to the repository's `AGENTS.md`. That file now has the install steps, written for an agent: check whether pyhood is already there, install into `~/pyhood` with uv, stop and hand the login to the user, and never use `pip`, `sudo` or `--break-system-packages`. A local model given that one line and nothing else fetched the file and installed pyhood with no errors. The README lists what the file says, folded away, and the by-hand steps are still in Getting Started.
 - The README says what has been run against Robinhood for real and what has not, in place of a table that called every feature "Functional".
 
 ### Fixed
