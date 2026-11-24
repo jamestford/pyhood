@@ -77,6 +77,27 @@ Robinhood does not issue you a key pair for the Crypto Trading API. You generate
 
 Run `pyhood setup` at any time to see what is configured. See [Setup](#setup) for the full walkthrough.
 
+## From the Command Line
+
+The questions asked most often need no code:
+
+```bash
+pyhood positions             # what you hold, with profit and loss
+pyhood orders                # orders from the last 30 days, newest first
+pyhood orders --since 2026-01-01 --symbol AAPL
+pyhood buying-power          # cash available to trade with
+pyhood quote AAPL MSFT       # current prices; add --fundamentals for more
+```
+
+```text
+Orders since 2026-10-25 (times are EST; today is 2026-11-24)
+PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT  FILLED  AVG PRICE  STATUS
+2026-11-19 12:36 EST  buy   AAPL    stock       10  $350.00      10    $349.80  filled
+2026-11-19 11:31 EST  buy   AAPL    stock       10  $340.00       0          -  cancelled
+```
+
+Every command is read-only. Each prints a table with times in your own time zone, and takes `--json` for exact values. Placing orders is done from Python, not from the command line.
+
 ## Use It With an AI Agent
 
 pyhood is built to be driven by an AI agent that writes and runs Python. Tell the agent one thing:
@@ -85,10 +106,11 @@ pyhood is built to be driven by an AI agent that writes and runs Python. Tell th
 pyhood is installed on this machine. Run `pyhood guide` before using it.
 ```
 
-`pyhood guide` prints what an agent needs for the installed version: how to run a script, how to log in, the main methods with their arguments, and the fields of what they return. Put that line in your agent's instructions file (`AGENTS.md`, `CLAUDE.md` or similar) so it does not have to be told each time.
+`pyhood guide` prints what an agent needs for the installed version: the commands above, how to run a script, how to log in, the main methods with their arguments, and the fields of what they return. Put that line in your agent's instructions file (`AGENTS.md`, `CLAUDE.md` or similar) so it does not have to be told each time.
 
-Two things make this dependable:
+Three things make this dependable:
 
+- **The commands above answer most questions with no script.** An agent asked what you bought runs `pyhood orders` and reads a table. Left to write a script, models trip on the same things: formatting the price of an order that never filled, which is `None`, and reading UTC timestamps as local time.
 - **`pyhood run script.py`** runs a script with the Python pyhood is installed in, so `import pyhood` works however pyhood was installed. An agent does not have to find the right Python.
 - **Errors say what to do.** A wrong field name lists the real ones. An unsupported Python, or running from a source folder, says so instead of failing somewhere unrelated.
 

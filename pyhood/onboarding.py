@@ -474,6 +474,50 @@ def build_parser() -> argparse.ArgumentParser:
         default="stocks",
         help="stocks (default): the main session. crypto: the Crypto API key pair.",
     )
+    as_json = argparse.ArgumentParser(add_help=False)
+    as_json.add_argument(
+        "--json", action="store_true",
+        help="print exact values as JSON instead of a table",
+    )
+    commands.add_parser(
+        "positions",
+        parents=[as_json],
+        help="show the stocks and options you hold (read-only)",
+        description="Shows open stock and option positions with cost and unrealized profit.",
+    )
+    orders = commands.add_parser(
+        "orders",
+        parents=[as_json],
+        help="show recent stock and option orders (read-only)",
+        description=(
+            "Shows stock and option orders, newest first, with what was ordered "
+            "and what actually filled. Covers the last 30 days unless told "
+            "otherwise. Times are shown in this computer's time zone."
+        ),
+    )
+    orders.add_argument(
+        "--since", type=_date, metavar="YYYY-MM-DD",
+        help="show orders placed on or after this date",
+    )
+    orders.add_argument("--all", action="store_true", help="show every order on record")
+    orders.add_argument("--symbol", help="show orders for one symbol only")
+    commands.add_parser(
+        "buying-power",
+        parents=[as_json],
+        help="show the cash available to trade with (read-only)",
+        description="Shows the buying power of the main account.",
+    )
+    quote = commands.add_parser(
+        "quote",
+        parents=[as_json],
+        help="show current prices for one or more stocks (read-only)",
+        description="Shows price, change, bid and ask for each symbol.",
+    )
+    quote.add_argument("symbols", nargs="+", metavar="SYMBOL", help="one or more tickers")
+    quote.add_argument(
+        "--fundamentals", action="store_true",
+        help="add volume, P/E, market cap and the 52-week range (one more request)",
+    )
     commands.add_parser(
         "guide",
         help="print how to use pyhood, written for an AI agent",
@@ -494,6 +538,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("python_args", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
     return parser
+
+
+def _date(value: str) -> str:
+    """An argparse type: a YYYY-MM-DD date, returned as given."""
+    from datetime import datetime
+
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"{value!r} is not a date in YYYY-MM-DD form, such as 2026-11-01"
+        ) from None
+    return value
 
 
 def run_python(python_args: list[str]) -> int:
@@ -532,6 +589,22 @@ def main(argv: list[str] | None = None) -> int:
         from pyhood import guide
 
         return guide.main()
+    if args.command in ("positions", "orders", "buying-power", "quote"):
+        from pyhood import cli
+
+        if args.command == "positions":
+            return cli.run(cli.positions, as_json_output=args.json)
+        if args.command == "orders":
+            return cli.run(
+                cli.orders, since=args.since, symbol=args.symbol,
+                everything=args.all, as_json_output=args.json,
+            )
+        if args.command == "buying-power":
+            return cli.run(cli.buying_power, as_json_output=args.json)
+        return cli.run(
+            cli.quote, symbols=args.symbols, fundamentals=args.fundamentals,
+            as_json_output=args.json,
+        )
     if args.command == "verify":
         from pyhood import verify
 

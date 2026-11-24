@@ -77,8 +77,20 @@ RULES
      showing the user the exact call first and getting a yes.
   4. Do not guess field or method names. They are all listed below.
 
-RUNNING IT
-  Write a Python script and run it with:
+QUICK ANSWERS (no script needed, all read-only)
+  Try these first. They cover most questions about an account.
+
+      pyhood positions            what the account holds, with profit and loss
+      pyhood orders               orders from the last 30 days, newest first
+      pyhood orders --since 2026-01-01    or --all, or --symbol AAPL
+      pyhood buying-power         cash available to trade with
+      pyhood quote AAPL MSFT      current prices; add --fundamentals for more
+
+  Each prints a table. Add --json for exact values. Times in the tables
+  are local; in --json and in scripts they are UTC.
+
+RUNNING A SCRIPT
+  For anything the commands above do not cover, write Python and run it:
 
       pyhood run script.py
 
@@ -106,16 +118,22 @@ EVERY SCRIPT STARTS WITH
 EXAMPLE: what do I own, and what did I buy this month?
 
       for p in client.get_positions():
-          print(p.symbol, p.quantity, p.average_cost, p.unrealized_pl)
+          print(p.symbol, p.quantity, f"{p.average_cost:.2f}", p.unrealized_pl)
 
       for o in client.get_stock_orders(start_date="2026-11-01"):
+          if not o.filled_quantity:
+              continue  # never filled: average_price and filled_at are None
           print(o.created_at, o.side, o.symbol, o.filled_quantity,
-                o.average_price, o.status)
+                f"{o.average_price:.2f}", o.status)
 
 RESULTS
   Methods return dataclasses, or lists of them. print() one to see every
-  field and value. A field that is None is unknown, not zero: check for
-  None before doing arithmetic or formatting with it.
+  field and value.
+  None means unknown, not zero. Formatting None fails: f"{x:.2f}" raises
+  TypeError when x is None. Check first, as the example does. On an Order,
+  average_price and filled_at are None until the order fills.
+  Times (created_at, filled_at, timestamp) are UTC, not local time. Call
+  .astimezone() on one before showing it to the user.
   Asking for a field that does not exist raises an AttributeError that
   lists the real fields.
 """
@@ -189,7 +207,8 @@ def render() -> str:
     from pyhood import __version__
 
     return "\n".join((
-        INTRO.format(version=__version__),
+        # Not str.format: the examples contain f-strings, whose braces it would read.
+        INTRO.replace("{version}", __version__),
         _methods("READING (safe to call freely)", READ_METHODS),
         _models(),
         _methods("ORDERS (ask the user first, every time)", WRITE_METHODS),
