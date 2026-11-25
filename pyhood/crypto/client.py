@@ -562,7 +562,9 @@ class CryptoClient:
             symbol: Crypto symbol (e.g., 'BTC-USD')
             order_config: Configuration for this order type, e.g.
                 ``{"asset_quantity": "0.001"}`` for a market order. It is
-                nested under ``{order_type}_order_config`` for you.
+                nested under ``{order_type}_order_config`` for you. An order
+                that is not a market order is sent as good till cancelled
+                unless the configuration gives its own ``time_in_force``.
             client_order_id: Idempotency key. Generated if omitted — resending
                 the same value returns the original order rather than placing
                 a second one.
@@ -575,6 +577,12 @@ class CryptoClient:
             a pair can be tradable in the app but not here.
         """
         path = CRYPTO_ORDERS.replace(CRYPTO_BASE, '')
+
+        # Every order that can wait must say how long. Robinhood refuses one
+        # that does not: "limit_order_config.time_in_force: A non-null value
+        # is required for this field." It did not ask for this in August 2026.
+        if order_type != 'market' and not order_config.get('time_in_force'):
+            order_config = {**order_config, 'time_in_force': 'gtc'}
 
         payload = {
             'client_order_id': client_order_id or str(uuid.uuid4()),

@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `pyhood orders` has a STOP column, and `pyhood cancel` names an order's stop. A stop order that then trades at market has no limit, so it read as a plain market order.
 - A refused order gives Robinhood's reason as a sentence. It printed the raw response: `{'non_field_errors': ['...']}`.
 - `pyhood orders` shows `market` under LIMIT for a market order. It showed the price ceiling Robinhood requires on one, which read as a limit you had set.
+- **Crypto limit orders were refused.** Robinhood now requires a limit, stop loss or stop limit crypto order to say how long it lasts, and pyhood did not: "limit_order_config.time_in_force: A non-null value is required for this field." `place_order()` sends good till cancelled unless the configuration gives its own `time_in_force`, which is what `pyhood crypto buy` and `sell` have always said the order is.
 
 ## [0.20.0] - 2026-11-24
 
