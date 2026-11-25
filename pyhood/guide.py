@@ -125,10 +125,10 @@ LOOKING THINGS UP (read-only, nothing to confirm)
 
     The account
       pyhood accounts             the accounts under this login: individual, IRA
-      pyhood positions            what the account holds, with profit and loss
+      pyhood positions            what each account holds, with profit and loss
       pyhood orders               orders from the last 30 days, newest first
       pyhood orders --since 2026-01-01    or --all, or --symbol AAPL, or --open
-      pyhood buying-power         cash available to trade with
+      pyhood buying-power         cash available to trade with, in each account
       pyhood dividends            dividends paid and pending
       pyhood transfers            money moved in, out and between accounts
       pyhood banks                the bank accounts linked for transfers
@@ -170,10 +170,12 @@ LOOKING THINGS UP (read-only, nothing to confirm)
 
   Each prints a table. Add --json for exact values. Times in the tables
   are local; in --json and in scripts they are UTC.
-  Commands use the first account unless told otherwise. For another, add
-  --account with part of its name from `pyhood accounts`, such as
-  --account roth. It works on positions, buying-power, buy, sell,
-  buy-option and sell-option.
+  positions, orders and buying-power cover every account; add --account
+  with part of an account's name from `pyhood accounts`, such as
+  --account roth, to see one. An order uses the first account unless it
+  names another the same way: buy, sell, buy-option and sell-option all
+  take --account. An account spends only its own cash and sells only its
+  own holdings: money in an IRA cannot pay for an order in another account.
   watch and unwatch change a watchlist at once. No money is involved, so
   there is nothing to confirm.
 

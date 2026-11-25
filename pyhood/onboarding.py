@@ -621,11 +621,20 @@ def build_parser() -> argparse.ArgumentParser:
             "last four characters; --json gives them in full."
         ),
     )
-    commands.add_parser(
+    positions = commands.add_parser(
         "positions",
-        parents=[as_json, in_account],
-        help="show the stocks and options you hold (read-only)",
-        description="Shows open stock and option positions with cost and unrealized profit.",
+        parents=[as_json],
+        help="show the stocks and options you hold, in each account (read-only)",
+        description=(
+            "Shows open stock and option positions with cost and unrealized profit, "
+            "for every account under this login, such as an individual account and "
+            "an IRA."
+        ),
+    )
+    positions.add_argument(
+        "--account", metavar="WHICH",
+        help="only this account's positions: part of its type, such as roth, or "
+             "the last four characters of its number",
     )
     orders = commands.add_parser(
         "orders",
@@ -1096,11 +1105,20 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     cancel.add_argument("order_id", metavar="ORDER_ID", help="from `pyhood orders --open`")
-    commands.add_parser(
+    buying_power = commands.add_parser(
         "buying-power",
-        parents=[as_json, in_account],
-        help="show the cash available to trade with (read-only)",
-        description="Shows the buying power of the main account.",
+        parents=[as_json],
+        help="show the cash available to trade with, in each account (read-only)",
+        description=(
+            "Shows the buying power of every account under this login, such as an "
+            "individual account and an IRA. An account spends only its own cash, "
+            "so the figures are not added up."
+        ),
+    )
+    buying_power.add_argument(
+        "--account", metavar="WHICH",
+        help="only this account's buying power: part of its type, such as roth, or "
+             "the last four characters of its number",
     )
     quote = commands.add_parser(
         "quote",

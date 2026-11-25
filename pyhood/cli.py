@@ -279,30 +279,57 @@ def accounts(client: Any, as_json_output: bool = False) -> int:
         right={2, 3, 4},
     ))
     print(
-        f"\nOther commands use the first account unless told otherwise, as in: "
-        f"{program()} positions --account roth"
+        "\npositions, orders and buying-power cover every account. An order uses the "
+        f"first account unless it names another, as in: {program()} buy AAPL 1 "
+        "--limit 350 --account roth"
     )
     return 0
 
 
 def positions(client: Any, account: str | None = None, as_json_output: bool = False) -> int:
-    """What an account holds: stocks, then options."""
-    account_number, label = find_account(client, account)
-    if account_number:
-        stocks = client.get_positions(account_number=account_number)
-        options = client.get_option_positions(account_number=account_number)
-    else:
-        stocks = client.get_positions()
-        options = client.get_option_positions()
+    """What each account holds: stocks, then options."""
+    held = []
+    for account_number, name in _accounts_to_ask(client, account):
+        named = {"account_number": account_number} if account_number else {}
+        held.append({
+            "account": name,
+            "account_number": account_number,
+            "stocks": client.get_positions(**named),
+            "options": client.get_option_positions(**named),
+        })
 
-    if as_json_output:
-        print(as_json({"stocks": stocks, "options": options}))
+    if len(held) == 1:
+        stocks, options, label = held[0]["stocks"], held[0]["options"], held[0]["account"]
+        if as_json_output:
+            print(as_json({"stocks": stocks, "options": options}))
+            return 0
+        if label:
+            print(f"{label}\n")
+        _print_positions(stocks, options)
         return 0
-    if label:
-        print(f"{label}\n")
+
+    # Several accounts, each under its own heading. A stock held in two of
+    # them stays two positions, since each is sold from its own account.
+    if as_json_output:
+        # `stocks` and `options` stay the first account's, which an order
+        # uses unless it names another.
+        print(as_json({
+            "stocks": held[0]["stocks"], "options": held[0]["options"], "accounts": held,
+        }))
+        return 0
+    for index, entry in enumerate(held):
+        if index:
+            print()
+        print(f"{entry['account']} ({masked(entry['account_number'] or '')})\n")
+        _print_positions(entry["stocks"], entry["options"])
+    return 0
+
+
+def _print_positions(stocks: list, options: list) -> None:
+    """One account's positions as tables: stocks, then options."""
     if not stocks and not options:
         print("No open positions.")
-        return 0
+        return
 
     if stocks:
         rows = [
@@ -339,16 +366,15 @@ def positions(client: Any, account: str | None = None, as_json_output: bool = Fa
             ["CONTRACT", "CONTRACTS", "AVG COST", "MARK", "VALUE", "UNREALIZED P/L", "P/L %"],
             rows, right={1, 2, 3, 4, 5, 6},
         ))
-    return 0
 
 
-def _order_accounts(client: Any, account: str | None) -> list[tuple[str | None, str]]:
-    """The accounts whose orders to list, as (number, name).
+def _accounts_to_ask(client: Any, account: str | None) -> list[tuple[str | None, str]]:
+    """The accounts a command reads when none is named, as (number, name).
 
-    Robinhood's order list holds one account's orders: the default one unless
+    Robinhood answers for one account at a time: the default one unless
     another is named. So with several accounts each is asked in turn, or an
-    order in an IRA would never be shown. (None, '') stands for the default
-    account, asked without naming it.
+    order, a holding or the cash in an IRA would never be shown. (None, '')
+    stands for the default account, asked without naming it.
     """
     if account is not None:
         number, label = find_account(client, account)
@@ -377,7 +403,7 @@ def orders(
     elif since is None:
         since = (datetime.now() - timedelta(days=DEFAULT_ORDER_DAYS)).strftime("%Y-%m-%d")
 
-    accounts = _order_accounts(client, account)
+    accounts = _accounts_to_ask(client, account)
     found = []
     where: dict[str, str] = {}
     for account_number, name in accounts:
@@ -444,15 +470,44 @@ def orders(
 def buying_power(
     client: Any, account: str | None = None, as_json_output: bool = False,
 ) -> int:
-    """Cash available to trade with."""
-    account_number, label = find_account(client, account)
-    amount = client.get_buying_power(account_number=account_number) if account_number else (
-        client.get_buying_power()
-    )
+    """Cash available to trade with, in each account."""
+    rows = [
+        {
+            "account": name,
+            "account_number": number,
+            "buying_power": (
+                client.get_buying_power(account_number=number) if number
+                else client.get_buying_power()
+            ),
+        }
+        for number, name in _accounts_to_ask(client, account)
+    ]
+    if len(rows) == 1:
+        amount, label = rows[0]["buying_power"], rows[0]["account"]
+        if as_json_output:
+            print(as_json({"buying_power": amount}))
+        else:
+            print(f"Buying power{f' in {label}' if label else ''}: {money(amount)}")
+        return 0
+
+    # Several accounts. Their cash is not added up: money in an IRA cannot
+    # pay for an order in another account.
     if as_json_output:
-        print(as_json({"buying_power": amount}))
-    else:
-        print(f"Buying power{f' in {label}' if label else ''}: {money(amount)}")
+        # `buying_power` stays the first account's, which an order uses
+        # unless it names another.
+        print(as_json({"buying_power": rows[0]["buying_power"], "accounts": rows}))
+        return 0
+    print(table(
+        ["ACCOUNT", "NUMBER", "BUYING POWER"],
+        [[r["account"], masked(r["account_number"] or ""), money(r["buying_power"])]
+         for r in rows],
+        right={2},
+    ))
+    print(
+        "\nEach account spends only its own buying power. An order uses the first "
+        f"account unless it names another, as in: {program()} buy AAPL 1 --limit 350 "
+        "--account roth"
+    )
     return 0
 
 

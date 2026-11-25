@@ -112,17 +112,21 @@ class FakeClient:
         self.calls.append(("get_all_accounts",))
         return [dict(a) for a in self.ACCOUNTS]
 
+    # What the fake is given is in the first account. `roth_stocks`,
+    # `roth_options` and `roth_orders` are in the second, which Robinhood only
+    # returns when that account is named.
+    roth_stocks = ()
+    roth_options = ()
+    roth_orders = ()
+
     def get_positions(self, account_number=None):
         if account_number:
             self.calls.append(("get_positions", account_number))
-        return self.stocks
+        return list(self.roth_stocks) if account_number == "444455556" else self.stocks
 
     def get_option_positions(self, account_number=None):
-        return self.options
+        return list(self.roth_options) if account_number == "444455556" else self.options
 
-    # Orders given to the fake are in the first account. `roth_orders` are in
-    # the second, which Robinhood only returns when that account is named.
-    roth_orders = ()
 
     def get_stock_orders(self, start_date=None, account_number=None):
         if account_number in (None, "111122223"):
@@ -137,9 +141,15 @@ class FakeClient:
             return list(self.option_orders)
         return []
 
+    # The second account's own figure. None means every account answers with
+    # `buying_power`, which is all a test of one account needs.
+    roth_buying_power = None
+
     def get_buying_power(self, account_number=None):
         if account_number:
             self.calls.append(("get_buying_power", account_number))
+        if account_number == "444455556" and self.roth_buying_power is not None:
+            return self.roth_buying_power
         return self.buying_power
 
     def get_quotes(self, symbols, include_fundamentals=False):
@@ -193,8 +203,13 @@ class TestPositions:
         Position("ANT", 95.0, 97.13, 80.16, 7615.20, -1611.80, -17.47),
     ]
 
+    def one_account(self, **held):
+        client = FakeClient(**held)
+        client.ACCOUNTS = FakeClient.ACCOUNTS[:1]
+        return client
+
     def test_table_has_every_position_and_a_total(self, capsys):
-        assert cli.positions(FakeClient(stocks=self.STOCKS)) == 0
+        assert cli.positions(self.one_account(stocks=self.STOCKS)) == 0
 
         out = capsys.readouterr().out
         assert "STOCKS" in out
@@ -212,7 +227,7 @@ class TestPositions:
             strategy="long_call",
         )
 
-        cli.positions(FakeClient(options=[option]))
+        cli.positions(self.one_account(options=[option]))
 
         out = capsys.readouterr().out
         assert "NKE 2026-12-18 $65 call" in out
@@ -221,16 +236,70 @@ class TestPositions:
         assert "STOCKS" not in out
 
     def test_nothing_held(self, capsys):
-        assert cli.positions(FakeClient()) == 0
+        assert cli.positions(self.one_account()) == 0
         assert capsys.readouterr().out.strip() == "No open positions."
 
     def test_json(self, capsys):
-        cli.positions(FakeClient(stocks=self.STOCKS), as_json_output=True)
+        cli.positions(self.one_account(stocks=self.STOCKS), as_json_output=True)
 
         data = json.loads(capsys.readouterr().out)
+        assert set(data) == {"stocks", "options"}
         assert data["options"] == []
         assert data["stocks"][1]["symbol"] == "ANT"
         assert data["stocks"][1]["average_cost"] == 97.13
+
+    ROTH_STOCKS = [Position("VTI", 20.0, 300.0, 350.0, 7000.0, 1000.0, 16.67)]
+
+    def test_every_account_is_listed_under_its_own_heading(self, capsys):
+        """Asked "what do I hold", an agent would otherwise see the first
+        account alone and never learn of a holding in an IRA."""
+        client = FakeClient(stocks=self.STOCKS)
+        client.roth_stocks = self.ROTH_STOCKS
+
+        assert cli.positions(client) == 0
+
+        out = capsys.readouterr().out
+        first, second = out.index("Individual (…2223)"), out.index("Roth IRA (…5556)")
+        assert first == 0 and first < out.index("ANT") < second < out.index("VTI")
+        assert "111122223" not in out and "444455556" not in out
+        # Each account has its own total: the two are not added up.
+        totals = [line for line in out.splitlines() if line.startswith("TOTAL")]
+        assert len(totals) == 2
+        assert "$7,619.64" in totals[0] and "$7,000.00" in totals[1]
+        assert client.calls == [("get_all_accounts",), ("get_positions", "111122223"),
+                                ("get_positions", "444455556")]
+
+    def test_an_account_holding_nothing_still_has_its_heading(self, capsys):
+        cli.positions(FakeClient(stocks=self.STOCKS))
+
+        out = capsys.readouterr().out
+        assert out.rstrip().endswith("Roth IRA (…5556)\n\nNo open positions.")
+
+    def test_json_lists_every_account(self, capsys):
+        client = FakeClient(stocks=self.STOCKS)
+        client.roth_stocks = self.ROTH_STOCKS
+
+        cli.positions(client, as_json_output=True)
+
+        data = json.loads(capsys.readouterr().out)
+        assert [p["symbol"] for p in data["stocks"]] == ["TSLA", "ANT"]
+        assert [(a["account"], a["account_number"]) for a in data["accounts"]] == [
+            ("Individual", "111122223"), ("Roth IRA", "444455556"),
+        ]
+        assert [p["symbol"] for p in data["accounts"][1]["stocks"]] == ["VTI"]
+        assert data["accounts"][1]["options"] == []
+
+    def test_positions_still_list_if_the_accounts_cannot_be_read(self, capsys):
+        client = FakeClient(stocks=self.STOCKS)
+
+        def broken():
+            raise APIError("503 Service Unavailable")
+
+        client.get_all_accounts = broken
+
+        assert cli.positions(client) == 0
+        out = capsys.readouterr().out
+        assert out.startswith("STOCKS") and "ANT" in out
 
 
 # ── orders ───────────────────────────────────────────────────────────
@@ -446,12 +515,66 @@ class TestBuyingPowerAndQuote:
         ),
     }
 
+    def one_account(self):
+        client = FakeClient()
+        client.ACCOUNTS = FakeClient.ACCOUNTS[:1]
+        return client
+
+    def two_accounts(self):
+        client = FakeClient()
+        client.roth_buying_power = 7000.0
+        return client
+
     def test_buying_power(self, capsys):
-        assert cli.buying_power(FakeClient()) == 0
+        assert cli.buying_power(self.one_account()) == 0
         assert capsys.readouterr().out.strip() == "Buying power: $168.85"
 
-        cli.buying_power(FakeClient(), as_json_output=True)
+        cli.buying_power(self.one_account(), as_json_output=True)
         assert json.loads(capsys.readouterr().out) == {"buying_power": 168.85}
+
+    def test_buying_power_shows_every_account(self, capsys):
+        """Asked "how much cash do I have", an agent ran this and answered
+        with the individual account alone: the IRA's cash was never shown."""
+        client = self.two_accounts()
+
+        assert cli.buying_power(client) == 0
+
+        out = capsys.readouterr().out
+        rows = out.splitlines()
+        assert rows[0].split() == ["ACCOUNT", "NUMBER", "BUYING", "POWER"]
+        assert rows[1].split() == ["Individual", "…2223", "$168.85"]
+        assert rows[2].split() == ["Roth", "IRA", "…5556", "$7,000.00"]
+        assert "111122223" not in out and "444455556" not in out
+        # Each account is asked by number, and the two are not added up.
+        assert client.calls == [("get_all_accounts",), ("get_buying_power", "111122223"),
+                                ("get_buying_power", "444455556")]
+        assert "7,168.85" not in out
+        assert "only its own buying power" in out
+        assert "--account roth" in out
+
+    def test_buying_power_json_lists_every_account(self, capsys):
+        cli.buying_power(self.two_accounts(), as_json_output=True)
+
+        assert json.loads(capsys.readouterr().out) == {
+            "buying_power": 168.85,
+            "accounts": [
+                {"account": "Individual", "account_number": "111122223",
+                 "buying_power": 168.85},
+                {"account": "Roth IRA", "account_number": "444455556",
+                 "buying_power": 7000.0},
+            ],
+        }
+
+    def test_buying_power_still_answers_if_the_accounts_cannot_be_read(self, capsys):
+        client = FakeClient()
+
+        def broken():
+            raise APIError("503 Service Unavailable")
+
+        client.get_all_accounts = broken
+
+        assert cli.buying_power(client) == 0
+        assert capsys.readouterr().out.strip() == "Buying power: $168.85"
 
     def test_quote(self, capsys):
         client = FakeClient(quotes=self.QUOTES)
@@ -1549,7 +1672,8 @@ class TestAccounts:
         assert rows[1].split() == ["Individual", "…2223", "$7,785.45", "$168.85", "$168.85"]
         assert rows[2].split()[:3] == ["Roth", "IRA", "…5556"]
         assert "111122223" not in out and "444455556" not in out
-        assert "pyhood positions --account roth" in out
+        assert "positions, orders and buying-power cover every account" in out
+        assert "pyhood buy AAPL 1 --limit 350 --account roth" in out
 
     def test_json_gives_the_numbers_in_full(self, capsys):
         cli.accounts(FakeClient(), as_json_output=True)
