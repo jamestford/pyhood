@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **You can turn confirmation off.** `pyhood setup confirmation off`, run in your own terminal, makes orders go through on the first run: no second step and no code. This covers stocks, options, spreads and crypto, buying and selling, in every account. `pyhood setup confirmation on` puts the two steps back, and confirmation is on unless you turn it off.
+- **A backstop for large orders.** With confirmation off, an order worth more than $5,000 still asks first. `pyhood setup confirmation above AMOUNT` sets the amount. It is judged order by order, by the order's estimated cost or proceeds, so it catches a mistake such as 100 shares for 10. It is not a spending limit.
+- **Only a person can loosen the setting.** Turning confirmation off, or changing the amount, is refused unless someone is at the terminal. Run by an agent, the command changes nothing and tells the agent to ask the user.
+- `--ask` on every order command makes that one order ask first, whatever the setting.
+- `pyhood guide` follows the setting, so an agent is told whether orders ask on this install and up to what amount. `pyhood setup` reports it.
+- Bank transfers always ask, and cancelling never does. Neither is affected.
+
+### Changed
+- **New wording for the step that asks.** It starts `NOT PLACED. This order needs your confirmation.` where it said `PREVIEW. Nothing has been sent.`, and a transfer starts `NOT SENT.` The docs and the guide say "the first step" and "confirmation" where they said "preview". `pyhood futures buy` and `sell`, which cannot place anything, are headed `ESTIMATE ONLY`.
+- New tag line: "Robinhood for AI agents: stocks, options, crypto and futures from the command line." The README is rewritten around choosing how much your agent asks you.
+
 ## [0.22.1] - 2026-11-24
 
 ### Fixed

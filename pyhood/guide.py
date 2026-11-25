@@ -15,6 +15,7 @@ from __future__ import annotations
 import dataclasses
 import inspect
 import sys
+from typing import Any
 
 # Read-only methods worth knowing about, in the order an agent tends to
 # need them. Every name is checked against PyhoodClient by the tests.
@@ -73,15 +74,11 @@ RULES
   1. pyhood is installed. Do not install it or its dependencies, and do
      not import it from a source folder.
   2. Never ask for, read or type a password or API key. Login is saved.
-  3. Never place an order or move money without showing the user exactly
-     what will happen first and getting a yes. See PLACING ORDERS. That
-     includes deposits and withdrawals.
-     Cancel an order only when the user asks you to.
+@@RULE_THREE@@
   4. Do not guess command, field or method names. The commands are all
      listed below.
 
-PLACING ORDERS (two steps, every time)
-  Step 1. Preview. This sends nothing:
+@@PLACING_HEAD@@
 
       pyhood buy AAPL 10 --limit 350
       pyhood sell AAPL 10 --limit 360
@@ -95,21 +92,7 @@ PLACING ORDERS (two steps, every time)
       pyhood crypto buy BTC 0.001 --limit 59000
       pyhood crypto sell BTC 0.001 --market
 
-  Moving money between the user's bank and Robinhood works the same way:
-
-      pyhood withdraw 500
-      pyhood deposit 500
-
-  The preview shows the order, its cost, the current price and any
-  problem with it, and ends with the exact command that would place it,
-  including a confirmation code.
-
-  Step 2. Show the whole preview to the user and ask. Only if they say
-  yes, run the command the preview printed, unchanged.
-
-  Do not invent a code and do not change an order after previewing it: a
-  code works for one exact order on one day, and anything else is refused.
-  If the user changes their mind about quantity or price, preview again.
+@@PLACING_STEPS@@
   An order needs --limit PRICE or --market; there is no default.
   Orders are good for the day unless you add --tif gtc.
   --stop PRICE makes a stop order: it waits until the price reaches PRICE,
@@ -134,11 +117,11 @@ CANCELLING AN ORDER (one step)
                                   are in the crypto orders list
       pyhood cancel-transfer TRANSFER_ID    a bank transfer that is still pending
 
-  There is no preview and no code: the user asking you to cancel is the
-  yes. Cancel the order they mean and tell them what the command reported.
+  There is no first step and no code: the user asking you to cancel is
+  the yes. Cancel the order they mean and tell them what the command reported.
   Never cancel an order they did not ask you to cancel.
 
-LOOKING THINGS UP (read-only, no preview needed)
+LOOKING THINGS UP (read-only, nothing to confirm)
 
     The account
       pyhood accounts             the accounts under this login: individual, IRA
@@ -171,9 +154,9 @@ LOOKING THINGS UP (read-only, no preview needed)
     Futures. Name the product, such as ES for the S&P 500, NQ for the
     Nasdaq, CL for crude oil or GC for gold, and pyhood finds the current
     contract. Do not guess contract codes like ESZ26. pyhood cannot place
-    a futures order: buy and sell only preview one, and the user places it
-    in the Robinhood app.
-      pyhood futures buy MES 1 --limit 5000    preview: margin, fees, verdict
+    a futures order: buy and sell only estimate one, and the user places
+    it in the Robinhood app.
+      pyhood futures buy MES 1 --limit 5000    estimate: margin, fees, verdict
       pyhood futures quote ES     last, bid, ask and the session's range
       pyhood futures contract ES    the product's contracts and their dates
       pyhood futures contract ESZ26    what one point and one tick are worth
@@ -192,7 +175,7 @@ LOOKING THINGS UP (read-only, no preview needed)
   --account roth. It works on positions, buying-power, buy, sell,
   buy-option and sell-option.
   watch and unwatch change a watchlist at once. No money is involved, so
-  they need no preview.
+  there is nothing to confirm.
 
 ANYTHING ELSE
   The commands above cover most requests. For something they do not, such
@@ -346,6 +329,88 @@ def _with_path_note(text: str, before: str) -> str:
     return text.replace(before, f"{note}\n{before}", 1) if note else text
 
 
+# The parts of the guide that depend on the user's confirmation setting.
+RULE_THREE_ON = """\
+  3. Never place an order or move money without showing the user exactly
+     what will happen first and getting a yes. See PLACING ORDERS. That
+     includes deposits and withdrawals.
+     Cancel an order only when the user asks you to."""
+
+RULE_THREE_OFF = """\
+  3. This user has turned confirmation off. An order worth up to {above}
+     is placed as soon as you run it, so run only what the user asked
+     for, exactly as they asked, and then tell them what was placed.
+     An order above {above}, and any deposit or withdrawal, still asks
+     first. See PLACING ORDERS. Only the user can change this setting.
+     Cancel an order only when the user asks you to."""
+
+PLACING_HEAD_ON = """\
+PLACING ORDERS (two steps, every time)
+  Step 1. Run the order with no --confirm. This sends nothing:"""
+
+PLACING_HEAD_OFF = """\
+PLACING ORDERS (confirmation is off: one step, up to {above})
+  Run the order. It is sent to Robinhood at once:"""
+
+PLACING_STEPS_ON = """\
+  Moving money between the user's bank and Robinhood works the same way:
+
+      pyhood withdraw 500
+      pyhood deposit 500
+
+  It prints NOT PLACED, then the order, its cost, the current price and
+  any problem with it, and ends with the exact command that would place
+  it, including a confirmation code.
+
+  Step 2. Show all of that to the user and ask. Only if they say yes, run
+  the command it printed, unchanged.
+
+  Do not invent a code and do not change an order after showing it: a
+  code works for one exact order on one day, and anything else is refused.
+  If the user changes their mind about quantity or price, start again."""
+
+PLACING_STEPS_OFF = """\
+  It prints PLACED, the order's status and its ID. Tell the user what was
+  placed and anything it warned about. Check the quantity and price
+  before you run it: there is no second step to catch a mistake.
+
+  An order worth more than {above} is not sent. It prints NOT PLACED and
+  a command with a confirmation code: show that to the user and ask, and
+  only on a yes run the command it printed, unchanged.
+  Add --ask to make any order ask first. Use it when you are not sure
+  what the user wants, or when they say to check with them.
+
+  Moving money between the user's bank and Robinhood always asks first:
+
+      pyhood withdraw 500
+      pyhood deposit 500
+
+  Show what it prints to the user, and only on a yes run the command it
+  printed, with its code, unchanged."""
+
+
+def _for_setting(text: str, chosen: Any = None) -> str:
+    """Fill in the parts of the guide that follow the confirmation setting.
+
+    `chosen` is the settings to write the guide for; the saved ones if None.
+    """
+    from pyhood import settings
+
+    chosen = chosen or settings.load()
+    on = chosen.confirmation
+    above = f"${chosen.above:,.0f}" if chosen.above == int(chosen.above) else (
+        f"${chosen.above:,.2f}"
+    )
+    parts = {
+        "@@RULE_THREE@@": RULE_THREE_ON if on else RULE_THREE_OFF,
+        "@@PLACING_HEAD@@": PLACING_HEAD_ON if on else PLACING_HEAD_OFF,
+        "@@PLACING_STEPS@@": PLACING_STEPS_ON if on else PLACING_STEPS_OFF,
+    }
+    for marker, part in parts.items():
+        text = text.replace(marker, part.replace("{above}", above))
+    return text
+
+
 def render(topic: str | None = None) -> str:
     """Build the guide for the installed version.
 
@@ -363,12 +428,14 @@ def render(topic: str | None = None) -> str:
             _models(),
             _methods(
                 "ORDERS FROM A SCRIPT (prefer the commands in `pyhood guide`, which\n"
-                "preview first; these send at once, so ask the user first)",
+                "follow the user's confirmation setting; these send at once)",
                 WRITE_METHODS,
             ),
             OUTRO,
         ))
-    return _with_path_note(COMMANDS.replace("{version}", __version__), "PLACING ORDERS (")
+    return _with_path_note(
+        _for_setting(COMMANDS.replace("{version}", __version__)), "PLACING ORDERS (",
+    )
 
 
 def main(topic: str | None = None) -> int:

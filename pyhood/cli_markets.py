@@ -2,11 +2,11 @@
 
 Crypto goes through Robinhood's official Crypto Trading API, which has its
 own client and its own credentials (`pyhood setup crypto`). Buying and
-selling work as stock orders do: a preview that sends nothing and prints a
+selling work as stock orders do: a first step that sends nothing and prints a
 confirmation code, then the same command with the code.
 
 Futures can be read here: quotes, contract details, orders and realized
-profit and loss. A futures order can be previewed, with Robinhood's own
+profit and loss. A futures order can be estimated, with Robinhood's own
 margin, fees and verdict, but not placed: pyhood has not seen the request
 that submits one.
 """
@@ -20,7 +20,9 @@ from collections.abc import Callable
 from typing import Any
 
 from pyhood.cli import (
+    NOT_PLACED,
     UsageError,
+    _ask_to_confirm,
     _wrong_code,
     as_json,
     confirmation_code,
@@ -69,7 +71,7 @@ def crypto_quote(client: Any, symbols: list[str], as_json_output: bool = False) 
         ))
         print(
             "\nRobinhood charges a fee on each crypto trade, on top of these prices. "
-            f"A preview shows it: {program()} crypto buy BTC 0.001 --market"
+            f"To see it: {program()} crypto buy BTC 0.001 --market --ask"
         )
     for s in missing:
         print(f"No quote for {s}.", file=sys.stderr)
@@ -148,7 +150,7 @@ def crypto_order(
     confirm: str | None = None,
     settle_seconds: float = 2.0,
 ) -> int:
-    """Preview a crypto order, or place it when given its confirmation code.
+    """Show a crypto order, or place it when given its confirmation code.
 
     `quantity` is in the coin, not dollars: 0.001 is a thousandth of a
     bitcoin. `limit` of None is a market order.
@@ -224,7 +226,7 @@ def crypto_order(
     market_price = estimate.ask_price if side == "buy" else estimate.bid_price
     value = quantity * (limit if limit is not None else market_price)
 
-    print("PREVIEW. Nothing has been sent.\n")
+    print(f"{NOT_PLACED}\n")
     print(f"  {summary}")
     if side == "buy":
         print(f"  {'Estimated cost:':<20}{money(value + estimate.fee)} "
@@ -275,8 +277,7 @@ def crypto_order(
     for warning in warnings:
         print(f"\n  Note: {warning}")
 
-    print("\nTo place this order, show this preview to the user. If they say yes, run:")
-    print(f"  {command} --confirm {code}")
+    _ask_to_confirm(command, code, value)
     return 0
 
 
@@ -431,7 +432,7 @@ def futures_order(
     time_in_force: str = "gfd",
     as_json_output: bool = False,
 ) -> int:
-    """Preview a futures order: what it ties up, what it costs, and whether
+    """Estimate a futures order: what it ties up, what it costs, and whether
     Robinhood would take it. It cannot be placed from here.
 
     The margin, fees and verdict are Robinhood's own, from the two requests
@@ -461,7 +462,7 @@ def futures_order(
     duration = "good for day" if time_in_force == "gfd" else "good till cancelled"
     plural = "contract" if quantity == 1 else "contracts"
 
-    print("PREVIEW ONLY. pyhood cannot place futures orders. Nothing has been sent.\n")
+    print("ESTIMATE ONLY. pyhood cannot place futures orders. Nothing has been sent.\n")
     if note:
         print(f"  {note}")
     print(f"  {side.capitalize()} {quantity} {code} {plural}, {terms}, {duration}")
@@ -521,7 +522,7 @@ def futures_order(
         print(f"\n  Note: {warning}")
 
     print(
-        "\nThis is a preview only, and there is no step that places it. To place this "
+        "\nThis is an estimate only, and there is no step that places it. To place this "
         "order, use the Robinhood app or Robinhood Legend."
     )
     return 0

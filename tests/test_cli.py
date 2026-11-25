@@ -33,6 +33,7 @@ from pyhood.models import (
     UnifiedTransfer,
     Watchlist,
 )
+from pyhood.settings import Settings
 
 UTC = timezone.utc
 
@@ -669,11 +670,11 @@ class TestStockOrder:
 
         out = capsys.readouterr().out
         assert client.writes == []
-        assert out.startswith("PREVIEW. Nothing has been sent.")
+        assert out.startswith("NOT PLACED. This order needs your confirmation.")
         assert "Buy 10 AAPL, limit $350.00, good for day" in out
         assert "Estimated cost:     $3,500.00" in out
         assert "Buying power:       $5,000.00" in out
-        assert "show this preview to the user" in out
+        assert "show this to the user" in out
         assert f"pyhood buy AAPL 10 --limit 350 --confirm {code_from(out)}" in out
 
     def test_the_printed_command_places_exactly_the_previewed_order(self, capsys):
@@ -796,7 +797,7 @@ class TestCancel:
         assert client.writes == [("cancel", "order-9")]
         out = capsys.readouterr().out
         assert out.startswith("CANCELLED: buy 40 ANT, limit $90.00, placed 2026-11-19")
-        assert "PREVIEW" not in out and "--confirm" not in out
+        assert "NOT PLACED" not in out and "--confirm" not in out
 
     def test_a_stop_order_is_described_with_its_stop(self, capsys):
         stop = stock_order(
@@ -908,7 +909,9 @@ class TestOrderCommandLine:
         monkeypatch.setattr(cli, "run", lambda fn, **kw: seen.append((fn, kw)) or 0)
 
         assert onboarding.main(argv) == 0
-        assert seen == [(cli.stock_order, kwargs)]
+        # An order goes through the user's confirmation setting on its way.
+        assert seen == [(cli.place_or_ask,
+                         {"order_command": cli.stock_order, "ask": False, **kwargs})]
 
     def test_cancel(self, monkeypatch):
         seen = []
@@ -1061,7 +1064,7 @@ class TestOptionOrder:
 
         out = capsys.readouterr().out
         assert client.writes == []
-        assert out.startswith("PREVIEW. Nothing has been sent.")
+        assert out.startswith("NOT PLACED. This order needs your confirmation.")
         assert (
             "Buy to open 2 contracts of F $12.00 call expiring 2026-12-11, "
             "limit $0.30 per share, good for day"
@@ -1225,7 +1228,8 @@ class TestOptionCommandLine:
             "buy-option", "F", "--expires", "2026-12-11", "--strike", "12", "--call",
             "--contracts", "2", "--limit", "0.30",
         ])
-        assert seen == [(cli.option_order, {
+        assert seen == [(cli.place_or_ask, {
+            "order_command": cli.option_order, "ask": False,
             "side": "buy", "symbol": "F", "expiration": "2026-12-11", "strike": 12.0,
             "option_type": "call", "contracts": 2, "limit": 0.30, "effect": None,
             "time_in_force": "gfd", "account": None, "confirm": None,
@@ -2064,9 +2068,10 @@ class TestProgram:
 
 def guide_command_lines():
     """Each `pyhood ...` line in the guide's quick answers, without its note."""
-    section = guide.COMMANDS[
-        guide.COMMANDS.index("PLACING ORDERS ("):guide.COMMANDS.index("ANYTHING ELSE")
-    ]
+    # Written for the default settings, whatever this computer has saved:
+    # this runs while tests are collected, before any fixture.
+    text = guide._for_setting(guide.COMMANDS, Settings())
+    section = text[text.index("PLACING ORDERS ("):text.index("ANYTHING ELSE")]
     lines = [line.strip() for line in section.splitlines() if line.strip().startswith("pyhood ")]
     # The command ends where the run of spaces before its description begins.
     return [line.split("    ")[0].strip() for line in lines]

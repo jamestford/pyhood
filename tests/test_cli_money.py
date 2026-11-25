@@ -322,7 +322,7 @@ class TestTransfer:
 
         out = capsys.readouterr().out
         assert client.writes == []
-        assert out.startswith("PREVIEW. Nothing has been sent.")
+        assert out.startswith("NOT SENT. This transfer needs your confirmation.")
         assert "Withdraw $50.00 from Robinhood to Savings …1234 (Rainy day)" in out
         assert "Withdrawable cash:  $168.85" in out
         assert "more than your withdrawable cash" not in out
@@ -427,8 +427,9 @@ class TestCommandLine:
         ])
 
         command, kwargs = seen[0]
-        assert command is cli_spreads.spread
+        assert command is cli.place_or_ask
         assert kwargs == {
+            "order_command": cli_spreads.spread, "ask": False,
             "symbol": "F", "expires": "2026-12-11", "contracts": 2, "debit": 0.25,
             "credit": None, "effect": "open", "time_in_force": "gfd", "account": "roth",
             "confirm": None, "legs": legs("buy:call:12", "sell:call:13"),

@@ -2,7 +2,7 @@
 
 The `pyhood` command answers the most common questions about an account without any code, and sets up and checks your login.
 
-The account commands are **read-only**. The order commands change your account. Placing an order takes two steps: a preview, then a confirmation. Cancelling one takes a single step.
+The account commands are **read-only**. The order commands change your account. Placing an order takes two steps, unless you have turned confirmation off: a first step that shows the order and sends nothing, then a second that places it. Cancelling one takes a single step.
 
 ## Account commands
 
@@ -124,7 +124,7 @@ pyhood watch NVDA --list Tech  # add to another list
 pyhood unwatch F               # take off
 ```
 
-`watch` and `unwatch` act at once. No money is involved, so there is no preview. Each reads the list back afterwards and tells you if a symbol did not take.
+`watch` and `unwatch` act at once. No money is involved, so there is nothing to confirm. Each reads the list back afterwards and tells you if a symbol did not take.
 
 ## Options
 
@@ -200,7 +200,7 @@ pyhood crypto orders           # crypto orders, newest first; --open for open on
 
 ```text
 $ pyhood crypto buy BTC 0.001 --limit 50000
-PREVIEW. Nothing has been sent.
+NOT PLACED. This order needs your confirmation.
 
   Buy 0.001 BTC, limit $50,000.00
   Estimated cost:     $50.57 ($50.00 plus a fee of about $0.57)
@@ -211,11 +211,11 @@ PREVIEW. Nothing has been sent.
 
   Note: A crypto limit order stays open until it fills or you cancel it.
 
-To place this order, show this preview to the user. If they say yes, run:
+To place this order, show this to the user. If they say yes, run:
   pyhood crypto buy BTC 0.001 --limit 50000 --confirm 4c1f0e
 ```
 
-The preview differs from a stock order's in three ways:
+The first step differs from a stock order's in three ways:
 
 - **It shows Robinhood's fee**, as part of what a buy costs and taken off what a sale brings in. The fee comes from Robinhood's own estimate for that order.
 - **It checks the coin can be traded through the API.** Some coins trade in the app but not here, and those are refused.
@@ -225,7 +225,7 @@ The preview differs from a stock order's in three ways:
 
 ## Futures
 
-Futures can be read, and an order previewed, but not placed. Name a product, such as `ES` for the E-mini S&P 500, `NQ` for the Nasdaq, `CL` for crude oil or `GC` for gold, and pyhood uses its nearest contract. You do not have to know which month is current.
+Futures can be read, and an order estimated, but not placed. Name a product, such as `ES` for the E-mini S&P 500, `NQ` for the Nasdaq, `CL` for crude oil or `GC` for gold, and pyhood uses its nearest contract. You do not have to know which month is current.
 
 ```bash
 pyhood futures quote ES NQ      # last, bid, ask, and the session's high, low and volume
@@ -246,11 +246,11 @@ A contract can also be named in full, by product, month and year: `ESZ26` is `ES
 
 `pyhood futures positions` prints what Robinhood sends without arranging it into columns. pyhood has not seen an open futures position, and does not guess at field names.
 
-### Previewing a futures order
+### Estimating a futures order
 
 ```text
 $ pyhood futures buy MES 1 --limit 5000
-PREVIEW ONLY. pyhood cannot place futures orders. Nothing has been sent.
+ESTIMATE ONLY. pyhood cannot place futures orders. Nothing has been sent.
 
   MES: the nearest contract is MESZ26, expiring 2026-12-18.
   Buy 1 MESZ26 contract, limit 5,000, good for day
@@ -263,7 +263,7 @@ PREVIEW ONLY. pyhood cannot place futures orders. Nothing has been sent.
   Buying power after:   -$2,809.95
   Robinhood says:       it would refuse this order: not enough buying power.
 
-This is a preview only, and there is no step that places it. To place this order, use the Robinhood app or Robinhood Legend.
+This is an estimate only, and there is no step that places it. To place this order, use the Robinhood app or Robinhood Legend.
 ```
 
 | Option | Effect |
@@ -280,13 +280,13 @@ There is no `--confirm`, because there is nothing to confirm. pyhood has not see
 
 ## Order commands
 
-`pyhood buy` and `pyhood sell` never act the first time they are run.
+Out of the box, `pyhood buy` and `pyhood sell` never act the first time they are run. You can change that: see [Turning confirmation off](#turning-confirmation-off).
 
-### Step 1: preview
+### Step 1: see the order
 
 ```text
 $ pyhood buy AAPL 10 --limit 350
-PREVIEW. Nothing has been sent.
+NOT PLACED. This order needs your confirmation.
 
   Buy 10 AAPL, limit $350.00, good for day
   Estimated cost:     $3,500.00
@@ -294,11 +294,11 @@ PREVIEW. Nothing has been sent.
   Buying power:       $5,000.00
   Market open:        yes
 
-To place this order, show this preview to the user. If they say yes, run:
+To place this order, show this to the user. If they say yes, run:
   pyhood buy AAPL 10 --limit 350 --confirm 98dee3
 ```
 
-The preview reads your quote, buying power or holdings, and points out anything that looks wrong:
+This step reads your quote, buying power or holdings, and points out anything that looks wrong:
 
 - the cost is more than your buying power
 - a sell is for more shares than you hold
@@ -307,7 +307,7 @@ The preview reads your quote, buying power or holdings, and points out anything 
 
 ### Step 2: confirm
 
-Run the command the preview printed. The order is placed and its status reported:
+Run the command the first step printed. The order is placed and its status reported:
 
 ```text
 $ pyhood buy AAPL 10 --limit 350 --confirm 98dee3
@@ -323,11 +323,63 @@ Cancel it with: pyhood cancel 1a2b3c4d-...
 
 The code is worked out from the order itself and today's date. So:
 
-- **What is placed is what was previewed.** A different symbol, quantity, price or duration has a different code, and the wrong code is refused before anything is sent.
-- **A preview always comes first**, because that is the only place the code appears.
+- **What is placed is what was shown.** A different symbol, quantity, price or duration has a different code, and the wrong code is refused before anything is sent.
+- **The order is always shown first**, because that is the only place the code appears.
 - **A code stops working at the end of the day.**
 
-It is a guardrail against mistakes, not a lock: anything that can run the preview can read the code. It makes an agent show its work. It does not stop an agent that ignores its instructions.
+It is a guardrail against mistakes, not a lock: anything that can run the first step can read the code. It makes an agent show its work. It does not stop an agent that ignores its instructions.
+
+### Turning confirmation off
+
+If you would rather your agent placed orders without asking, turn confirmation off. Run this yourself, in your own terminal:
+
+```text
+$ pyhood setup confirmation off
+Turning confirmation off means:
+  - An order worth up to $5,000.00 is sent to Robinhood as soon as your
+    agent runs it. You are not shown it first and are not asked.
+  ...
+Type yes to turn confirmation off: yes
+
+Confirmation is off. Orders up to $5,000.00 are placed at once.
+```
+
+After that an order is placed on the first run:
+
+```text
+$ pyhood buy AAPL 10 --limit 350
+Confirmation is off and this order is not above $5,000.00, so it is sent at once.
+
+  Buy 10 AAPL, limit $350.00, good for day
+  Estimated cost:     $3,500.00
+  AAPL now:           $352.01 (bid $351.99, ask $352.01)
+  Buying power:       $5,000.00
+  Market open:        yes
+
+PLACED: Buy 10 AAPL, limit $350.00, good for day
+  Status:    queued
+  Order ID:  ...
+```
+
+| Command | What it does |
+|---|---|
+| `pyhood setup confirmation` | Shows the setting |
+| `pyhood setup confirmation off` | Orders are placed at once, except above your amount |
+| `pyhood setup confirmation above 500` | Sets the amount. An order worth more still asks |
+| `pyhood setup confirmation on` | Every order asks first. This is how pyhood starts |
+
+How it behaves:
+
+- **The amount is a backstop.** It starts at $5,000. An order worth more is not refused: it takes the usual two steps, and says why.
+- **It measures what the order is worth**: the estimated cost or proceeds the first step shows. Selling counts the same as buying. An option order counts its whole cost, 100 shares a contract.
+- **Each order is judged on its own.** Several orders under the amount all go through. It catches a mistake, such as 100 shares for 10. It is not a spending limit.
+- **An order whose worth cannot be worked out asks.**
+- **`--ask` makes one order ask**, whatever the setting.
+- **Bank transfers always ask.** Cancelling never does.
+- **Warnings are still printed**, above the line that says the order was placed. By then it has been sent.
+- **The agent is told.** `pyhood guide` describes whichever way this install is set, with the amount.
+
+Turning confirmation off, or changing the amount, needs a person at the terminal. Run by an agent, the command changes nothing and tells the agent to ask you. Turning it back on works from anywhere. The setting is kept in `~/.pyhood/settings.json`; an agent that can run commands could edit that file by hand, so this too is a guardrail and not a lock.
 
 ### Options
 
@@ -347,7 +399,8 @@ It is a guardrail against mistakes, not a lock: anything that can run the previe
 | `--tif gfd` | Good for day. The default |
 | `--tif gtc` | Good till cancelled |
 | `--extended-hours` | Allow the order to trade outside regular hours |
-| `--confirm CODE` | Act, using the code from the preview |
+| `--confirm CODE` | Place the order, using the code the first step printed |
+| `--ask` | Ask first for this order, even with confirmation off |
 
 ### Orders by dollar amount
 
@@ -357,7 +410,7 @@ It is a guardrail against mistakes, not a lock: anything that can run the previe
 pyhood buy AAPL --dollars 50 --market
 ```
 
-It is always a market order, in regular hours, of at least $1: Robinhood takes a fraction of a share no other way. The preview shows roughly how many shares the amount comes to.
+It is always a market order, in regular hours, of at least $1: Robinhood takes a fraction of a share no other way. The first step shows roughly how many shares the amount comes to.
 
 A buy by dollar amount has been placed for real, with the market closed so that it could be cancelled before it traded. A sell by dollar amount has not.
 
@@ -370,7 +423,7 @@ pyhood sell AAPL 10 --stop 340 --market --tif gtc   # sell if it falls to $340
 pyhood sell AAPL 10 --stop 340 --limit 338 --tif gtc   # ... but not below $338
 ```
 
-The preview points out two things that catch people:
+The first step points out two things that catch people:
 
 - **A stop that would trigger at once.** A sell stop belongs below the current price and a buy stop above it.
 - **A stop that lasts only for today.** Orders are good for the day by default, and a stop meant as protection is no use once it has expired. Add `--tif gtc`.
@@ -383,9 +436,9 @@ The preview points out two things that catch people:
 pyhood sell AAPL 10 --trail-percent 5 --market --tif gtc
 ```
 
-The preview shows where the stop starts. It is always a market order for a number of shares.
+The first step shows where the stop starts. It is always a market order for a number of shares.
 
-A trailing stop that sells has been placed for real. One that buys has not yet, and the preview says so. If Robinhood refuses an order, nothing is placed and the reason is printed.
+A trailing stop that sells has been placed for real. One that buys has not yet, and the first step says so. If Robinhood refuses an order, nothing is placed and the reason is printed.
 
 ### Option orders
 
@@ -393,7 +446,7 @@ A trailing stop that sells has been placed for real. One that buys has not yet, 
 
 ```text
 $ pyhood buy-option F --expires 2026-12-11 --strike 12 --call --contracts 1 --limit 0.30
-PREVIEW. Nothing has been sent.
+NOT PLACED. This order needs your confirmation.
 
   Buy to open 1 contract of F $12.00 call expiring 2026-12-11, limit $0.30 per share, good for day
   Estimated cost:     $30.00 (1 contract x 100 shares x $0.30)
@@ -404,7 +457,7 @@ PREVIEW. Nothing has been sent.
   Buying power:       $500.00
   Market open:        yes
 
-To place this order, show this preview to the user. If they say yes, run:
+To place this order, show this to the user. If they say yes, run:
   pyhood buy-option F --expires 2026-12-11 --strike 12 --call --contracts 1 --limit 0.3 --confirm fdf2a6
 ```
 
@@ -418,7 +471,7 @@ To place this order, show this preview to the user. If they say yes, run:
 | `--to open` or `--to close` | Whether the order opens a position or closes one. A buy opens and a sell closes unless you say otherwise |
 | `--tif gfd` or `--tif gtc` | Good for day (the default) or good till cancelled |
 
-The preview checks that the contract exists and names the nearest expirations or strikes if it does not. It also points out:
+The first step checks that the contract exists and names the nearest expirations or strikes if it does not. It also points out:
 
 - a cost of more than your buying power
 - a sell to close of more contracts than you hold
@@ -432,7 +485,7 @@ The preview checks that the contract exists and names the nearest expirations or
 
 ```text
 $ pyhood spread F --expires 2026-12-11 --leg buy:call:12 --leg sell:call:13 --contracts 1 --debit 0.25
-PREVIEW. Nothing has been sent.
+NOT PLACED. This order needs your confirmation.
 
   Open 1 F spread for a debit of $0.25 per share, good for day
     buy  $12.00 call 2026-12-11   mark $0.31 (bid $0.29, ask $0.33)
@@ -451,7 +504,7 @@ PREVIEW. Nothing has been sent.
 | `--to open` or `--to close` | Opening is the default |
 | `--tif`, `--account` | As for other orders |
 
-The preview checks that every leg is a real contract, and prices the spread from its legs. It points out:
+The first step checks that every leg is a real contract, and prices the spread from its legs. It points out:
 
 - **legs the wrong way round.** If you ask for a debit but the legs as written pay a credit, the bought and sold legs are probably swapped.
 - **a price 20% or more from what the spread is worth** at the marks.
@@ -468,28 +521,28 @@ $ pyhood cancel 5e6f7a8b-...
 CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share, placed 2026-11-24 17:17 EST
 ```
 
-`pyhood cancel ORDER_ID` acts at once, for stock and option orders alike. There is no preview and no code. A cancel names one order and can only remove it, so there is no symbol, quantity or price to get wrong, and when you want out of an order a second step is time in which it can fill.
+`pyhood cancel ORDER_ID` acts at once, for stock and option orders alike. There is no first step and no code. A cancel names one order and can only remove it, so there is no symbol, quantity or price to get wrong, and when you want out of an order a second step is time in which it can fill.
 
 - Find the ID with `pyhood orders --open`.
 - An order that has already finished is left alone, and the command says so.
 - A cancel is a request. If the order filled before it landed, the command reports that in place of `CANCELLED`, and any part that had already filled is not undone.
 
-These cover stock orders by shares or by dollar amount, stop orders and trailing stops, single-leg option orders and spreads, in any of your accounts, and crypto orders. Futures orders cannot be placed, from the command line or from Python. They can be previewed: see [Previewing a futures order](#previewing-a-futures-order).
+These cover stock orders by shares or by dollar amount, stop orders and trailing stops, single-leg option orders and spreads, in any of your accounts, and crypto orders. Futures orders cannot be placed, from the command line or from Python. They can be estimated: see [Estimating a futures order](#estimating-a-futures-order).
 
 ## Moving money
 
-`pyhood deposit` and `pyhood withdraw` move money between a linked bank account and Robinhood. They work in two steps, as orders do.
+`pyhood deposit` and `pyhood withdraw` move money between a linked bank account and Robinhood. They always take two steps, whatever your confirmation setting.
 
 ```text
 $ pyhood withdraw 500
-PREVIEW. Nothing has been sent.
+NOT SENT. This transfer needs your confirmation.
 
   Withdraw $500.00 from Robinhood to Savings …1234 (Rainy day)
   Withdrawable cash:  $1,250.00
 
   Note: A bank transfer takes a few business days to arrive.
 
-To make this transfer, show this preview to the user. If they say yes, run:
+To make this transfer, show this to the user. If they say yes, run:
   pyhood withdraw 500 --confirm 98fafd
 ```
 
@@ -498,7 +551,7 @@ To make this transfer, show this preview to the user. If they say yes, run:
 - **A withdrawal of more than your withdrawable cash is pointed out.** Money from a recent sale or deposit takes time to become withdrawable.
 - **`pyhood cancel-transfer TRANSFER_ID`** cancels a transfer that has not gone through, at once. The ID is printed when the transfer is made.
 
-pyhood has not made a transfer against Robinhood through these commands. Previews have been run live; the step that sends has only been tested against a stand-in.
+pyhood has not made a transfer against Robinhood through these commands. The first step has been run live; the step that sends has only been tested against a stand-in.
 
 ## Setup and checks
 
@@ -507,6 +560,7 @@ pyhood has not made a transfer against Robinhood through these commands. Preview
 | `pyhood setup` | Reports what is configured. See [Setup](setup.md) |
 | `pyhood setup login` | Logs in and saves a session |
 | `pyhood setup crypto` | Generates and registers a Crypto API key pair |
+| `pyhood setup confirmation` | Shows or changes whether orders ask first. See [Turning confirmation off](#turning-confirmation-off) |
 | `pyhood verify` | Reads live prices to confirm the saved login works |
 | `pyhood verify crypto` | The same for the Crypto API key pair |
 | `pyhood version` | Prints the installed version |

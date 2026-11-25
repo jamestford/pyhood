@@ -1,4 +1,4 @@
-"""pyhood — A modern, reliable Python client for the Robinhood API."""
+"""pyhood: Robinhood for AI agents, and a Python client for the Robinhood API."""
 
 __version__ = "0.22.1"
 

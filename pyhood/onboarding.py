@@ -220,8 +220,121 @@ def print_status(out: Printer = print) -> int:
             f"so {crypto['path']} is being ignored."
         )
 
+    out("")
+    out("Confirmation (whether an order asks before it is placed)")
+    out(f"    {confirmation_summary()}")
+
     usable = session["exists"] and crypto["source"] != "none" and crypto["private_key_valid"]
     return 0 if usable else 1
+
+
+# ── Confirmation setting ─────────────────────────────────────────────
+
+
+def confirmation_summary() -> str:
+    """The confirmation setting in one line."""
+    from pyhood import settings
+
+    chosen = settings.load()
+    if chosen.confirmation:
+        return "on: every order asks first."
+    return f"off: orders are placed at once, except those above ${chosen.above:,.2f}."
+
+
+def setup_confirmation(
+    values: list[str],
+    prompt: Prompt = input,
+    out: Printer = print,
+    at_terminal: Callable[[], bool] | None = None,
+) -> int:
+    """Show or change whether orders ask before they are placed.
+
+    Showing it, and turning confirmation on, work anywhere. Turning it off,
+    or changing the amount above which an order still asks, loosens what an
+    agent may do with the user's money, so those need a person at the
+    terminal: they are refused when the command is not run from one.
+    """
+    from dataclasses import replace
+
+    from pyhood import settings
+
+    chosen = settings.load()
+    program = invocation()
+    if not values:
+        out(f"Confirmation is {confirmation_summary()}")
+        out("")
+        out(f"    {program} setup confirmation on            every order asks first")
+        out(f"    {program} setup confirmation off           orders are placed at once,")
+        out("                                              except above the amount below")
+        out(f"    {program} setup confirmation above AMOUNT  with confirmation off, an order")
+        out("                                              above AMOUNT dollars still asks")
+        out("")
+        out("Bank transfers always ask. Cancelling an order never does.")
+        return 0
+
+    action = values[0].lower()
+    if action == "on" and len(values) == 1:
+        settings.save(replace(chosen, confirmation=True))
+        out("Confirmation is on: every order asks first.")
+        return 0
+
+    if at_terminal is None:
+        def at_terminal() -> bool:
+            return sys.stdin.isatty() and sys.stdout.isatty()
+
+    if action == "above" and len(values) == 2:
+        try:
+            amount = float(values[1].replace(",", "").lstrip("$"))
+        except ValueError:
+            amount = -1.0
+        if not amount >= 0 or amount == float("inf"):
+            out(f"{values[1]!r} is not an amount in dollars, such as 5000.")
+            return 2
+    elif action == "off" and len(values) == 1:
+        amount = chosen.above
+    else:
+        out("Give on, off, or above AMOUNT. For example:")
+        out(f"    {program} setup confirmation above 5000")
+        return 2
+
+    if not at_terminal():
+        out("This setting decides how much is done with your money without asking,")
+        out("so only a person can loosen it. Nothing was changed.")
+        out("")
+        out("If you are an AI agent: do not try another way. Ask the user to run this")
+        out("themselves, in their own terminal:")
+        out(f"    {program} setup confirmation {' '.join(values)}")
+        return 2
+
+    if action == "above":
+        settings.save(replace(chosen, above=amount))
+        out(f"Saved. With confirmation off, an order above ${amount:,.2f} still asks.")
+        if chosen.confirmation:
+            out("Confirmation is on, so every order asks first for now. To turn it off:")
+            out(f"    {program} setup confirmation off")
+        return 0
+
+    out("Turning confirmation off means:")
+    out(f"  - An order worth up to ${amount:,.2f} is sent to Robinhood as soon as your")
+    out("    agent runs it. You are not shown it first and are not asked.")
+    out("  - That covers stocks, options, spreads and crypto, buying and selling, in")
+    out("    every account.")
+    out(f"  - An order above ${amount:,.2f} still asks. Change the amount with:")
+    out(f"        {program} setup confirmation above AMOUNT")
+    out("  - Each order is judged on its own. Several orders under the amount all go")
+    out("    through, so this catches a mistake, and is not a spending limit.")
+    out("  - A market order that is sent while the market is open cannot be taken back.")
+    out("  - Bank transfers always ask.")
+    out("")
+    answer = prompt("Type yes to turn confirmation off: ").strip().lower()
+    if answer != "yes":
+        out("Nothing was changed. Confirmation is still on.")
+        return 1
+    settings.save(replace(chosen, confirmation=False))
+    out("")
+    out(f"Confirmation is off. Orders up to ${amount:,.2f} are placed at once.")
+    out(f"To turn it back on: {program} setup confirmation on")
+    return 0
 
 
 # ── Crypto setup ─────────────────────────────────────────────────────
@@ -446,8 +559,18 @@ def build_parser() -> argparse.ArgumentParser:
     setup.add_argument(
         "target",
         nargs="?",
-        choices=("crypto", "login"),
-        help="crypto: generate a Crypto API key pair. login: obtain session tokens.",
+        choices=("crypto", "login", "confirmation"),
+        help=(
+            "crypto: generate a Crypto API key pair. login: obtain session tokens. "
+            "confirmation: show or change whether orders ask before they are placed"
+        ),
+    )
+    setup.add_argument(
+        "values", nargs="*", metavar="VALUE",
+        help=(
+            "for confirmation: on, off, or above AMOUNT. With confirmation off, an "
+            "order worth more than AMOUNT dollars still asks"
+        ),
     )
     setup.add_argument(
         "--force",
@@ -530,16 +653,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="show only orders that can still fill, which are the ones that can be cancelled",
     )
     two_steps = (
-        " Runs in two steps. Without --confirm it only previews: it shows what "
-        "would be sent and prints a confirmation code, and sends nothing. With "
-        "--confirm and that code, it acts. Run the preview first and show the "
-        "user what it printed; ask for a yes only after that."
+        " Takes two steps, unless the user has turned confirmation off. Run "
+        "without --confirm it sends nothing: it shows the order and prints a "
+        "confirmation code. Show the user what it printed and ask; on a yes, run "
+        "it again with --confirm and that code. If the user has turned "
+        "confirmation off, an order up to the amount they set is sent on the "
+        "first run. `pyhood setup confirmation` shows the setting."
+    )
+    always_two_steps = (
+        " Always takes two steps, whatever the confirmation setting. Run without "
+        "--confirm it sends nothing: it shows the transfer and prints a "
+        "confirmation code. Show the user what it printed and ask; on a yes, run "
+        "it again with --confirm and that code."
+    )
+    ask_help = (
+        "ask before placing this order, even if the user has turned confirmation off"
     )
     for side in ("buy", "sell"):
         order = commands.add_parser(
             side,
             parents=[in_account],
-            help=f"preview a stock {side} order, then place it with --confirm",
+            help=f"{side} a stock; asks first unless confirmation is off",
             description=f"Places an order to {side} a stock." + two_steps,
         )
         order.add_argument("symbol", metavar="SYMBOL", help="the stock's ticker")
@@ -591,8 +725,9 @@ def build_parser() -> argparse.ArgumentParser:
         )
         order.add_argument(
             "--confirm", metavar="CODE",
-            help="the code a preview of this exact order printed; places the order",
+            help="the code the first step printed for this exact order; places the order",
         )
+        order.add_argument("--ask", action="store_true", help=ask_help)
     chain = commands.add_parser(
         "options",
         parents=[as_json],
@@ -619,7 +754,7 @@ def build_parser() -> argparse.ArgumentParser:
         option = commands.add_parser(
             f"{side}-option",
             parents=[in_account],
-            help=f"preview an order to {side} option contracts, then place it with --confirm",
+            help=f"{side} option contracts; asks first unless confirmation is off",
             description=(
                 f"Places a limit order to {side} contracts of one option." + two_steps
                 + " Find contracts with `pyhood options SYMBOL --expires DATE`."
@@ -657,8 +792,9 @@ def build_parser() -> argparse.ArgumentParser:
         )
         option.add_argument(
             "--confirm", metavar="CODE",
-            help="the code a preview of this exact order printed; places the order",
+            help="the code the first step printed for this exact order; places the order",
         )
+        option.add_argument("--ask", action="store_true", help=ask_help)
     earnings = commands.add_parser(
         "earnings", parents=[as_json],
         help="show when companies next report earnings (read-only)",
@@ -733,7 +869,7 @@ def build_parser() -> argparse.ArgumentParser:
     spread = commands.add_parser(
         "spread",
         parents=[in_account],
-        help="preview an option spread, then place it with --confirm",
+        help="trade an option spread; asks first unless confirmation is off",
         description=(
             "Places two to four option contracts as one order, for one net price."
             + two_steps
@@ -774,8 +910,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     spread.add_argument(
         "--confirm", metavar="CODE",
-        help="the code a preview of this exact spread printed; places the order",
+        help="the code the first step printed for this exact spread; places the order",
     )
+    spread.add_argument("--ask", action="store_true", help=ask_help)
 
     documents = commands.add_parser(
         "documents", parents=[as_json],
@@ -813,8 +950,8 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         move = commands.add_parser(
             direction,
-            help=f"preview moving money {sense}, then do it with --confirm",
-            description=f"Moves money {sense}." + two_steps,
+            help=f"move money {sense}; always asks first",
+            description=f"Moves money {sense}." + always_two_steps,
         )
         move.add_argument("amount", type=_positive, metavar="AMOUNT", help="dollars")
         move.add_argument(
@@ -826,7 +963,7 @@ def build_parser() -> argparse.ArgumentParser:
         )
         move.add_argument(
             "--confirm", metavar="CODE",
-            help="the code a preview of this exact transfer printed; makes the transfer",
+            help="the code the first step printed for this exact transfer; makes the transfer",
         )
     cancel_transfer = commands.add_parser(
         "cancel-transfer",
@@ -864,7 +1001,7 @@ def build_parser() -> argparse.ArgumentParser:
     for side in ("buy", "sell"):
         trade = crypto_commands.add_parser(
             side,
-            help=f"preview a crypto {side} order, then place it with --confirm",
+            help=f"{side} a coin; asks first unless confirmation is off",
             description=f"Places an order to {side} a coin." + two_steps,
         )
         trade.add_argument("symbol", metavar="SYMBOL", help="the coin, such as BTC")
@@ -883,8 +1020,9 @@ def build_parser() -> argparse.ArgumentParser:
         )
         trade.add_argument(
             "--confirm", metavar="CODE",
-            help="the code a preview of this exact order printed; places the order",
+            help="the code the first step printed for this exact order; places the order",
         )
+        trade.add_argument("--ask", action="store_true", help=ask_help)
     crypto_cancel = crypto_commands.add_parser(
         "cancel", help="cancel an open crypto order, at once",
     )
@@ -894,11 +1032,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     futures = commands.add_parser(
         "futures",
-        help="futures quotes, contracts, orders, and a preview of an order",
+        help="futures quotes, contracts, orders, and an estimate for an order",
         description=(
             "Futures. Name a product, such as ES for the E-mini S&P 500, and the "
             "nearest contract is used. Or name a contract by product, month and "
-            "year: ESZ26 is ES for December 2026. An order can be previewed with "
+            "year: ESZ26 is ES for December 2026. An order can be estimated with "
             "buy or sell, but not placed."
         ),
     )
@@ -915,9 +1053,9 @@ def build_parser() -> argparse.ArgumentParser:
     for side in ("buy", "sell"):
         futures_order = futures_commands.add_parser(
             side, parents=[as_json],
-            help=f"preview a futures order to {side}: margin, fees and Robinhood's verdict",
+            help=f"estimate a futures order to {side}: margin, fees and Robinhood's verdict",
             description=(
-                f"Previews an order to {side} futures. It shows the margin the order "
+                f"Estimates an order to {side} futures. It shows the margin the order "
                 "ties up, the fees, and whether Robinhood would accept it, all as "
                 "Robinhood reports them. It cannot place the order, and there is no "
                 "--confirm: use the Robinhood app or Robinhood Legend for that."
@@ -1103,7 +1241,8 @@ def main(argv: list[str] | None = None) -> int:
         from pyhood import cli, cli_spreads
 
         return cli.run(
-            cli_spreads.spread, symbol=args.symbol, expires=args.expires, legs=args.legs,
+            cli.place_or_ask, order_command=cli_spreads.spread, ask=args.ask,
+            symbol=args.symbol, expires=args.expires, legs=args.legs,
             contracts=args.contracts, debit=args.debit, credit=args.credit,
             effect=args.effect, time_in_force=args.tif, account=args.account,
             confirm=args.confirm,
@@ -1135,8 +1274,11 @@ def main(argv: list[str] | None = None) -> int:
             )
         if which == "cancel":
             return markets.run_crypto(markets.crypto_cancel, order_id=args.order_id)
+        from pyhood import cli
+
         return markets.run_crypto(
-            markets.crypto_order, side=which, symbol=args.symbol, quantity=args.quantity,
+            cli.place_or_ask, order_command=markets.crypto_order, ask=args.ask,
+            side=which, symbol=args.symbol, quantity=args.quantity,
             limit=args.limit, confirm=args.confirm,
         )
     if args.command == "futures":
@@ -1182,7 +1324,8 @@ def main(argv: list[str] | None = None) -> int:
         from pyhood import cli
 
         return cli.run(
-            cli.option_order, side=args.command.split("-")[0], symbol=args.symbol,
+            cli.place_or_ask, order_command=cli.option_order, ask=args.ask,
+            side=args.command.split("-")[0], symbol=args.symbol,
             expiration=args.expires, strike=args.strike, option_type=args.option_type,
             contracts=args.contracts, limit=args.limit, effect=args.effect,
             time_in_force=args.tif, account=args.account, confirm=args.confirm,
@@ -1200,7 +1343,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "cancel":
             return cli.run(cli.cancel, order_id=args.order_id)
         return cli.run(
-            cli.stock_order, side=args.command, symbol=args.symbol, quantity=args.quantity,
+            cli.place_or_ask, order_command=cli.stock_order, ask=args.ask,
+            side=args.command, symbol=args.symbol, quantity=args.quantity,
             limit=args.limit, stop=args.stop, time_in_force=args.tif,
             extended_hours=args.extended_hours, account=args.account, confirm=args.confirm,
             dollars=args.dollars, trail_percent=args.trail_percent,
@@ -1234,6 +1378,10 @@ def main(argv: list[str] | None = None) -> int:
         return setup_crypto(force=args.force, verify=not args.no_verify)
     if args.target == "login":
         return setup_login()
+    if args.target == "confirmation":
+        return setup_confirmation(args.values)
+    if args.values:
+        parser.error(f"unrecognized arguments: {' '.join(args.values)}")
     return print_status()
 
 

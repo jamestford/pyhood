@@ -3,7 +3,7 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/jamestford/pyhood/main/assets/logo-tight.png" alt="pyhood logo" width="200">
 
-**Let your AI agent work your Robinhood account, with a preview before every order.**
+**Robinhood for AI agents: stocks, options, crypto and futures from the command line.**
 </div>
 
 [![CI](https://github.com/jamestford/pyhood/actions/workflows/ci.yml/badge.svg)](https://github.com/jamestford/pyhood/actions/workflows/ci.yml)
@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/jamestford/pyhood/blob/main/LICENSE)
 [![Security](https://github.com/jamestford/pyhood/actions/workflows/security.yml/badge.svg)](https://github.com/jamestford/pyhood/actions/workflows/security.yml)
 
-pyhood lets an AI agent read your Robinhood account and place orders for you. You ask in plain language. The agent runs pyhood. Before anything is sent to Robinhood, you see exactly what it will be and say yes or no.
+pyhood gives an AI agent your Robinhood account. You ask in plain language, and the agent runs pyhood: it reads your positions and orders, looks up prices, earnings and option chains, and places and cancels orders for stocks, options and crypto.
 
 It works with any agent that can run commands on your computer.
 
@@ -31,13 +31,13 @@ Once it is set up, talk to your agent the way you would to a person:
 | "What's in my Roth IRA?" | It shows that account's positions |
 | "When does Apple report earnings, and what do analysts think?" | It gives the date, the ratings and the price targets |
 | "Show me AAPL calls expiring next month" | It shows the contracts near the stock's price, with bid, ask and delta |
-| "Buy 10 shares of AAPL at $350 or better" | It shows you a preview and waits for your yes |
-| "Buy one of those $350 calls for $2.50" | It shows you a preview and waits for your yes |
-| "Sell my AAPL if it drops to $340" | It previews a stop order and waits for your yes |
-| "Sell my AAPL if it falls 10% from its high" | It previews a trailing stop and waits for your yes |
-| "Put $50 into Apple" | It previews a $50 order and waits for your yes |
-| "Move $500 to my bank" | It previews the withdrawal and waits for your yes |
-| "Buy $50 of bitcoin... how much is that?" then "buy 0.0008 BTC" | It previews the order with Robinhood's fee and waits for your yes |
+| "Buy 10 shares of AAPL at $350 or better" | It places the order, after asking you unless you have turned that off |
+| "Buy one of those $350 calls for $2.50" | It places the option order the same way |
+| "Sell my AAPL if it drops to $340" | It places a stop order |
+| "Sell my AAPL if it falls 10% from its high" | It places a trailing stop |
+| "Put $50 into Apple" | It buys $50 worth |
+| "Move $500 to my bank" | It shows you the withdrawal and waits for your yes, always |
+| "Buy $50 of bitcoin... how much is that?" then "buy 0.0008 BTC" | It works out the amount, then places the order with Robinhood's fee shown |
 | "Cancel that order" | It cancels it and tells you what happened |
 | "Save my latest statement" | It saves the PDF into a folder only you can read |
 
@@ -106,7 +106,7 @@ pyhood is installed at ~/pyhood. Run `~/pyhood/bin/pyhood guide` before using it
 ```text
 You:    buy 1 share of F with a limit price of $5
 
-Agent:  Here is the preview:
+Agent:  Here is the order:
 
           Buy 1 F, limit $5.00, good for day
           Estimated cost:  $5.00
@@ -125,13 +125,45 @@ You:    cancel that order
 Agent:  Cancelled: buy 1 F, limit $5.00.
 ```
 
-The agent did not work that preview out for itself. pyhood produced it, from your live account, and the agent passed it on.
+The agent did not work those figures out for itself. pyhood produced them, from your live account, and the agent passed them on.
 
-## How you stay in control
+If you would rather not be asked, turn confirmation off, and the same request goes straight through:
 
-**Every order and every transfer is previewed first.** When the agent asks pyhood to buy or sell, pyhood sends nothing. It replies with what the order would be, what it would cost, the current price, and anything that looks wrong: a cost above your buying power, a sale of more than you hold, or a price far from the market.
+```text
+You:    buy 1 share of F with a limit price of $5
 
-**An order can only be placed with a code from its preview.** The preview ends with a short code. The order goes through only when the agent repeats the same request with that code. The code belongs to that exact order: change the stock, the amount or the price, and it stops working. So what gets placed is what you were shown.
+Agent:  Placed. Buy 1 F at a $5.00 limit, status: queued. Your limit is 58%
+        below the current price, so it is unlikely to fill.
+```
+
+## You choose how much your agent asks you
+
+**Out of the box, every order asks first.** When the agent asks pyhood to buy or sell, pyhood sends nothing. It replies with what the order would be, what it would cost, the current price, and anything that looks wrong: a cost above your buying power, a sale of more than you hold, or a price far from the market. It ends with a short code, and the order goes through only when the agent repeats the same request with that code. The code belongs to that exact order: change the stock, the amount or the price, and it stops working. So what gets placed is what you were shown.
+
+**You can turn the asking off.** Run this yourself, in your own terminal:
+
+```bash
+pyhood setup confirmation off
+```
+
+From then on your agent places orders as soon as you ask for them, and tells you what it placed.
+
+**A backstop stays in place.** With confirmation off, an order worth more than $5,000 still asks first. Set the amount to whatever suits you:
+
+```bash
+pyhood setup confirmation above 500
+```
+
+This is there for the mistake that matters most: 100 shares where you said 10. It is judged order by order, so it is not a spending limit.
+
+| | Confirmation on | Confirmation off |
+|---|---|---|
+| An order up to your amount | Asks first | Placed at once |
+| An order above your amount | Asks first | Asks first |
+| A deposit or withdrawal | Asks first | Asks first |
+| Cancelling an order | At once | At once |
+
+**Only you can change the setting.** pyhood refuses to turn confirmation off, or to raise the amount, unless a person is at the terminal. Run by an agent, the command changes nothing and tells the agent to ask you. Turning confirmation back on works from anywhere: `pyhood setup confirmation on`.
 
 **Nothing is assumed.** An order needs a price, or an explicit instruction to buy at the market. Options need every term spelled out. Orders last for the day unless you say otherwise.
 
@@ -143,8 +175,10 @@ The agent did not work that preview out for itself. pyhood produced it, from you
 
 These are guardrails against mistakes. They are not a lock.
 
-- **An agent that ignores its instructions can still place an order.** The code makes it produce a preview first. It does not force the agent to show you the preview or to wait for your answer. That part depends on the agent following the instructions pyhood gives it.
-- **Your saved login is a file on your computer.** An agent that can run commands can read it. In testing, a model that had been given no instructions printed that file to look at it.
+- **An agent that ignores its instructions can still place an order.** With confirmation on, the code makes the agent ask pyhood before placing. It does not force the agent to show you the answer or to wait for yours. That part depends on the agent following the instructions pyhood gives it.
+- **With confirmation off, a mistake under your amount goes straight to Robinhood.** A limit order can be cancelled if it has not filled. A market order sent while the market is open cannot be taken back.
+- **The setting is a file on your computer.** pyhood refuses to loosen it for an agent, but an agent that can run commands could edit the file by hand.
+- **Your saved login is a file on your computer too.** An agent that can run commands can read it. In testing, a model that had been given no instructions printed that file to look at it.
 
 So give this only to an agent you would trust with the account, and start with small orders.
 
@@ -158,18 +192,18 @@ So give this only to an agent you would trust with the account, and start with s
 | Dividends, transfer history, statements and tax forms | Yes | Yes |
 | Watchlists | Yes | Yes |
 | Option expirations and contracts | Yes | Yes |
-| Buy and sell stock, including stop orders and trailing stops | Yes, with a preview | Yes |
-| Buy and sell single options | Yes, with a preview | Yes |
+| Buy and sell stock, including stop orders and trailing stops | Yes | Yes |
+| Buy and sell single options | Yes | Yes |
 | Cancel an order | Yes | Yes |
-| Orders by dollar amount, and option spreads | Yes, with a preview | Yes |
-| Crypto prices, holdings, and buying and selling | Yes, with a preview | Yes |
+| Orders by dollar amount, and option spreads | Yes | Yes |
+| Crypto prices, holdings, and buying and selling | Yes | Yes |
 | Futures quotes, contracts, orders and profit and loss | Yes | Yes |
-| Preview a futures order: margin, fees and whether Robinhood would accept it | Yes | Yes |
-| Deposits and withdrawals to a linked bank | Yes, with a preview | Yes |
+| Estimate a futures order: margin, fees and whether Robinhood would accept it | Yes | Yes |
+| Deposits and withdrawals to a linked bank | Yes, always asking first | Yes |
 
 Everything here is a command, so the agent rarely needs to write code. For something no command covers, such as a calculation across several results, it writes a short script, and `pyhood guide python` tells it how.
 
-**Futures can be read and previewed, but not traded.** `pyhood futures buy` and `sell` show the margin an order ties up, its fees, and whether Robinhood would accept it, all as Robinhood reports them. They cannot place the order: pyhood has not seen the request that submits one, and will not guess at it with your money.
+**Futures can be read and estimated, but not traded.** `pyhood futures buy` and `sell` show the margin an order ties up, its fees, and whether Robinhood would accept it, all as Robinhood reports them. They cannot place the order: pyhood has not seen the request that submits one, and will not guess at it with your money.
 
 **What has been run against Robinhood for real.** Tests that pass against made-up responses are not proof, and three of the orders below were refused by Robinhood the first time they were sent, with every test passing. So here is what has actually been placed, by a local model, with a real account:
 
@@ -179,7 +213,7 @@ Everything here is a command, so the agent rarely needs to write code. For somet
 | Buy stock at market, and by dollar amount | A trailing stop that buys |
 | Stop orders, at market and with a limit | Selling crypto, and crypto at market |
 | A trailing stop that sells | A withdrawal, and cancelling a transfer |
-| Buy an option to open | Any futures order: these can only be previewed |
+| Buy an option to open | Any futures order: these can only be estimated |
 | An option spread | |
 | Buy crypto at a limit | |
 | A deposit from a bank | |
@@ -187,7 +221,7 @@ Everything here is a command, so the agent rarely needs to write code. For somet
 
 Every read command has been run for real too, and so has saving a statement. The orders on the right go through the same code as those on the left, but until one has been sent, treat its first use as a test: start small, and far from the market price.
 
-**What it has been tested with:** a local model, Qwen3.6 35B, running in the [Pi](https://github.com/earendil-works/pi) agent. Given the one-line install request above and nothing else, it fetched the instructions and installed pyhood with no errors. Asked to buy, it previewed and waited.
+**What it has been tested with:** a local model, Qwen3.6 35B, running in the [Pi](https://github.com/earendil-works/pi) agent. Given the one-line install request above and nothing else, it fetched the instructions and installed pyhood with no errors. Asked to buy, it showed the order and waited for a yes.
 
 ## Using it without an agent
 
@@ -204,7 +238,7 @@ pyhood buying-power          # cash available to trade with
 pyhood quote AAPL MSFT       # current prices
 pyhood options AAPL          # option expiration dates
 pyhood earnings AAPL         # next earnings date
-pyhood buy AAPL 10 --limit 350    # preview; add the code it prints to place it
+pyhood buy AAPL 10 --limit 350    # asks first; add the code it prints to place it
 pyhood cancel ORDER_ID       # cancel an open order
 ```
 
@@ -246,7 +280,7 @@ Against [robin_stocks](https://github.com/jmfernandes/robin_stocks) and its main
 
 | Capability | pyhood | robin_stocks | robin_stocks_v2 |
 |---|---:|---:|---:|
-| Command line an AI agent can drive, with order previews | Yes | No | No |
+| Command line an AI agent can drive, asking before orders if you want it to | Yes | No | No |
 | Silent session refresh without credentials | Yes | No | No |
 | JSON session storage | Yes | No, uses pickle | Yes |
 | IRA / retirement accounts | Yes | No | No |

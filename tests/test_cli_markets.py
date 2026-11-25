@@ -190,7 +190,7 @@ class TestCryptoOrder:
 
         out = capsys.readouterr().out
         assert client.writes == []
-        assert out.startswith("PREVIEW. Nothing has been sent.")
+        assert out.startswith("NOT PLACED. This order needs your confirmation.")
         assert "Buy 0.001 BTC, limit $50,000.00" in out
         # The fee is part of what it costs, and is shown as such.
         assert "Estimated cost:     $50.57 ($50.00 plus a fee of about $0.57)" in out
@@ -436,6 +436,11 @@ class TestCommandLine:
         monkeypatch.setattr(markets, "run_crypto", lambda fn, **kw: seen.append((fn, kw)) or 0)
 
         assert onboarding.main(argv) == 0
+        if command is markets.crypto_order:
+            # An order goes through the user's confirmation setting on its way.
+            command, kwargs = cli.place_or_ask, {
+                "order_command": markets.crypto_order, "ask": False, **kwargs,
+            }
         assert seen == [(command, kwargs)]
 
     @pytest.mark.parametrize(("argv", "command", "kwargs"), [
@@ -510,7 +515,7 @@ class TestFuturesOrderPreview:
 
         assert client.checked == [("MESZ26", "buy", 1, 5000, None, "gfd")]
         out = capsys.readouterr().out
-        assert out.startswith("PREVIEW ONLY. pyhood cannot place futures orders.")
+        assert out.startswith("ESTIMATE ONLY. pyhood cannot place futures orders.")
         assert "MES: the nearest contract is MESZ26" in out
         assert "Buy 1 MESZ26 contract, limit 5,000, good for day" in out
         assert "Position size:        $25,000.00 (1 x $5.00 a point x 5,000)" in out
