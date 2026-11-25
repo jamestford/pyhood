@@ -1,6 +1,7 @@
 """Tests for PyhoodClient — quotes, options, positions, earnings."""
 
 import json
+import urllib.parse
 from datetime import datetime, timezone
 
 import pytest
@@ -3041,6 +3042,9 @@ class TestTrailingStopOrders:
         assert body["trigger"] == "stop"
         assert body["type"] == "market"
         assert body["stop_price"] == "95.0"  # 100 - 5 for a sell
+        # Robinhood: "Stop market sell order requested, but price provided."
+        assert "price" not in body
+        assert "ask_price" not in body
 
     @responses.activate
     def test_trail_percent_builds_percentage_peg(self, client):
@@ -3051,6 +3055,7 @@ class TestTrailingStopOrders:
         body = json.loads(responses.calls[-1].request.body)
         assert body["trailing_peg"] == {"type": "percentage", "percentage": "10.0"}
         assert body["stop_price"] == "90.0"  # 100 - 10%
+        assert "price" not in body
 
     @responses.activate
     def test_buy_trail_sets_limit_above_stop(self, client):
@@ -3061,6 +3066,31 @@ class TestTrailingStopOrders:
         body = json.loads(responses.calls[-1].request.body)
         assert body["stop_price"] == "105.0"  # 100 + 5 for a buy
         assert float(body["price"]) > float(body["stop_price"])
+
+    @responses.activate
+    def test_stop_market_sell_sends_no_price(self, client):
+        """Robinhood: 'Stop market sell order requested, but price provided.'"""
+        self._mock_order_prereqs("100.00")
+
+        client.sell_stock("AAPL", 1, stop_price=90.0)
+
+        body = dict(urllib.parse.parse_qsl(responses.calls[-1].request.body))
+        assert body["type"] == "market"
+        assert body["trigger"] == "stop"
+        assert body["stop_price"] == "90.0"
+        assert "price" not in body
+        assert "ask_price" not in body
+
+    @responses.activate
+    def test_stop_market_buy_sends_the_stop_as_its_price(self, client):
+        self._mock_order_prereqs("100.00")
+
+        client.buy_stock("AAPL", 1, stop_price=110.0)
+
+        body = dict(urllib.parse.parse_qsl(responses.calls[-1].request.body))
+        assert body["trigger"] == "stop"
+        assert body["price"] == "110.0"
+        assert body["stop_price"] == "110.0"
 
     def test_both_trail_args_rejected(self, client):
         with pytest.raises(OrderError, match="not both"):

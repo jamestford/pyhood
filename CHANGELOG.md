@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `download_document(document_id, directory)` is the library method behind it. It refuses to save anything that is not a PDF, so an error page cannot be left on disk looking like a statement.
 - **Trailing stops.** `--trail-percent` and `--trail-amount` on `pyhood buy` and `pyhood sell` place a stop that follows the price. The preview shows where the stop starts, and says that Robinhood may refuse the order: it has rejected trailing stops from apps other than its own, and pyhood has not been able to place one.
 
+### Fixed
+- **Stop market sells were refused.** `pyhood sell SYMBOL N --stop PRICE --market`, `sell_stock(stop_price=...)` with no limit, and every trailing stop sell sent a price with the order, and Robinhood rejects a stop market sell that carries one: "Stop market sell order requested, but price provided." No price is sent now. Stop market buys, which must carry one, are unchanged.
+
 ## [0.20.0] - 2026-11-24
 
 ### Added

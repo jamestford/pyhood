@@ -1698,18 +1698,23 @@ class PyhoodClient:
         elif price is None and stop_price is not None:
             order_type = "market"
             trigger = "stop"
-            price = stop_price  # For stop market orders, price = stop_price
+            # A stop market buy carries its stop as the price. A stop market
+            # sell carries none: Robinhood rejects it with "Stop market sell
+            # order requested, but price provided."
+            price = stop_price if side == "buy" else None
         else:  # both price and stop_price
             order_type = "limit"
             trigger = "stop"
 
-        # Robinhood requires a collar price on market orders: submitting one
-        # without it is rejected with "Market buy order requested, but no price
-        # provided." The collar is the current ask for a buy, bid for a sell.
+        # Robinhood requires a collar price on a market order sent at once:
+        # without it the order is rejected with "Market buy order requested,
+        # but no price provided." The collar is the current ask for a buy, bid
+        # for a sell. A stop market order is not collared: a sell must carry no
+        # price at all, and a buy already carries one.
         ask_price = None
         bid_price = None
         collar_price = None
-        if order_type == "market" and price is None:
+        if order_type == "market" and trigger == "immediate" and price is None:
             quote = self.get_quote(symbol)
             ask_price = quote.ask or quote.price
             bid_price = quote.bid or quote.price
