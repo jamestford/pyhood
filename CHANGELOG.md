@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`pyhood positions` and `pyhood buying-power` left out an IRA.** Each showed the first account and nothing else, so an agent asked "how much cash do I have for trading" or "what do I hold" answered with the individual account alone. With more than one account, `buying-power` now shows a row for each and `positions` lists each under its own heading. Buying power is not added up, because an account spends only its own cash. `--account` still shows one, and with one account the output is unchanged.
+- With `--json` and several accounts, `buying_power`, `stocks` and `options` are still the first account's, and a new `accounts` list holds them all.
+
 ## [0.23.0] - 2026-11-24
 
 ### Added
