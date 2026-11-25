@@ -46,3 +46,15 @@ ruff check .
 - **The README is also the PyPI page**, so every link in it must be absolute.
 - **`pyhood guide` is generated from the code.** When you add a method an agent should know about, add its name to `pyhood/guide.py`.
 - Add an entry to `CHANGELOG.md` under `[Unreleased]`.
+
+### When the change is done
+
+`main` is protected, so every change lands through a pull request. Once `pytest` and `ruff check .` pass, do these steps without asking first:
+
+1. **Branch.** `fix/short-name` for a fix, `feat/short-name` for a feature.
+2. **Commit.** Use a conventional subject, such as `fix: show orders in every account`, and a short body that says what was wrong and what changes. Add no `Co-Authored-By` line.
+3. **Push and open the pull request.** Give it the same title as the commit. In the body, say what was wrong, what changes, and how it was checked. If it was not checked against a real account, say so.
+
+Stop there. Do not merge the pull request, and do not release, unless the user asks.
+
+A release is its own pull request, from a `release/X.Y.Z` branch, titled `chore: release X.Y.Z`. It sets the version in `pyhood/__init__.py` and `pyproject.toml` and dates the `[Unreleased]` section of the changelog.
