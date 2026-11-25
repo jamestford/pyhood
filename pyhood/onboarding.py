@@ -14,6 +14,7 @@ Run interactively, either as the ``pyhood`` console script or as a module
     pyhood version         # the installed version
     pyhood setup           # what is configured, and what is not
     pyhood setup login     # obtain session tokens
+    pyhood setup login --window   # open a window for the user to do that in
     pyhood setup crypto    # generate and register a key pair
 
 Handling of secrets, which the rest of this module is built around:
@@ -435,6 +436,14 @@ def setup_crypto(
 # ── Login setup ──────────────────────────────────────────────────────
 
 
+def _has_terminal() -> bool:
+    """True when a person can type an answer."""
+    try:
+        return sys.stdin.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
 def setup_login(
     prompt: Prompt = input,
     secret_prompt: Prompt = getpass.getpass,
@@ -468,6 +477,14 @@ def setup_login(
             out("    OK — the stored session works. Nothing else to do.")
             return 0
         out("")
+
+    if prompt is input and not _has_terminal():
+        # Run by an AI agent, or from a script: nobody can type here.
+        out("There is no terminal here to type a password into.")
+        out("An AI agent can open a login window on the user's screen with:")
+        out(f"    {invocation()} setup login --window")
+        out("Otherwise, run this in a terminal of your own.")
+        return 1
 
     out("Robinhood needs your username and password for a fresh login.")
     out("The password is read without echoing, is not stored, and is not")
@@ -581,6 +598,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-verify",
         action="store_true",
         help="skip the signed read-only call that confirms new crypto keys work",
+    )
+    setup.add_argument(
+        "--window",
+        action="store_true",
+        help=(
+            "for login: open a terminal window on the user's screen for them to "
+            "log in, and wait. For an AI agent, which has no terminal to type in"
+        ),
+    )
+    setup.add_argument(
+        "--wait", type=float, default=None, metavar="SECONDS",
+        help=(
+            "with --window: how long to wait for the user before handing back "
+            "(default 90). Run the command again to keep waiting"
+        ),
     )
     verify = commands.add_parser(
         "verify",
@@ -1392,9 +1424,20 @@ def main(argv: list[str] | None = None) -> int:
     if args.command != "setup":
         parser.print_help()
         return 0
+    if (args.window or args.wait is not None) and args.target != "login":
+        parser.error("--window and --wait go with: setup login")
     if args.target == "crypto":
         return setup_crypto(force=args.force, verify=not args.no_verify)
     if args.target == "login":
+        if args.window:
+            from pyhood import login_window
+
+            return login_window.login_in_window(
+                wait=login_window.DEFAULT_WAIT if args.wait is None else args.wait,
+                program=invocation(),
+            )
+        if args.wait is not None:
+            parser.error("--wait goes with --window")
         return setup_login()
     if args.target == "confirmation":
         return setup_confirmation(args.values)

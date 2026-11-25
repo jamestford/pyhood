@@ -256,9 +256,15 @@ class TestWithoutATerminal:
         result = machine.run()
 
         assert "It is not logged in yet." in result.stdout
-        assert "Log in yourself, in your own terminal." in result.stdout
-        assert "    pyhood setup login" in result.stdout
+        assert "If you are a person, log in yourself, in your own terminal." in result.stdout
+        assert "    pyhood setup login\n" in result.stdout
         assert "    pyhood verify" in result.stdout
+
+    def test_tells_an_agent_to_open_the_login_window(self, machine):
+        result = machine.run()
+
+        assert "If you are an AI agent, open a login window on the user's screen:" in result.stdout
+        assert "    pyhood setup login --window" in result.stdout
 
     def test_does_not_claim_the_login_works(self, machine):
         result = machine.run()

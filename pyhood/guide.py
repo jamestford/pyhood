@@ -220,8 +220,10 @@ EVERY SCRIPT STARTS WITH
       client = PyhoodClient(pyhood.login())
 
   pyhood.login() takes no arguments here: it loads the saved login and
-  renews it if needed. If it raises AuthError, stop and tell the user to
-  run `pyhood setup login` themselves.
+  renews it if needed. If it raises AuthError, the user has to log in
+  again. Run `pyhood setup login --window`: it opens a terminal window on
+  the user's screen for them to log in, and waits. Never ask for, read or
+  type their password.
 
 EXAMPLE: what do I own, and what did I buy this month?
 

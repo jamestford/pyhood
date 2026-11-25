@@ -348,24 +348,52 @@ class TestInstallByAgent:
             text = (ROOT / path).read_text(encoding="utf-8")
             assert f"Follow the install steps in {self.URL}" in text, path
 
-    def test_the_file_has_the_install_steps(self):
+    def steps(self):
         text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        steps = text[text.index("## If you were asked to install pyhood"):
-                     text.index("## If you want to use pyhood")]
+        return text[text.index("## If you were asked to install pyhood"):
+                    text.index("## If you want to use pyhood")]
+
+    def test_the_file_has_the_install_steps(self):
+        steps = self.steps()
+        assert (
+            "curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh | sh"
+            in steps
+        )
         assert "uv venv --managed-python --python 3.14 ~/pyhood" in steps
         assert "uv pip install --python ~/pyhood/bin/python pyhood" in steps
         assert "~/pyhood/bin/pyhood verify" in steps
         assert "Read `~/pyhood/AGENTS.md`" in steps
 
+    def test_the_agent_opens_the_login_window(self):
+        steps = self.steps()
+        assert "~/pyhood/bin/pyhood setup login --window" in steps
+        assert "allow it two minutes" in steps
+        assert "run it again. It does not open a second window" in steps
+        assert "ask the user what happened before running it again" in steps
+
+    def test_the_agent_has_a_way_on_when_no_window_opens(self):
+        steps = self.steps()
+        assert "could not open a window" in steps
+        assert "run `~/pyhood/bin/pyhood setup login` themselves" in steps
+
     def test_the_agent_is_told_what_not_to_do(self):
-        text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        steps = text[text.index("## If you were asked to install pyhood"):
-                     text.index("## If you want to use pyhood")]
+        steps = self.steps()
         assert "If one fails, stop" in steps
         assert "already installed" in steps
         assert "Never ask for, read or type their password" in steps
-        assert "Do not run it for them" in steps
+        assert "Do not run `setup login` without `--window`" in steps
+        assert "Do not install it yourself without asking" in steps
         assert "Do not use `pip`, `sudo` or `--break-system-packages`" in steps
+
+    def test_the_readme_says_what_the_agent_is_told(self):
+        """The folded-away list is a promise about what the file says."""
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for promise in (
+            "`pyhood setup login --window`",
+            "`pyhood verify`",
+            "never to ask for, read or type your password",
+        ):
+            assert promise in readme, promise
 
     def test_the_agent_steps_and_the_readme_name_the_same_commands(self):
         """Both ways in build the same install."""

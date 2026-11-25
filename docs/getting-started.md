@@ -2,9 +2,23 @@
 
 ## Installation
 
+### Have your AI agent do it
+
+pyhood is built to be driven by an AI agent, so the quickest install is to hand it the job. Paste this into your agent:
+
+```text
+Install pyhood for me. Follow the install steps in https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md
+```
+
+[That file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) is written for AI agents. It tells yours to run the install script described under [One command](#one-command), and gives it rules that keep it from improvising: stop if a step fails, do not use `pip` or `sudo`, and do not install anything else.
+
+An agent cannot log in for you. The login needs your password, which the agent must never see, and an approval on your phone. So the agent runs `pyhood setup login --window`, which opens a terminal window on your screen with the login in it, and waits for you. You type in that window, and nothing you type passes through the agent. See [First Login](#first-login).
+
+It needs [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS). If uv is missing, the agent stops and asks you.
+
 ### One command
 
-Run this in your own terminal, on macOS or Linux:
+To do it yourself, run this in your own terminal, on macOS or Linux:
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh | sh
@@ -29,23 +43,9 @@ Then open your AI agent in `~/pyhood` and ask it something.
 | `~/.local/bin/pyhood` is already something else | It is left alone, and the script tells you to use `~/pyhood/bin/pyhood` |
 | `~/.local/bin` is not on your PATH | The script says so. Add it to your PATH to type just `pyhood` |
 | The login does not finish | pyhood stays installed. Log in later with `pyhood setup login` |
-| No terminal is attached, as when an agent runs it | It installs pyhood and tells you to log in yourself |
+| No terminal is attached, as when an agent runs it | It installs pyhood and leaves the login alone. The agent then opens a login window with `pyhood setup login --window` |
 
 A download that is cut off partway runs nothing: the script does its work only on its last line.
-
-### Have your AI agent do it
-
-pyhood is built to be driven by an AI agent, so you can also hand it the job. Paste this into your agent:
-
-```text
-Install pyhood for me. Follow the install steps in https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md
-```
-
-[That file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) is written for AI agents. It has the same steps as [By hand](#by-hand) below, plus the rules that keep an agent from improvising: stop if a step fails, do not use `pip` or `sudo`, and do not install anything else.
-
-The agent stops when it reaches the login. That needs your password and an approval on your phone, so that part is yours. See [First Login](#first-login).
-
-It needs [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS).
 
 ### By hand
 
@@ -150,6 +150,8 @@ pyhood setup login
 ```
 
 It prompts for your username and password — the password is read without echoing and is never stored — then Robinhood sends a device approval push notification to your phone. Tap **"Yes, it's me"** to approve. The session is saved to `~/.pyhood/session.json`, readable only by you.
+
+An AI agent runs `pyhood setup login --window` instead, which opens a terminal window on your screen with the same login in it. See [Setup](setup.md#logging-in-from-an-ai-agent).
 
 To log in from code instead:
 

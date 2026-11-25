@@ -43,15 +43,15 @@ Once it is set up, talk to your agent the way you would to a person:
 
 ## Get started
 
-Run this in your own terminal:
+Paste this into your agent:
 
-```bash
-curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh | sh
+```text
+Install pyhood for me. Follow the install steps in https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md
 ```
 
-It installs pyhood into a folder of its own, `~/pyhood`, asks you to log in to Robinhood, and reads live prices to check the login works.
+Your agent installs pyhood into a folder of its own, `~/pyhood`. Then a terminal window opens on your screen. Type your Robinhood username and password there, and approve the login in the Robinhood app on your phone. Your agent sees none of it. When you are done, it reads live prices to check the login, and tells you it is ready.
 
-Then open your agent in that folder and ask it something:
+From then on, open your agent in that folder and ask it something:
 
 ```bash
 cd ~/pyhood
@@ -64,41 +64,49 @@ What is Tesla trading at?
 That is the whole setup. The install put a file called `AGENTS.md` in the folder. Many agents read a file of that name when they start, and this one tells them how to use pyhood.
 
 <details>
-<summary><strong>What the script does</strong></summary>
+<summary><strong>What your agent is told to do</strong></summary>
 
-1. Looks for [uv](https://docs.astral.sh/uv/), a free tool for installing Python programs. If uv is missing, it asks before installing it.
-2. Runs `uv venv --managed-python --python 3.14 ~/pyhood`, then `uv pip install --python ~/pyhood/bin/python pyhood`. If pyhood is already there, it upgrades it.
-3. Links the command into `~/.local/bin`, so that `pyhood` works from any folder.
-4. Runs `pyhood setup login`, which asks for your username and password.
-5. Runs `pyhood verify`, which reads live prices and changes nothing.
+[The file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) in that request is written for AI agents. It tells yours to:
 
-It never uses `sudo`, and it installs nothing but pyhood, and uv if you say yes. Nothing is installed system-wide, and your other Python setups are not touched. uv downloads a copy of Python for pyhood to run on, which it keeps in its own folder.
+1. Run the [install script](https://github.com/jamestford/pyhood/blob/main/install.sh), which runs `uv venv --managed-python --python 3.14 ~/pyhood`, then `uv pip install --python ~/pyhood/bin/python pyhood`. If [uv](https://docs.astral.sh/uv/) is missing, it stops and asks you.
+2. Run `pyhood setup login --window`, which opens the login window and waits for you. If no window can be opened, it asks you to run `pyhood setup login` yourself.
+3. Run `pyhood verify`, which reads live prices and changes nothing.
+4. Read the instructions that came with the install.
 
-The script is short: [read it](https://github.com/jamestford/pyhood/blob/main/install.sh) before you run it, or follow the same steps [by hand](https://jamestford.github.io/pyhood/getting-started/). It is for macOS and Linux. On Windows, use one of the other two ways.
+It is also told to stop if a step fails, not to use `pip` or `sudo`, to install nothing but pyhood, and never to ask for, read or type your password.
+
+Nothing is installed system-wide, and your other Python setups are not touched. uv is a free tool for installing Python programs (`brew install uv` on macOS). It downloads a copy of Python for pyhood to run on, which it keeps in its own folder.
 
 </details>
 
 ### The login
 
-The script asks for your Robinhood username and password, then waits for you to approve the login in the Robinhood app on your phone. Your password is not stored and your agent never sees it. What is saved is a session, in `~/.pyhood/session.json`, readable only by you. pyhood renews that session on its own, so you should rarely need to log in again.
+The window asks for your Robinhood username and password, then waits for you to approve the login in the Robinhood app on your phone. Your password goes to Robinhood and is not stored. It never passes through your agent, or through the chat. What is saved is a session, in `~/.pyhood/session.json`, readable only by you. pyhood renews that session on its own, so you should rarely need to log in again.
 
-### Or have your agent install it
+The window opens on macOS, and on Linux with a desktop. Where it cannot open, such as on Windows or over SSH, your agent asks you to run `pyhood setup login` in a terminal of your own.
 
-Paste this into your agent:
+### Or install it yourself
 
-```text
-Install pyhood for me. Follow the install steps in https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md
-```
-
-[That file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) is written for AI agents. It has the same steps as the script, with rules that keep an agent from improvising: stop if a step fails, do not use `pip` or `sudo`, install nothing else, and never ask for your password. It needs uv installed first.
-
-The agent stops at the login and asks you to run this yourself, in your own terminal:
+Run this in your own terminal, on macOS or Linux:
 
 ```bash
-~/pyhood/bin/pyhood setup login
+curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh | sh
 ```
 
-Then tell your agent you are logged in.
+It does the same install, asks for your login in that terminal, and reads live prices to check it.
+
+<details>
+<summary><strong>What the script does</strong></summary>
+
+1. Looks for uv. If uv is missing, it asks before installing it.
+2. Creates `~/pyhood` and installs pyhood into it, with the two commands above. If pyhood is already there, it upgrades it.
+3. Links the command into `~/.local/bin`, so that `pyhood` works from any folder.
+4. Runs `pyhood setup login`, which asks for your username and password.
+5. Runs `pyhood verify`.
+
+It never uses `sudo`, and it installs nothing but pyhood, and uv if you say yes. The script is short: [read it](https://github.com/jamestford/pyhood/blob/main/install.sh) before you run it, or follow the same steps [by hand](https://jamestford.github.io/pyhood/getting-started/).
+
+</details>
 
 ### If your agent reads a different file
 

@@ -58,6 +58,41 @@ Robinhood then sends a device approval prompt to your phone. Tap **"Yes, it's me
 
 Only the resulting tokens are written to disk. The password is not stored anywhere.
 
+### Logging in from an AI agent
+
+An agent cannot log in. The login needs your password, which the agent must never see, and an approval on your phone. An agent's commands also run without a terminal, so there is nowhere to type.
+
+```bash
+pyhood setup login --window
+```
+
+Run by the agent, this opens a terminal window on your screen with the login above running in it, and waits. You type in that window. Nothing you type passes through the agent, or through the chat.
+
+```text
+A terminal window has opened on the user's screen for them to log in.
+Tell the user: type your Robinhood username and password in that window,
+then approve the login in the Robinhood app on your phone.
+Never ask for, read or type their password.
+Waiting up to 90 seconds for them to finish.
+Logged in.
+Check it with: pyhood verify
+```
+
+Agents stop a command that runs too long, so the wait is short and the command can be run again. `--wait SECONDS` changes how long it waits.
+
+| What happens | What the command does | Exit code |
+|---|---|---|
+| A login is already saved and works | Opens no window and says so | 0 |
+| You log in | Says so | 0 |
+| The login fails, or you close the window | Says the login did not finish | 1 |
+| No window can be opened | Prints `pyhood setup login` for you to run yourself | 2 |
+| You have not finished when the wait ends | Tells the agent to run it again | 3 |
+
+- **Run again, it does not open a second window.** It goes back to waiting on the one that is open. A window nobody finished is taken to be gone after 15 minutes.
+- **A window you closed does not come back by itself.** The next run reports that the login did not finish. Only the run after that opens a new one.
+- **The window opens on macOS, and on Linux with a desktop.** On Windows, over SSH, or with no screen, the command prints the login command for you to run.
+- **Run without a terminal, plain `pyhood setup login` says so** and points at `--window`.
+
 ## Setting up crypto keys
 
 ```bash
