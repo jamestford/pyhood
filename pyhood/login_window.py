@@ -1,10 +1,10 @@
-"""Open a terminal window for the user to log in, and wait for them.
+"""Open a terminal window for the user to authorize pyhood, and wait for them.
 
 An AI agent cannot log in. The login needs a password, which the agent must
 never see, and an approval on the user's phone. An agent's commands also run
 without a terminal, so there is nowhere for anyone to type.
 
-``pyhood setup login --window`` closes that gap. It opens a terminal window
+``pyhood authorize --window`` closes that gap. It opens a terminal window
 on the user's own screen with the ordinary login running in it, and waits.
 The user types in that window. Nothing they type passes through this
 process, or through the agent that started it.
@@ -24,6 +24,8 @@ import sys
 import time
 from collections.abc import Callable
 from pathlib import Path
+
+from pyhood.onboarding import IN_WINDOW_VARIABLE, TITLE
 
 DEFAULT_WAIT = 90
 """Seconds to wait before handing back to the agent. Under two minutes,
@@ -56,8 +58,8 @@ def _login_command() -> list[str]:
     """The login, run with the Python this pyhood is installed in."""
     beside = Path(sys.executable).parent / "pyhood"
     if beside.is_file():
-        return [str(beside), "setup", "login"]
-    return [sys.executable, "-m", "pyhood", "setup", "login"]
+        return [str(beside), "authorize"]
+    return [sys.executable, "-m", "pyhood", "authorize"]
 
 
 def script_text(status: Path) -> str:
@@ -68,23 +70,19 @@ def script_text(status: Path) -> str:
     """
     command = " ".join(shlex.quote(part) for part in _login_command())
     return f"""#!/bin/sh
-# Written by `pyhood setup login --window`. Safe to delete.
+# Written by `pyhood authorize --window`. Safe to delete.
 status={shlex.quote(str(status))}
 # Save the login where the command that opened this window will look.
 HOME={shlex.quote(str(Path.home()))}
 export HOME
+# Tells the login it is in this window, so its text says what to do with it.
+{IN_WINDOW_VARIABLE}=1
+export {IN_WINDOW_VARIABLE}
 trap 'echo 130 > "$status"; exit 130' HUP INT TERM
-printf '\\033]0;pyhood: log in to Robinhood\\007'
+printf '\\033]0;{TITLE}\\007'
 clear
 {command}
-code=$?
-echo "$code" > "$status"
-echo
-if [ "$code" -eq 0 ]; then
-    echo "Done. You can close this window and go back to your agent."
-else
-    echo "The login did not finish. Close this window, then ask your agent to try again."
-fi
+echo "$?" > "$status"
 """
 
 
@@ -203,14 +201,14 @@ def login_in_window(
     """
     from pyhood.secure_files import OWNER_ONLY_DIR, ensure_private_dir
 
-    again = f"{program} setup login --window"
+    again = f"{program} authorize --window"
 
     folder = state_dir()
     script, status = folder / "login.command", folder / "status"
 
     if saved_login_works():
         _clear(folder)  # what an earlier run left, if the user finished after it
-        out("Logged in: the saved login works.")
+        out("pyhood is already authorized. No window was needed.")
         out(f"Check it with: {program} verify")
         return LOGGED_IN
 
@@ -219,7 +217,8 @@ def login_in_window(
         # so a login that failed is not answered with a window popping up.
         pass
     elif _window_is_open(script, now()):
-        out("The login window is already open on the user's screen. Not opening another.")
+        out(f'The "{TITLE}" window is already open on the user\'s screen.')
+        out("Not opening another.")
         out(f"Waiting up to {wait:g} seconds for them to finish.")
     else:
         ensure_private_dir(folder)
@@ -231,12 +230,12 @@ def login_in_window(
             out("Could not open a terminal window here.")
             out("Ask the user to run this themselves, in their own terminal, and to")
             out("tell you when they have:")
-            out(f"    {program} setup login")
+            out(f"    {program} authorize")
             out("Never ask for, read or type their password.")
             return NO_WINDOW
-        out("A terminal window has opened on the user's screen for them to log in.")
+        out(f'A terminal window titled "{TITLE}" has opened on the user\'s screen.')
         out("Tell the user: type your Robinhood username and password in that window,")
-        out("then approve the login in the Robinhood app on your phone.")
+        out("then approve the request in the Robinhood app on your phone.")
         out("Never ask for, read or type their password.")
         out(f"Waiting up to {wait:g} seconds for them to finish.")
 
@@ -246,17 +245,17 @@ def login_in_window(
         if code is not None:
             _clear(folder)
             if code == 0:
-                out("Logged in.")
+                out("Authorized.")
                 out(f"Check it with: {program} verify")
                 return LOGGED_IN
-            out("The login in the window did not finish. Ask the user what happened.")
+            out("The authorization in the window did not finish. Ask the user what happened.")
             out(f"To open the window again: {again}")
             return NOT_FINISHED
         if clock() >= deadline:
             break
         sleep(0.5)
 
-    out("The user has not finished logging in yet. Run this again to keep waiting.")
+    out("The user has not finished yet. Run this again to keep waiting.")
     out("It will not open a second window:")
     out(f"    {again}")
     return STILL_WAITING

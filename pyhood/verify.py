@@ -21,8 +21,9 @@ def verify_stocks() -> int:
     try:
         session = pyhood.login()
     except AuthError as e:
-        print(f"Not authenticated: {e}")
-        print("Run: pyhood setup login")
+        print(f"pyhood is not authorized: {e}")
+        print("Run: pyhood authorize")
+        print("An AI agent has no terminal to type in, so it runs: pyhood authorize --window")
         return 1
 
     client = PyhoodClient(session)

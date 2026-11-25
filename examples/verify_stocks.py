@@ -13,7 +13,7 @@ working.
 
 Set up a session first with:
 
-    pyhood setup login
+    pyhood authorize
 """
 
 import sys

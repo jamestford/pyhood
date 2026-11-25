@@ -16,7 +16,7 @@ Run them from the repository root — the tapes write to `assets/` relative to t
 | Tape | Output | Needs |
 |---|---|---|
 | `install.tape` | `assets/install.gif` | Nothing. Builds a fresh environment in `/tmp` and installs from PyPI. |
-| `setup-stocks.tape` | `assets/setup-stocks.gif` | A stored session (`pyhood setup login`) for the verification half. |
+| `setup-stocks.tape` | `assets/setup-stocks.gif` | A stored session (`pyhood authorize`) for the verification half. |
 | `setup-crypto.tape` | `assets/setup-crypto.gif` | Registered crypto credentials (`pyhood setup crypto`) for the verification half. |
 
 ## What is real, and what is not

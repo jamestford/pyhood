@@ -144,7 +144,7 @@ class TestPrintStatus:
         out = Recorder()
 
         assert onboarding.print_status(out=out) == 1
-        assert "python -m pyhood setup login" in out.text
+        assert "python -m pyhood authorize" in out.text
         assert "python -m pyhood setup crypto" in out.text
 
     def test_configured_reports_success(self, crypto_env, session_file):
@@ -311,7 +311,7 @@ class TestSetupLogin:
         code = onboarding.setup_login(prompt=fail, secret_prompt=fail, out=out)
 
         assert code == 0
-        assert "Nothing else to do" in out.text
+        assert "pyhood is already authorized. There is nothing to do." in out.text
 
     def test_falls_back_to_a_full_login(self, session_file, monkeypatch):
         session_file.write_text(json.dumps({"refresh_token": "r", "saved_at": time.time()}))
@@ -361,7 +361,7 @@ class TestSetupLogin:
         monkeypatch.setattr("pyhood.login", fake_login)
 
         code = onboarding.setup_login(
-            prompt=lambda p: "123456" if "MFA" in p else "me@example.com",
+            prompt=lambda p: "123456" if "sent you a code" in p else "me@example.com",
             secret_prompt=lambda _: "hunter2",
             out=Recorder(),
         )
@@ -385,7 +385,151 @@ class TestSetupLogin:
         )
 
         assert code == 1
-        assert "FAILED" in out.text
+        assert "Robinhood did not accept the login." in out.text
+        assert "    bad credentials" in out.text
+        assert "Nothing was saved. Run this again to retry." in out.text
+        assert "FAILED" not in out.text and "AuthError" not in out.text
+
+    def test_says_why_and_what_happens_to_the_password(self, session_file, monkeypatch):
+        monkeypatch.setattr("pyhood.login", lambda *a, **k: object())
+        out = Recorder()
+
+        onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=out,
+        )
+
+        assert out.lines[0] == "pyhood Authorization"
+        assert "authorize the connection between pyhood" in out.text
+        assert "pyhood sends your password to Robinhood and does not save" in out.text
+        assert "Do not share your password with your agent or anyone else." in out.text
+
+    def test_says_how_to_remove_the_authorization(self, session_file, monkeypatch):
+        monkeypatch.setattr("pyhood.login", lambda *a, **k: object())
+        out = Recorder()
+
+        onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=out,
+        )
+
+        assert "Account > Menu > Security and privacy > Devices" in out.text
+
+    def test_asks_in_plain_words(self, session_file, monkeypatch):
+        monkeypatch.setattr("pyhood.login", lambda *a, **k: object())
+        asked = []
+
+        onboarding.setup_login(
+            prompt=lambda q: asked.append(q) or "me@example.com",
+            secret_prompt=lambda q: asked.append(q) or "x",
+            out=Recorder(),
+        )
+
+        assert asked == [
+            "Robinhood email or username: ",
+            "Password (nothing shows as you type): ",
+        ]
+
+    def test_says_when_to_pick_up_the_phone(self, session_file, monkeypatch):
+        said = []
+
+        def fake_login(*a, **k):
+            said.append("LOGIN")
+            return object()
+
+        monkeypatch.setattr("pyhood.login", fake_login)
+
+        onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=said.append,
+        )
+
+        phone = said.index('Now open the Robinhood app on your phone and tap "Yes, it\'s me".')
+        assert said[phone + 1] == "Waiting for you..."
+        assert phone < said.index("LOGIN") < said.index("Authorized.")
+
+    def test_no_jargon(self, session_file, monkeypatch):
+        monkeypatch.setattr("pyhood.login", lambda *a, **k: object())
+        out = Recorder()
+
+        onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=out,
+        )
+
+        for word in ("token", "echo", "session", "fresh login", "—"):
+            assert word not in out.text, word
+
+    @pytest.mark.parametrize("error", ["LoginTimeoutError", "DeviceApprovalRequiredError"])
+    def test_no_approval_in_time_is_said_plainly(self, session_file, monkeypatch, error):
+        from pyhood import exceptions
+
+        def fake_login(*a, **k):
+            raise getattr(exceptions, error)("timed out")
+
+        monkeypatch.setattr("pyhood.login", fake_login)
+        out = Recorder()
+
+        code = onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=out,
+        )
+
+        assert code == 1
+        assert "Robinhood did not get an approval from your phone in time." in out.text
+        assert "Nothing was saved. Run this again to retry." in out.text
+        assert error not in out.text
+
+    def test_a_saved_authorization_that_stopped_working_is_explained(
+        self, session_file, monkeypatch,
+    ):
+        session_file.write_text(json.dumps({"refresh_token": "r", "saved_at": time.time()}))
+
+        def fake_login(username=None, password=None, **kwargs):
+            if username is None:
+                raise RuntimeError("expired")
+            return object()
+
+        monkeypatch.setattr("pyhood.login", fake_login)
+        out = Recorder()
+
+        code = onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=out,
+        )
+
+        assert code == 0
+        assert "The saved authorization no longer works" in out.text
+
+    def test_in_the_window_it_says_what_to_do_with_the_window(self, session_file, monkeypatch):
+        monkeypatch.setenv(onboarding.IN_WINDOW_VARIABLE, "1")
+        monkeypatch.setattr("pyhood.login", lambda *a, **k: object())
+        out = Recorder()
+
+        onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=out,
+        )
+
+        assert out.lines[-1] == "Authorized. You can close this window."
+
+    def test_outside_the_window_it_does_not_mention_one(self, session_file, monkeypatch):
+        monkeypatch.delenv(onboarding.IN_WINDOW_VARIABLE, raising=False)
+        monkeypatch.setattr("pyhood.login", lambda *a, **k: object())
+        out = Recorder()
+
+        onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=out,
+        )
+
+        assert out.lines[-1] == "Authorized."
+        assert "window" not in out.text
+
+    def test_a_failure_in_the_window_says_to_close_it(self, session_file, monkeypatch):
+        monkeypatch.setenv(onboarding.IN_WINDOW_VARIABLE, "1")
+        out = Recorder()
+
+        code = onboarding.setup_login(
+            prompt=lambda _: "", secret_prompt=lambda _: "x", out=out,
+        )
+
+        assert code == 1
+        assert out.lines[-1] == (
+            "Nothing was entered, so nothing was sent. Close this window and try again."
+        )
 
     def test_empty_username_attempts_nothing(self, session_file, monkeypatch):
         def fail(*a, **k):
@@ -428,6 +572,14 @@ class TestCommandLine:
         monkeypatch.setattr(onboarding, "setup_login", lambda: 0)
 
         assert onboarding.main(["setup", "login"]) == 0
+
+    def test_authorize_is_the_same_command(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(onboarding, "setup_login", lambda: calls.append("x") or 0)
+
+        assert onboarding.main(["authorize"]) == 0
+        assert onboarding.main(["setup", "login"]) == 0
+        assert calls == ["x", "x"]
 
     def test_rejects_unknown_target(self):
         with pytest.raises(SystemExit):
@@ -526,5 +678,5 @@ class TestInvocation:
 
         onboarding.print_status(out=out)
 
-        assert "run: pyhood setup login" in out.text
+        assert "run: pyhood authorize" in out.text
         assert "python -m pyhood" not in out.text

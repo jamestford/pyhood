@@ -1548,8 +1548,13 @@ def run(command: Callable[..., int], **kwargs: Any) -> int:
         print(e, file=sys.stderr)
         return 2
     except AuthError as e:
-        print(f"Not logged in: {e}", file=sys.stderr)
-        print(f"Run: {program()} setup login", file=sys.stderr)
+        print(f"pyhood is not authorized: {e}", file=sys.stderr)
+        print(f"Run: {program()} authorize", file=sys.stderr)
+        print(
+            f"An AI agent has no terminal to type in, so it runs: "
+            f"{program()} authorize --window",
+            file=sys.stderr,
+        )
         return 1
     except PyhoodError as e:
         print(f"Robinhood request failed: {e}", file=sys.stderr)

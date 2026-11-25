@@ -8,7 +8,7 @@ pyhood needs two unrelated kinds of credential, depending on what you trade.
 | **Stored at** | `~/.pyhood/session.json` | `~/.pyhood/crypto.env` |
 | **Obtained by** | Logging in | Generating a key pair and registering the public half |
 | **Lifetime** | Short, refreshes automatically | Long-lived; cannot be refreshed, only revoked |
-| **Set up with** | `pyhood setup login` | `pyhood setup crypto` |
+| **Set up with** | `pyhood authorize` | `pyhood setup crypto` |
 
 Both are written `0600` inside a `0700` directory, with the mode applied at creation so the contents are never briefly readable by other users on the machine.
 
@@ -37,44 +37,64 @@ It reports three things that are easy to get wrong and hard to diagnose:
 - **Whether the private key is real.** A placeholder pasted from documentation is valid text but not a valid Ed25519 key. This shows up as `not valid base64` or a byte count other than 32.
 - **Whether the files are owner-only.** A credential file readable by other users is reported with the `chmod` to fix it.
 
-## Logging in
+## Authorizing pyhood
 
 ```bash
-pyhood setup login
+pyhood authorize
 ```
 
-The stored session is tried first — if it is valid, or can be refreshed, no password is needed at all. Only when that fails does it prompt:
+A saved authorization is tried first. If it still works, or can be renewed, no password is needed and the command says pyhood is already authorized. Otherwise it asks:
 
+```text
+pyhood Authorization
+
+pyhood needs you to log in and authorize the connection between pyhood
+and Robinhood. pyhood sends your password to Robinhood and does not save
+it. Do not share your password with your agent or anyone else.
+
+Once authorized, you will not be asked for your username and password
+again. To remove this authorization, open the Robinhood app and go to
+Account > Menu > Security and privacy > Devices, then remove the device.
+
+Robinhood email or username:
+Password (nothing shows as you type):
+
+Now open the Robinhood app on your phone and tap "Yes, it's me".
+Waiting for you...
+
+Authorized.
 ```
-Robinhood needs your username and password for a fresh login.
-The password is read without echoing, is not stored, and is not
-written anywhere — only the resulting tokens are saved to disk.
 
-Robinhood email/username: you@email.com
-Password (hidden):
-```
+- **Your password is sent to Robinhood and is not saved.** What is saved is the key Robinhood hands back, in `~/.pyhood/session.json`.
+- **The approval is on your phone.** Robinhood sends a prompt to its app, and you tap **"Yes, it's me"**. If Robinhood sends a code instead, the command asks for it.
+- **To remove the authorization,** open the Robinhood app and go to Account, then Menu, then Security and privacy, then Devices, and remove the device.
 
-Robinhood then sends a device approval prompt to your phone. Tap **"Yes, it's me"**. If your account uses MFA, the command asks for the code and retries.
+`pyhood setup login` is an older name for the same command, and still works.
 
-Only the resulting tokens are written to disk. The password is not stored anywhere.
+| If | It says |
+|---|---|
+| Nothing is typed | Nothing was entered, so nothing was sent |
+| You press Ctrl-C | Cancelled. Nothing was saved |
+| No approval arrives from your phone in time | Robinhood did not get an approval from your phone in time. Nothing was saved |
+| Robinhood refuses the login | Robinhood did not accept the login, with Robinhood's reason. Nothing was saved |
 
-### Logging in from an AI agent
+### Authorizing from an AI agent
 
 An agent cannot log in. The login needs your password, which the agent must never see, and an approval on your phone. An agent's commands also run without a terminal, so there is nowhere to type.
 
 ```bash
-pyhood setup login --window
+pyhood authorize --window
 ```
 
-Run by the agent, this opens a terminal window on your screen with the login above running in it, and waits. You type in that window. Nothing you type passes through the agent, or through the chat.
+Run by the agent, this opens a terminal window on your screen, titled "pyhood Authorization", with the text above in it, and waits. You type in that window. Nothing you type passes through the agent, or through the chat. The agent is told:
 
 ```text
-A terminal window has opened on the user's screen for them to log in.
+A terminal window titled "pyhood Authorization" has opened on the user's screen.
 Tell the user: type your Robinhood username and password in that window,
-then approve the login in the Robinhood app on your phone.
+then approve the request in the Robinhood app on your phone.
 Never ask for, read or type their password.
 Waiting up to 90 seconds for them to finish.
-Logged in.
+Authorized.
 Check it with: pyhood verify
 ```
 
@@ -82,16 +102,16 @@ Agents stop a command that runs too long, so the wait is short and the command c
 
 | What happens | What the command does | Exit code |
 |---|---|---|
-| A login is already saved and works | Opens no window and says so | 0 |
+| pyhood is already authorized | Opens no window and says so | 0 |
 | You log in | Says so | 0 |
-| The login fails, or you close the window | Says the login did not finish | 1 |
-| No window can be opened | Prints `pyhood setup login` for you to run yourself | 2 |
+| The login fails, or you close the window | Says the authorization did not finish | 1 |
+| No window can be opened | Prints `pyhood authorize` for you to run yourself | 2 |
 | You have not finished when the wait ends | Tells the agent to run it again | 3 |
 
 - **Run again, it does not open a second window.** It goes back to waiting on the one that is open. A window nobody finished is taken to be gone after 15 minutes.
-- **A window you closed does not come back by itself.** The next run reports that the login did not finish. Only the run after that opens a new one.
-- **The window opens on macOS, and on Linux with a desktop.** On Windows, over SSH, or with no screen, the command prints the login command for you to run.
-- **Run without a terminal, plain `pyhood setup login` says so** and points at `--window`.
+- **A window you closed does not come back by itself.** The next run reports that the authorization did not finish. Only the run after that opens a new one.
+- **The window opens on macOS, and on Linux with a desktop.** On Windows, over SSH, or with no screen, the command prints `pyhood authorize` for you to run.
+- **Run without a terminal, plain `pyhood authorize` says so** and points at `--window`.
 
 ## Setting up crypto keys
 
@@ -156,7 +176,7 @@ The same functions are importable, which is what the tests use:
 from pyhood.onboarding import crypto_status, session_status, print_status
 
 if not session_status()["exists"]:
-    raise SystemExit("run: pyhood setup login")
+    raise SystemExit("run: pyhood authorize")
 
 status = crypto_status()
 if not status["private_key_valid"]:

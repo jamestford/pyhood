@@ -23,7 +23,7 @@ The guide lists the commands for reading the account and the market, and for pla
 
 - **Do not install anything.** pyhood and everything it needs are already here.
 - **Leave `bin/`, `lib/` and `include/` alone.** They are the install. Do not read through them to learn how pyhood works; the guide tells you.
-- **Never ask for, read or type a password or API key.** The login is already saved. Do not open the files in `~/.pyhood/`. If pyhood says the login is missing or has expired, run `bin/pyhood setup login --window`: it opens a terminal window on the user's screen for them to log in, and waits.
+- **Never ask for, read or type a password or API key.** pyhood is already authorized to use the account. Do not open the files in `~/.pyhood/`. If pyhood says it is not authorized, run `bin/pyhood authorize --window`: it opens a terminal window on the user's screen for them to log in, and waits.
 - **Place orders the way the guide says for this install.** Unless the user has turned confirmation off, an order command sends nothing the first time: show the user what it printed, wait for a yes, then run the command it printed, unchanged. If they have turned it off, the guide says so, and up to what amount. Deposits and withdrawals always need a yes. Only the user can change that setting: never run `pyhood setup confirmation off` or edit the files in `~/.pyhood/`.
 - **Cancel an order only when the user asks you to.** `pyhood cancel` acts at once.
 - **Put any script you write in `scripts/`**, creating the folder if needed, and run it with `bin/pyhood run scripts/name.py`.

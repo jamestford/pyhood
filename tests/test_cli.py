@@ -618,7 +618,8 @@ class TestRun:
 
         assert cli.run(cli.positions) == 1
         err = capsys.readouterr().err
-        assert "Not logged in" in err and "pyhood setup login" in err
+        assert "pyhood is not authorized" in err
+        assert "authorize\n" in err and "authorize --window" in err
 
     def test_api_failure_is_one_line_not_a_traceback(self, monkeypatch, capsys):
         import pyhood

@@ -50,7 +50,7 @@ FAKE_PYHOOD = """#!/bin/sh
 echo "pyhood $*" >> "$HOME/calls.log"
 case "$1 ${2:-}" in
     "version ") echo "pyhood 9.9.9" ;;
-    "setup login")
+    "authorize ")
         read -r who
         echo "typed $who" >> "$HOME/calls.log"
         [ "$who" != refuse ] && : > "$HOME/logged-in"
@@ -250,35 +250,38 @@ class TestWithoutATerminal:
     def test_does_not_try_to_log_in(self, machine):
         machine.run()
 
-        assert "pyhood setup login" not in machine.calls
+        assert "pyhood authorize" not in machine.calls
 
     def test_tells_the_user_to_log_in_themselves(self, machine):
         result = machine.run()
 
-        assert "It is not logged in yet." in result.stdout
-        assert "If you are a person, log in yourself, in your own terminal." in result.stdout
-        assert "    pyhood setup login\n" in result.stdout
+        assert "It is not authorized yet." in result.stdout
+        assert "If you are a person, authorize it yourself, in your own terminal." in result.stdout
+        assert "    pyhood authorize\n" in result.stdout
         assert "    pyhood verify" in result.stdout
 
     def test_tells_an_agent_to_open_the_login_window(self, machine):
         result = machine.run()
 
-        assert "If you are an AI agent, open a login window on the user's screen:" in result.stdout
-        assert "    pyhood setup login --window" in result.stdout
+        assert (
+            "If you are an AI agent, open the authorization window on the user's screen:"
+            in result.stdout
+        )
+        assert "    pyhood authorize --window" in result.stdout
 
     def test_does_not_claim_the_login_works(self, machine):
         result = machine.run()
 
-        assert "your login works" not in result.stdout
+        assert "and it is authorized" not in result.stdout
 
     def test_a_login_saved_earlier_is_checked_and_reported(self, machine):
         (machine.home / "logged-in").touch()
 
         result = machine.run()
 
-        assert "pyhood setup login" not in machine.calls
-        assert "pyhood 9.9.9 is installed in ~/pyhood, and your login works." in result.stdout
-        assert "not logged in yet" not in result.stdout
+        assert "pyhood authorize" not in machine.calls
+        assert "pyhood 9.9.9 is installed in ~/pyhood, and it is authorized." in result.stdout
+        assert "not authorized yet" not in result.stdout
 
     def test_the_check_prints_nothing_of_its_own(self, machine):
         (machine.home / "logged-in").touch()
@@ -302,22 +305,22 @@ class TestAtATerminal:
         machine.run_at_terminal("someone\n")
 
         calls = machine.calls
-        assert calls.index("pyhood setup login") < calls.index("pyhood verify")
+        assert calls.index("pyhood authorize") < calls.index("pyhood verify")
 
     def test_says_the_login_works(self, machine):
         result = machine.run_at_terminal("someone\n")
 
-        assert "pyhood 9.9.9 is installed in ~/pyhood, and your login works." in result.stdout
-        assert "not logged in yet" not in result.stdout
+        assert "pyhood 9.9.9 is installed in ~/pyhood, and it is authorized." in result.stdout
+        assert "not authorized yet" not in result.stdout
 
     def test_a_login_that_fails_stops_the_script(self, machine):
         result = machine.run_at_terminal("refuse\n")
 
         assert result.returncode == 1
-        assert "pyhood is installed, but the login did not finish." in result.stdout
-        assert "    pyhood setup login" in result.stdout
+        assert "pyhood is installed, but it is not authorized yet." in result.stdout
+        assert "    pyhood authorize" in result.stdout
         assert "pyhood verify" not in machine.calls
-        assert "your login works" not in result.stdout
+        assert "and it is authorized" not in result.stdout
 
     def test_a_check_that_fails_stops_the_script(self, machine):
         (machine.home / "verify-fails").touch()
@@ -326,7 +329,7 @@ class TestAtATerminal:
 
         assert result.returncode == 1
         assert "the check did not pass" in result.stdout
-        assert "your login works" not in result.stdout
+        assert "and it is authorized" not in result.stdout
 
 
 # ── Running it again upgrades ────────────────────────────────────────
@@ -396,7 +399,7 @@ class TestTheLink:
     def test_names_the_command_by_its_short_name_when_it_resolves(self, machine):
         result = machine.run()
 
-        assert "    pyhood setup login" in result.stdout
+        assert "    pyhood authorize" in result.stdout
         assert "add ~/.local/bin to your PATH" not in result.stdout
 
     def test_says_so_when_local_bin_is_not_on_the_path(self, machine):
@@ -405,7 +408,7 @@ class TestTheLink:
         result = machine.run()
 
         assert "add ~/.local/bin to your PATH" in result.stdout
-        assert "    ~/pyhood/bin/pyhood setup login" in result.stdout
+        assert "    ~/pyhood/bin/pyhood authorize" in result.stdout
 
     def test_leaves_a_real_file_alone(self, machine):
         local_bin = machine.home / ".local" / "bin"
@@ -417,7 +420,7 @@ class TestTheLink:
         assert result.returncode == 0, result.stderr
         assert (local_bin / "pyhood").read_text() == "something else"
         assert "Left ~/.local/bin/pyhood alone" in result.stdout
-        assert "    ~/pyhood/bin/pyhood setup login" in result.stdout
+        assert "    ~/pyhood/bin/pyhood authorize" in result.stdout
 
     def test_leaves_a_link_to_another_pyhood_alone(self, machine):
         local_bin = machine.home / ".local" / "bin"
@@ -446,7 +449,7 @@ class TestTheLink:
         result = machine.run()
 
         assert "Another pyhood comes first on your PATH" in result.stdout
-        assert "    ~/pyhood/bin/pyhood setup login" in result.stdout
+        assert "    ~/pyhood/bin/pyhood authorize" in result.stdout
 
 
 # ── uv is missing ────────────────────────────────────────────────────
