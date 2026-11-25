@@ -1,6 +1,6 @@
 """pyhood: Robinhood for AI agents, and a Python client for the Robinhood API."""
 
-__version__ = "0.23.0"
+__version__ = "0.23.1"
 
 # The two checks below turn the errors a misplaced install produces into
 # ones that say what to do. This file must stay importable on old Pythons
