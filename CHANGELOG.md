@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Your agent can now do the whole install.** `pyhood setup login --window`, run by an agent, opens a terminal window on your screen with the login in it, and waits for you. You type your username and password in that window and approve on your phone. Nothing you type passes through the agent or the chat. Until now the agent had to stop, ask you to copy a command into a terminal of your own, and wait to be told you were done.
+  - The wait is 90 seconds, because agents stop a command that runs too long. Run again, the command goes back to waiting and does not open a second window. `--wait SECONDS` changes the wait.
+  - A window you closed does not come back by itself: the next run reports that the login did not finish.
+  - The window opens on macOS, and on Linux with a desktop. On Windows, over SSH or with no screen, the command prints the login command for you to run.
+  - A login that is already saved and works needs no window.
+
+### Changed
+- **The README leads with asking your agent to install pyhood.** The `curl` command is the way to do it yourself.
+- **The install steps for an agent are five, down from eight.** The agent runs the install script, opens the login window, checks the login, and reads the instructions that came with the install.
+- `pyhood setup login`, run with no terminal, says so and points at `--window`. It used to say only that the login was cancelled.
+- `pyhood guide` and the instructions in the install folder tell an agent to open the login window when a login has expired.
+
 ## [0.24.0] - 2026-11-25
 
 ### Added

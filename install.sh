@@ -180,8 +180,10 @@ finish() {
     else
         say "$installed is installed in $(short "$DIR"). It is not logged in yet."
         say ""
-        say "Log in yourself, in your own terminal. It asks for your Robinhood"
-        say "username and password, then for an approval in the Robinhood app:"
+        say "If you are an AI agent, open a login window on the user's screen:"
+        say "    $COMMAND setup login --window"
+        say "If you are a person, log in yourself, in your own terminal. It asks for"
+        say "your Robinhood username and password, then for an approval in the app:"
         say "    $COMMAND setup login"
         say "Then check it, which reads live prices and changes nothing:"
         say "    $COMMAND verify"

@@ -584,6 +584,7 @@ pyhood has not made a transfer against Robinhood through these commands. The fir
 |---|---|
 | `pyhood setup` | Reports what is configured. See [Setup](setup.md) |
 | `pyhood setup login` | Logs in and saves a session |
+| `pyhood setup login --window` | For an AI agent: opens a terminal window for the user to log in, and waits. See [Setup](setup.md#logging-in-from-an-ai-agent) |
 | `pyhood setup crypto` | Generates and registers a Crypto API key pair |
 | `pyhood setup confirmation` | Shows or changes whether orders ask first. See [Turning confirmation off](#turning-confirmation-off) |
 | `pyhood verify` | Reads live prices to confirm the saved login works |

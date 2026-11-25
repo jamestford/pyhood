@@ -4,14 +4,22 @@
 
 Do these steps in order. If one fails, stop and tell the user what happened. Do not improvise around a failure.
 
-1. **Check whether it is already installed.** If `~/pyhood/bin/pyhood` exists, run `~/pyhood/bin/pyhood version`, tell the user pyhood is already installed, and go to step 6.
-2. **Check for uv.** Run `uv --version`. If uv is not installed, stop and ask the user to install it: https://docs.astral.sh/uv/getting-started/installation/ (`brew install uv` on macOS). Do not install it yourself without asking.
-3. **Create the install folder.** Run `uv venv --managed-python --python 3.14 ~/pyhood`
-4. **Install pyhood into it.** Run `uv pip install --python ~/pyhood/bin/python pyhood`
-5. **Check it.** Run `~/pyhood/bin/pyhood version`. It should print a version number.
-6. **Hand the login to the user.** Run `~/pyhood/bin/pyhood setup`. If it shows a saved session, go to step 7. If not, tell the user to run `~/pyhood/bin/pyhood setup login` themselves, in their own terminal, and to tell you when they have. Do not run it for them. Never ask for, read or type their password.
-7. **Confirm the login works.** Run `~/pyhood/bin/pyhood verify`. It reads live prices and changes nothing.
-8. **Read the instructions that came with the install.** Read `~/pyhood/AGENTS.md` and follow it from now on. Tell the user to start you in the `~/pyhood` folder next time, so that you read that file automatically.
+1. **Install it.** Run `curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh | sh`. It creates the folder `~/pyhood` and installs pyhood into it. If pyhood is already installed there, it upgrades it. If it says uv is missing, stop and ask the user to install uv: https://docs.astral.sh/uv/getting-started/installation/ (`brew install uv` on macOS). Do not install it yourself without asking.
+2. **Check it.** Run `~/pyhood/bin/pyhood version`. It should print a version number.
+3. **Open the login for the user.** Run `~/pyhood/bin/pyhood setup login --window`, and allow it two minutes. If a login is already saved, it says so and you go to step 4. Otherwise a terminal window opens on the user's screen. Tell the user to type their Robinhood username and password in that window, and to approve the login in the Robinhood app on their phone. The command waits for them.
+   - If it says the user has not finished, run it again. It does not open a second window.
+   - If it says the login did not finish, ask the user what happened before running it again.
+   - If it says it could not open a window, tell the user to run `~/pyhood/bin/pyhood setup login` themselves, in their own terminal, and to tell you when they have.
+   - Never ask for, read or type their password. Do not run `setup login` without `--window`: it needs a terminal, and you do not have one.
+4. **Confirm the login works.** Run `~/pyhood/bin/pyhood verify`. It reads live prices and changes nothing.
+5. **Read the instructions that came with the install.** Read `~/pyhood/AGENTS.md` and follow it from now on. Tell the user to start you in the `~/pyhood` folder next time, so that you read that file automatically.
+
+If you cannot run the script, these two commands are what it runs:
+
+```bash
+uv venv --managed-python --python 3.14 ~/pyhood
+uv pip install --python ~/pyhood/bin/python pyhood
+```
 
 Rules for the install:
 
@@ -19,7 +27,7 @@ Rules for the install:
 - Do not install anything other than pyhood, and do not install pyhood anywhere but `~/pyhood`.
 - Do not run pyhood from a copy of this repository.
 
-On Windows the commands are in `~\pyhood\Scripts\` rather than `~/pyhood/bin/`.
+On Windows the script does not run: use the two commands, and the commands are in `~\pyhood\Scripts\` rather than `~/pyhood/bin/`. No login window can be opened there, so the user runs `setup login` themselves.
 
 ## If you want to use pyhood
 
