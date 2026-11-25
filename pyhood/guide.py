@@ -116,8 +116,7 @@ PLACING ORDERS (two steps, every time)
   then places the --market or --limit order. A stop meant as protection
   needs --tif gtc, or it expires at the end of the day.
   --trail-percent or --trail-amount makes a trailing stop, which follows
-  the price that far behind. Robinhood may refuse these; tell the user if
-  it does.
+  the price that far behind. It is always a --market order.
   Option prices are per share and a contract is 100 shares: --limit 2.50
   on 1 contract is $250. A crypto quantity is in the coin, not dollars:
   0.001 BTC is a thousandth of a bitcoin. Look up real expirations and

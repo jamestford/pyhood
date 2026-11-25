@@ -1341,14 +1341,19 @@ class TestTrailingStops:
         assert "trailing stop 10% above the price" in out
         assert "Stop starts at:     $90.20" in out
 
-    def test_the_preview_says_robinhood_may_refuse_it(self, capsys):
-        """Robinhood has rejected trailing stops from other apps. Better
-        to hear that before saying yes than after."""
+    def test_a_sell_carries_no_warning_that_it_may_be_refused(self, capsys):
+        """A trailing stop sell was placed live on 2026-11-24."""
         cli.stock_order(self.client(), "sell", "ANT", 10, trail_percent=5.0)
 
         out = capsys.readouterr().out
-        assert "Robinhood has refused trailing stops from apps other than its own" in out
+        assert "may reject" not in out
         assert "lasts for today only" in out
+
+    def test_a_buy_says_it_has_not_been_placed_before(self, capsys):
+        """Better to hear that before saying yes than after."""
+        cli.stock_order(self.client(), "buy", "ANT", 10, trail_percent=10.0)
+
+        assert "has not yet been placed through pyhood" in capsys.readouterr().out
 
     def test_a_code_for_one_trail_will_not_place_another(self, capsys):
         client = self.client()

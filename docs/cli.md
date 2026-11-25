@@ -344,7 +344,7 @@ pyhood sell AAPL 10 --trail-percent 5 --market --tif gtc
 
 The preview shows where the stop starts. It is always a market order for a number of shares.
 
-**Robinhood may refuse it.** It has rejected trailing stops from apps other than its own, and pyhood has not been able to place one. The preview says so. If the order is refused, nothing is placed and the reason is printed.
+A trailing stop that sells has been placed for real. One that buys has not yet, and the preview says so. If Robinhood refuses an order, nothing is placed and the reason is printed.
 
 ### Option orders
 

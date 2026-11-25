@@ -1034,10 +1034,13 @@ def stock_order(
     if trailing:
         if start is not None and start <= 0:
             warnings.append("The trail is larger than the price, so the stop starts at nothing.")
-        warnings.append(
-            "Robinhood has refused trailing stops from apps other than its own. It may "
-            "reject this order; if it does, nothing is placed."
-        )
+        if side == "buy":
+            # A trailing stop sell was placed live on 2026-11-24. A buy has
+            # not been, and it is sent differently: it carries a price.
+            warnings.append(
+                "A trailing stop that buys has not yet been placed through pyhood. "
+                "Robinhood may reject it; if it does, nothing is placed."
+            )
         if time_in_force == "gfd":
             warnings.append(
                 "This stop lasts for today only. Add --tif gtc to keep it working "

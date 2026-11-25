@@ -1631,8 +1631,7 @@ class PyhoodClient:
             account_number: Specific account (e.g. IRA). None = default.
             trail_amount: Trail by a dollar amount, for a trailing stop.
             trail_percent: Trail by a percentage, for a trailing stop.
-                Note that Robinhood currently blocks trailing stops for
-                third-party clients — see the module docs.
+                A trailing stop sell was placed live on 2026-11-24.
             market_hours: Trading session — 'regular_hours', 'extended_hours'
                 or 'all_day_hours'. Defaults to regular hours. Anything other
                 than regular hours sets extended_hours automatically; the two
