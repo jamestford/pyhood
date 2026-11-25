@@ -20,18 +20,18 @@ Account numbers show only their last four characters. `--json` gives them in ful
 
 ### `--account`
 
-Commands use the first account unless told otherwise. To use another, add `--account` with something that identifies it: part of its type, such as `roth`, `ira` or `individual`, or the last four characters of its number.
+`positions`, `orders` and `buying-power` cover every account under your login. Add `--account` to see one. An order uses the first account unless it names another the same way. Name an account by part of its type, such as `roth`, `ira` or `individual`, or by the last four characters of its number.
 
 ```bash
 pyhood positions --account roth
 pyhood buy AAPL 10 --limit 350 --account roth
 ```
 
-It works on `positions`, `buying-power`, `buy`, `sell`, `buy-option` and `sell-option`. If what you type fits no account, or more than one, the command stops and lists your accounts. It does not guess.
+It works on `positions`, `orders`, `buying-power`, `buy`, `sell`, `buy-option` and `sell-option`. If what you type fits no account, or more than one, the command stops and lists your accounts. It does not guess.
 
 ### `pyhood positions`
 
-What the account holds: stocks, then options, with cost, value and unrealized profit or loss.
+What you hold: stocks, then options, with cost, value and unrealized profit or loss.
 
 ```text
 STOCKS
@@ -39,6 +39,23 @@ SYMBOL  SHARES  AVG COST    PRICE      VALUE  UNREALIZED P/L   P/L %
 AAPL        10   $340.00  $352.01  $3,520.10        +$120.10  +3.53%
 TOTAL                              $3,520.10        +$120.10
 ```
+
+With more than one account, such as an individual account and an IRA, each is listed under its own heading:
+
+```text
+Individual (…2223)
+
+STOCKS
+SYMBOL  SHARES  AVG COST    PRICE      VALUE  UNREALIZED P/L   P/L %
+AAPL        10   $340.00  $352.01  $3,520.10        +$120.10  +3.53%
+TOTAL                              $3,520.10        +$120.10
+
+Roth IRA (…5556)
+
+No open positions.
+```
+
+A stock held in two accounts shows as two positions, because each is sold from its own account. `--account roth` shows one account. With `--json`, `stocks` and `options` are the first account's and `accounts` lists them all.
 
 Option prices are per share; one contract is 100 shares.
 
@@ -71,7 +88,15 @@ An option order reads as a trade in a contract: `buy to open` under `SIDE`, and 
 
 ### `pyhood buying-power`
 
-The cash available to trade with in the main account.
+The cash available to trade with. With one account it is one line. With more than one, such as an individual account and an IRA, each account has its own row:
+
+```text
+ACCOUNT     NUMBER  BUYING POWER
+Individual  …2223        $168.85
+Roth IRA    …5556      $7,000.00
+```
+
+The figures are not added up, because an account spends only its own cash: money in an IRA cannot pay for an order in another account. `--account roth` shows one account. With `--json`, `buying_power` is the first account's and `accounts` lists them all.
 
 ### `pyhood quote SYMBOL [SYMBOL ...]`
 
