@@ -252,6 +252,17 @@ class TestOrders:
         plain = next(line for line in lines if line.endswith("order-1"))
         assert plain.split()[-5] == "-"  # no stop
 
+    def test_a_market_order_does_not_show_its_collar_as_a_limit(self, capsys):
+        """Robinhood records the price ceiling it requires on a market order."""
+        market = stock_order(order_id="order-4", order_type="market", price=11.94)
+
+        cli.orders(FakeClient(stock_orders=[market]))
+
+        row = next(line for line in capsys.readouterr().out.splitlines()
+                   if line.endswith("order-4"))
+        assert "market" in row.split()
+        assert "$11.94" not in row
+
     def test_times_are_local_and_the_header_says_so(self, capsys):
         cli.orders(FakeClient(stock_orders=[stock_order()]))
 

@@ -1794,7 +1794,7 @@ class PyhoodClient:
                     "has likely moved to a newer one — raise ORDER_FORM_VERSION in "
                     f"pyhood/client.py. Server said: {errors}"
                 )
-            raise OrderError(f"Order rejected: {data}")
+            raise OrderError(f"Order rejected: {_rejection(data)}")
 
         # Parse successful response
         created_at = None
@@ -1985,7 +1985,7 @@ class PyhoodClient:
         # Field-level validation errors carry neither key; without this an
         # order with a blank id is returned as if it succeeded.
         if "id" not in data:
-            raise OrderError(f"Option order rejected: {data}")
+            raise OrderError(f"Option order rejected: {_rejection(data)}")
 
         # Parse successful response
         created_at = None
@@ -3204,6 +3204,23 @@ def _safe_float(val: Any) -> float | None:
         return float(val)
     except (ValueError, TypeError):
         return None
+
+
+def _rejection(data: Any) -> str:
+    """Robinhood's reasons for refusing a request, in plain words.
+
+    Validation errors arrive as {field: [messages]}, with the ones about the
+    request as a whole under 'non_field_errors'.
+    """
+    if not isinstance(data, dict) or not data:
+        return str(data) if data else "Robinhood gave no reason."
+    parts = []
+    for field, messages in data.items():
+        if not isinstance(messages, (list, tuple)):
+            messages = [messages]
+        text = " ".join(str(message) for message in messages)
+        parts.append(text if field == "non_field_errors" else f"{field}: {text}")
+    return " ".join(parts)
 
 
 def _safe_int(val: Any) -> int | None:

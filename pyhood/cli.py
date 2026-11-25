@@ -187,6 +187,17 @@ def order_side(order: Any) -> str:
     return order.side
 
 
+def _limit(order: Any) -> str:
+    """An order's limit price, or 'market'.
+
+    Robinhood records a price on a market order too: the ceiling or floor it
+    requires, or a stop buy's stop. That is not a limit anyone chose.
+    """
+    if order.order_type == "market":
+        return "market"
+    return money(order.price)
+
+
 def order_kind(order: Any) -> str:
     """'stock', '$12.00 call 2026-12-11', or '2-leg option' for a spread."""
     if order.instrument_type != "option":
@@ -370,7 +381,7 @@ def orders(
     rows = [
         [
             local_time(o.created_at), order_side(o), o.symbol, order_kind(o), number(o.quantity),
-            money(o.price), money(getattr(o, "stop_price", None)),
+            _limit(o), money(getattr(o, "stop_price", None)),
             number(o.filled_quantity), money(o.average_price), o.status, o.order_id,
         ]
         for o in found
@@ -1248,7 +1259,7 @@ def cancel(
     it can fill.
     """
     order = client.get_order(order_id)
-    limit = "at market" if order.price is None else f"limit {money(order.price)}"
+    limit = "at market" if _limit(order) in ("market", "-") else f"limit {money(order.price)}"
     if getattr(order, "stop_price", None) is not None:
         limit = f"stop {money(order.stop_price)} then {limit}"
     what = order.symbol

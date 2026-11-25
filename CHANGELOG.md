@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Stop market sells were refused.** `pyhood sell SYMBOL N --stop PRICE --market`, `sell_stock(stop_price=...)` with no limit, and every trailing stop sell sent a price with the order, and Robinhood rejects a stop market sell that carries one: "Stop market sell order requested, but price provided." No price is sent now. Stop market buys, which must carry one, are unchanged.
 - `pyhood orders` has a STOP column, and `pyhood cancel` names an order's stop. A stop order that then trades at market has no limit, so it read as a plain market order.
+- A refused order gives Robinhood's reason as a sentence. It printed the raw response: `{'non_field_errors': ['...']}`.
+- `pyhood orders` shows `market` under LIMIT for a market order. It showed the price ceiling Robinhood requires on one, which read as a limit you had set.
 
 ## [0.20.0] - 2026-11-24
 
