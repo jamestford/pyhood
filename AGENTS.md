@@ -49,12 +49,20 @@ ruff check .
 
 ### When the change is done
 
-`main` is protected, so every change lands through a pull request. Once `pytest` and `ruff check .` pass, do these steps without asking first:
+`main` is protected, so every change lands through a pull request. Once `pytest` and `ruff check .` pass, do all of these steps without asking first:
 
 1. **Branch.** `fix/short-name` for a fix, `feat/short-name` for a feature.
 2. **Commit.** Use a conventional subject, such as `fix: show orders in every account`, and a short body that says what was wrong and what changes. Add no `Co-Authored-By` line.
 3. **Push and open the pull request.** Give it the same title as the commit. In the body, say what was wrong, what changes, and how it was checked. If it was not checked against a real account, say so.
+4. **Merge.** When every check has passed, squash-merge it. If a check fails, fix the cause. Do not merge around a failing check.
+5. **Release.** A fix or a feature is released as soon as it is merged. A change that users would not notice, such as tests alone, waits for the next release.
 
-Stop there. Do not merge the pull request, and do not release, unless the user asks.
+To release:
 
-A release is its own pull request, from a `release/X.Y.Z` branch, titled `chore: release X.Y.Z`. It sets the version in `pyhood/__init__.py` and `pyproject.toml` and dates the `[Unreleased]` section of the changelog.
+1. **Open a release pull request** from a `release/X.Y.Z` branch, titled `chore: release X.Y.Z`. Raise the last number for fixes and the middle one for a feature. Set the version in `pyhood/__init__.py` and `pyproject.toml`, and date the `[Unreleased]` section of the changelog.
+2. **Check the wheel.** Build it, install it into a clean environment, and run `pyhood version` there. It should print the new version.
+3. **Merge it** when every check has passed.
+4. **Publish a GitHub release** tagged `vX.Y.Z` on `main`. Write the notes for a user: what changed and why, with an example of the new output. Publishing the release is what sends the package to PyPI.
+5. **Confirm it.** Check that the "Publish to PyPI" run succeeded.
+
+Stop and tell the user if a step fails in a way you cannot fix. Never ask for, read or type a PyPI password or token: publishing runs in GitHub Actions and needs none.
