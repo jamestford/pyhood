@@ -44,7 +44,7 @@ Option prices are per share; one contract is 100 shares.
 
 ### `pyhood orders`
 
-Stock and option orders, newest first.
+Stock and option orders in every account, newest first. With more than one account, an ACCOUNT column says which each order is in.
 
 ```text
 Orders since 2026-10-25 (times are EST; today is 2026-11-24)
@@ -61,6 +61,7 @@ PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT     STOP  FILLED  AV
 | `--all` | Every order on record |
 | `--symbol AAPL` | Orders for one symbol only |
 | `--open` | Only orders that can still fill, which are the ones that can be cancelled |
+| `--account roth` | One account's orders only |
 
 The last column is the order ID, which `pyhood cancel` takes.
 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`pyhood orders` did not show orders in an IRA.** Robinhood's order list holds one account's orders, the default account's unless another is named, so an order placed with `--account roth` was missing from `pyhood orders` and `pyhood orders --open`. The placing step said to check the order with a command that could not show it. `pyhood orders` now asks every account, and with more than one account an ACCOUNT column says which each order is in. `--account` narrows to one.
+- `get_stock_orders()` and `get_option_orders()` take `account_number`, and `Order` gains `account_number`.
+
+### Changed
+- The help for `pyhood buy`, `sell` and the other two-step commands says to run the preview and show the user what it printed before asking for a yes. A model was seen describing the order in its own words, taking the yes, and only then running the preview.
+
 ## [0.22.0] - 2026-11-24
 
 ### Added

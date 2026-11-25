@@ -175,14 +175,15 @@ Everything here is a command, so the agent rarely needs to write code. For somet
 
 | Placed for real, then cancelled | Not placed yet |
 |---|---|
-| Buy and sell stock at a limit | Any order in an IRA |
-| Buy stock at market, and by dollar amount | Selling an option |
-| Stop orders, at market and with a limit | A trailing stop that buys |
-| A trailing stop that sells | Selling crypto, and crypto at market |
-| Buy an option to open | A withdrawal, and cancelling a transfer |
+| Buy and sell stock at a limit | Selling an option |
+| Buy stock at market, and by dollar amount | A trailing stop that buys |
+| Stop orders, at market and with a limit | Selling crypto, and crypto at market |
+| A trailing stop that sells | A withdrawal, and cancelling a transfer |
+| Buy an option to open | Any futures order: these can only be previewed |
 | An option spread | |
 | Buy crypto at a limit | |
 | A deposit from a bank | |
+| Buy stock in a Roth IRA | |
 
 Every read command has been run for real too, and so has saving a statement. The orders on the right go through the same code as those on the left, but until one has been sent, treat its first use as a test: start small, and far from the market price.
 
