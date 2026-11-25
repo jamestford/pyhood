@@ -2199,7 +2199,9 @@ class PyhoodClient:
             account_number=account_number,
         )
 
-    def get_stock_orders(self, start_date: str | datetime | None = None) -> list[Order]:
+    def get_stock_orders(
+        self, start_date: str | datetime | None = None, account_number: str | None = None,
+    ) -> list[Order]:
         """Get all stock orders (not options).
 
         Args:
@@ -2207,13 +2209,16 @@ class PyhoodClient:
                 Accepts a datetime or ISO-8601 string ('2026-01-01'); naive
                 values are treated as UTC. Filtering is requested server-side
                 to avoid paging through a long history, and re-applied locally.
+            account_number: The account whose orders to return, such as an
+                IRA. With None, Robinhood returns the default account's
+                orders only: an order in another account is not in the list.
 
         Returns:
             List of Order objects for stock orders.
         """
         cutoff = self._parse_start_date(start_date)
         data = self._session.get_paginated(
-            urls.ORDERS, params=self._start_date_params(cutoff),
+            urls.ORDERS, params=self._order_list_params(cutoff, account_number),
         )
         symbol_cache: dict[str, str] = {}
         orders = []
@@ -2230,7 +2235,9 @@ class PyhoodClient:
 
         return orders
 
-    def get_option_orders(self, start_date: str | datetime | None = None) -> list[Order]:
+    def get_option_orders(
+        self, start_date: str | datetime | None = None, account_number: str | None = None,
+    ) -> list[Order]:
         """Get all option orders.
 
         Args:
@@ -2238,13 +2245,16 @@ class PyhoodClient:
                 Accepts a datetime or ISO-8601 string ('2026-01-01'); naive
                 values are treated as UTC. Filtering is requested server-side
                 to avoid paging through a long history, and re-applied locally.
+            account_number: The account whose orders to return, such as an
+                IRA. With None, Robinhood returns the default account's
+                orders only.
 
         Returns:
             List of Order objects for option orders.
         """
         cutoff = self._parse_start_date(start_date)
         data = self._session.get_paginated(
-            urls.OPTIONS_ORDERS, params=self._start_date_params(cutoff),
+            urls.OPTIONS_ORDERS, params=self._order_list_params(cutoff, account_number),
         )
         orders = []
 
@@ -2277,6 +2287,15 @@ class PyhoodClient:
             except Exception as e:
                 raise OrderError(f"Order {order_id} not found") from e
 
+    def _order_list_params(
+        self, cutoff: datetime | None, account_number: str | None,
+    ) -> dict[str, str] | None:
+        """Query parameters for an order list: a start date, an account, or both."""
+        params = dict(self._start_date_params(cutoff) or {})
+        if account_number:
+            params["account_numbers"] = account_number
+        return params or None
+
     def _stock_order(self, item: dict, symbol_cache: dict[str, str]) -> Order:
         """Map a raw stock order onto an Order.
 
@@ -2308,6 +2327,7 @@ class PyhoodClient:
             average_price=_safe_float(item.get("average_price")),
             fees=_safe_float(item.get("fees")),
             filled_quantity=filled_quantity,
+            account_number=_order_account(item),
         )
 
     def _option_order(self, item: dict) -> Order:
@@ -2346,6 +2366,7 @@ class PyhoodClient:
             average_price=_average_execution_price(executions) if len(legs) == 1 else None,
             fees=_option_fees(item),
             filled_quantity=filled_quantity,
+            account_number=_order_account(item),
             **_option_contract(legs),
         )
 
@@ -3301,6 +3322,14 @@ def _safe_float(val: Any) -> float | None:
         return float(val)
     except (ValueError, TypeError):
         return None
+
+
+def _order_account(item: dict) -> str | None:
+    """The account an order is in, from its number or its account URL."""
+    number = item.get("account_number")
+    if not number and isinstance(item.get("account"), str):
+        number = item["account"].rstrip("/").rsplit("/", 1)[-1]
+    return number or None
 
 
 def _plain_number(value: float) -> str:

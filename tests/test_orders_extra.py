@@ -464,3 +464,57 @@ class TestRejectionWording:
         from pyhood.client import _rejection
 
         assert _rejection({}) == "Robinhood gave no reason."
+
+
+class TestOrdersInAnotherAccount:
+    """Robinhood's order lists hold one account's orders: the default one
+    unless another is named. Found when an order placed in a Roth IRA was
+    missing from the list."""
+
+    @responses.activate
+    def test_an_account_can_be_named_and_the_order_says_where_it_is(self, client):
+        # A stock order names its account by URL, as Robinhood sent it.
+        responses.add(
+            responses.GET, urls.ORDERS,
+            json={"results": [{
+                "id": "order-1", "account": f"{BASE}/accounts/ROTH0001/",
+                "instrument": f"{urls.INSTRUMENTS}f-id/", "side": "buy", "type": "limit",
+                "quantity": "1.00000000", "cumulative_quantity": "0.00000000",
+                "price": "5.00000000", "average_price": None, "state": "queued",
+                "created_at": "2026-11-25T03:41:56.320164Z", "time_in_force": "gfd",
+            }], "next": None},
+            status=200,
+        )
+        responses.add(responses.GET, f"{urls.INSTRUMENTS}f-id/", json={"symbol": "F"})
+
+        orders = client.get_stock_orders(account_number="ROTH0001")
+
+        assert "account_numbers=ROTH0001" in responses.calls[0].request.url
+        assert orders[0].account_number == "ROTH0001"
+
+    @responses.activate
+    def test_no_account_is_sent_unless_one_is_named(self, client):
+        responses.add(responses.GET, urls.ORDERS, json={"results": [], "next": None})
+
+        client.get_stock_orders()
+
+        assert "account_numbers" not in responses.calls[0].request.url
+
+    @responses.activate
+    def test_an_option_order_names_its_account_by_number(self, client):
+        responses.add(
+            responses.GET, urls.OPTIONS_ORDERS,
+            json={"results": [{
+                "id": "opt-1", "account_number": "ROTH0001", "chain_symbol": "F",
+                "direction": "debit", "type": "limit", "quantity": "2.00000",
+                "processed_quantity": "2.00000", "price": "1.64000000", "state": "filled",
+                "created_at": "2026-03-23T18:28:25.387476Z", "time_in_force": "gtc",
+                "legs": [],
+            }], "next": None},
+            status=200,
+        )
+
+        orders = client.get_option_orders(account_number="ROTH0001")
+
+        assert "account_numbers=ROTH0001" in responses.calls[0].request.url
+        assert orders[0].account_number == "ROTH0001"

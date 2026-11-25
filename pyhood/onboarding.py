@@ -509,10 +509,15 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[as_json],
         help="show recent stock and option orders (read-only)",
         description=(
-            "Shows stock and option orders, newest first, with what was ordered "
-            "and what actually filled. Covers the last 30 days unless told "
-            "otherwise. Times are shown in this computer's time zone."
+            "Shows stock and option orders in every account, newest first, with "
+            "what was ordered and what actually filled. Covers the last 30 days "
+            "unless told otherwise. Times are shown in this computer's time zone."
         ),
+    )
+    orders.add_argument(
+        "--account", metavar="WHICH",
+        help="only this account's orders: part of its type, such as roth, or the "
+             "last four characters of its number",
     )
     orders.add_argument(
         "--since", type=_date, metavar="YYYY-MM-DD",
@@ -527,7 +532,8 @@ def build_parser() -> argparse.ArgumentParser:
     two_steps = (
         " Runs in two steps. Without --confirm it only previews: it shows what "
         "would be sent and prints a confirmation code, and sends nothing. With "
-        "--confirm and that code, it acts."
+        "--confirm and that code, it acts. Run the preview first and show the "
+        "user what it printed; ask for a yes only after that."
     )
     for side in ("buy", "sell"):
         order = commands.add_parser(
@@ -1209,6 +1215,7 @@ def main(argv: list[str] | None = None) -> int:
             return cli.run(
                 cli.orders, since=args.since, symbol=args.symbol,
                 everything=args.all, open_only=args.open, as_json_output=args.json,
+                account=args.account,
             )
         if args.command == "buying-power":
             return cli.run(cli.buying_power, account=args.account, as_json_output=args.json)

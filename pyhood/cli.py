@@ -340,6 +340,26 @@ def positions(client: Any, account: str | None = None, as_json_output: bool = Fa
     return 0
 
 
+def _order_accounts(client: Any, account: str | None) -> list[tuple[str | None, str]]:
+    """The accounts whose orders to list, as (number, name).
+
+    Robinhood's order list holds one account's orders: the default one unless
+    another is named. So with several accounts each is asked in turn, or an
+    order in an IRA would never be shown. (None, '') stands for the default
+    account, asked without naming it.
+    """
+    if account is not None:
+        number, label = find_account(client, account)
+        return [(number, label)]
+    try:
+        accounts = client.get_all_accounts()
+    except PyhoodError:
+        accounts = []
+    if len(accounts) < 2:
+        return [(None, "")]
+    return [(a.get("account_number"), account_name(a)) for a in accounts]
+
+
 def orders(
     client: Any,
     since: str | None = None,
@@ -347,14 +367,24 @@ def orders(
     everything: bool = False,
     open_only: bool = False,
     as_json_output: bool = False,
+    account: str | None = None,
 ) -> int:
-    """Stock and option orders, newest first."""
+    """Stock and option orders in every account, newest first."""
     if everything:
         since = None
     elif since is None:
         since = (datetime.now() - timedelta(days=DEFAULT_ORDER_DAYS)).strftime("%Y-%m-%d")
 
-    found = client.get_stock_orders(start_date=since) + client.get_option_orders(start_date=since)
+    accounts = _order_accounts(client, account)
+    found = []
+    where: dict[str, str] = {}
+    for account_number, name in accounts:
+        named = {"account_number": account_number} if account_number else {}
+        for order in (client.get_stock_orders(start_date=since, **named)
+                      + client.get_option_orders(start_date=since, **named)):
+            if order.order_id not in where:
+                where[order.order_id] = name
+                found.append(order)
     if symbol:
         found = [o for o in found if o.symbol.upper() == symbol.upper()]
     if open_only:
@@ -370,6 +400,10 @@ def orders(
     scope = f"All {kind}" if since is None else f"{kind.capitalize()} since {since}"
     if symbol:
         scope += f" for {symbol.upper()}"
+    if account is not None:
+        scope += f" in {accounts[0][1]}"
+    elif len(accounts) > 1:
+        scope += f" in your {len(accounts)} accounts"
     if not found:
         print(f"{scope}: none.")
         if since is not None:
@@ -386,11 +420,16 @@ def orders(
         ]
         for o in found
     ]
-    print(table(
-        ["PLACED", "SIDE", "SYMBOL", "TYPE", "ORDERED", "LIMIT", "STOP", "FILLED",
-         "AVG PRICE", "STATUS", "ORDER ID"],
-        rows, right={4, 5, 6, 7, 8},
-    ))
+    headers = ["PLACED", "SIDE", "SYMBOL", "TYPE", "ORDERED", "LIMIT", "STOP", "FILLED",
+               "AVG PRICE", "STATUS", "ORDER ID"]
+    right = {4, 5, 6, 7, 8}
+    if len(accounts) > 1:
+        # Which account each order is in, right after when it was placed.
+        headers.insert(1, "ACCOUNT")
+        for row, o in zip(rows, found):
+            row.insert(1, where[o.order_id])
+        right = {index + 1 for index in right}
+    print(table(headers, rows, right=right))
     print(
         "\nFILLED is the quantity that actually traded and AVG PRICE the price it "
         "traded at. An order that never filled shows 0 and '-'. A STOP is the price "

@@ -113,6 +113,8 @@ class Order(Model):
     option_type: str | None = None  # 'call' or 'put'
     strike: float | None = None
     expiration: str | None = None
+    # The account the order is in. None if Robinhood did not say.
+    account_number: str | None = None
 
 
 @dataclass(frozen=True)

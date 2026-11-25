@@ -119,13 +119,22 @@ class FakeClient:
     def get_option_positions(self, account_number=None):
         return self.options
 
-    def get_stock_orders(self, start_date=None):
-        self.calls.append(("get_stock_orders", start_date))
-        return list(self.stock_orders)
+    # Orders given to the fake are in the first account. `roth_orders` are in
+    # the second, which Robinhood only returns when that account is named.
+    roth_orders = ()
 
-    def get_option_orders(self, start_date=None):
-        self.calls.append(("get_option_orders", start_date))
-        return list(self.option_orders)
+    def get_stock_orders(self, start_date=None, account_number=None):
+        if account_number in (None, "111122223"):
+            self.calls.append(("get_stock_orders", start_date))
+            return list(self.stock_orders)
+        self.asked_accounts = getattr(self, "asked_accounts", []) + [account_number]
+        return list(self.roth_orders) if account_number == "444455556" else []
+
+    def get_option_orders(self, start_date=None, account_number=None):
+        if account_number in (None, "111122223"):
+            self.calls.append(("get_option_orders", start_date))
+            return list(self.option_orders)
+        return []
 
     def get_buying_power(self, account_number=None):
         if account_number:
@@ -247,7 +256,7 @@ class TestOrders:
         cli.orders(FakeClient(stock_orders=[stop, stock_order()]))
 
         lines = capsys.readouterr().out.splitlines()
-        assert lines[1].split()[3:7] == ["TYPE", "ORDERED", "LIMIT", "STOP"]
+        assert lines[1].split()[4:8] == ["TYPE", "ORDERED", "LIMIT", "STOP"]
         row = next(line for line in lines if line.endswith("order-3"))
         assert row.split()[-6:] == ["-", "$40.00", "0", "-", "confirmed", "order-3"]
         plain = next(line for line in lines if line.endswith("order-1"))
@@ -278,15 +287,85 @@ class TestOrders:
         client = FakeClient()
         cli.orders(client)
         expected = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-        assert client.calls == [("get_stock_orders", expected), ("get_option_orders", expected)]
+        assert client.calls == [("get_all_accounts",), ("get_stock_orders", expected),
+                                ("get_option_orders", expected)]
 
         client = FakeClient()
         cli.orders(client, since="2026-01-01")
-        assert client.calls[0] == ("get_stock_orders", "2026-01-01")
+        assert client.calls[1] == ("get_stock_orders", "2026-01-01")
 
         client = FakeClient()
         cli.orders(client, since="2026-01-01", everything=True)
-        assert client.calls[0] == ("get_stock_orders", None)
+        assert client.calls[1] == ("get_stock_orders", None)
+
+    ROTH_ORDER = stock_order(
+        order_id="order-roth", symbol="F", status="queued", quantity=1.0, price=5.0,
+        created_at=datetime(2026, 11, 20, 3, 41, 56, tzinfo=UTC), filled_at=None,
+        average_price=None, filled_quantity=0.0, account_number="444455556",
+    )
+
+    def test_an_order_in_another_account_is_shown(self, capsys):
+        """Robinhood's order list holds the default account's orders only. An
+        order placed in a Roth IRA was missing from `pyhood orders`, so the
+        command the placing step said to check it with showed nothing."""
+        client = FakeClient(stock_orders=[stock_order()])
+        client.roth_orders = [self.ROTH_ORDER]
+
+        cli.orders(client)
+
+        out = capsys.readouterr().out
+        lines = out.splitlines()
+        assert "in your 2 accounts" in lines[0]
+        assert lines[1].split()[:2] == ["PLACED", "ACCOUNT"]
+        roth = next(line for line in lines if line.endswith("order-roth"))
+        assert "Roth IRA" in roth
+        assert roth.split()[-2:] == ["queued", "order-roth"]
+        mine = next(line for line in lines if line.endswith("order-1"))
+        assert "Individual" in mine
+        assert client.asked_accounts == ["444455556"]
+
+    def test_open_orders_include_other_accounts(self, capsys):
+        client = FakeClient(stock_orders=[stock_order()])
+        client.roth_orders = [self.ROTH_ORDER]
+
+        cli.orders(client, open_only=True)
+
+        out = capsys.readouterr().out
+        assert "order-roth" in out
+        assert "order-1" not in out
+
+    def test_account_narrows_to_one_account(self, capsys):
+        client = FakeClient(stock_orders=[stock_order()])
+        client.roth_orders = [self.ROTH_ORDER]
+
+        cli.orders(client, account="roth")
+
+        out = capsys.readouterr().out
+        assert "in Roth IRA (…5556)" in out.splitlines()[0]
+        assert "ACCOUNT" not in out.splitlines()[1]
+        assert "order-roth" in out and "order-1" not in out
+
+    def test_with_one_account_nothing_changes(self, capsys):
+        client = FakeClient(stock_orders=[stock_order()])
+        client.ACCOUNTS = client.ACCOUNTS[:1]
+
+        cli.orders(client)
+
+        out = capsys.readouterr().out
+        assert "accounts" not in out.splitlines()[0]
+        assert "ACCOUNT" not in out.splitlines()[1]
+        assert not hasattr(client, "asked_accounts")
+
+    def test_the_orders_still_list_if_the_accounts_cannot_be_read(self, capsys):
+        client = FakeClient(stock_orders=[stock_order()])
+
+        def broken():
+            raise APIError("503 Service Unavailable")
+
+        client.get_all_accounts = broken
+
+        assert cli.orders(client) == 0
+        assert "order-1" in capsys.readouterr().out
 
     def test_stock_and_option_orders_are_merged_newest_first(self, capsys):
         option = option_order_row(
@@ -336,11 +415,11 @@ class TestOrders:
     def test_none_found_says_how_to_look_further_back(self, capsys):
         cli.orders(FakeClient(), since="2026-11-01")
         out = capsys.readouterr().out
-        assert "Orders since 2026-11-01: none." in out
+        assert "Orders since 2026-11-01 in your 2 accounts: none." in out
         assert "--all" in out
 
         cli.orders(FakeClient(), everything=True)
-        assert capsys.readouterr().out.strip() == "All orders: none."
+        assert capsys.readouterr().out.strip() == "All orders in your 2 accounts: none."
 
     def test_json_keeps_exact_values_utc_times_and_nulls(self, capsys):
         cli.orders(FakeClient(stock_orders=[stock_order(), CANCELLED]), as_json_output=True)
@@ -435,13 +514,13 @@ class TestRun:
          {"account": "roth", "as_json_output": True}),
         (["orders"], cli.orders,
          {"since": None, "symbol": None, "everything": False, "open_only": False,
-          "as_json_output": False}),
+          "as_json_output": False, "account": None}),
         (["orders", "--since", "2026-11-01", "--symbol", "ant", "--json"], cli.orders,
          {"since": "2026-11-01", "symbol": "ant", "everything": False, "open_only": False,
-          "as_json_output": True}),
-        (["orders", "--all", "--open"], cli.orders,
+          "as_json_output": True, "account": None}),
+        (["orders", "--all", "--open", "--account", "roth"], cli.orders,
          {"since": None, "symbol": None, "everything": True, "open_only": True,
-          "as_json_output": False}),
+          "as_json_output": False, "account": "roth"}),
         (["buying-power"], cli.buying_power, {"account": None, "as_json_output": False}),
         (["accounts"], cli.accounts, {"as_json_output": False}),
         (["earnings", "AAPL", "NVDA", "--days", "30"], cli.earnings,
