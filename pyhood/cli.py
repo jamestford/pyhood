@@ -708,6 +708,41 @@ def transfers(client: Any, as_json_output: bool = False) -> int:
     return 0
 
 
+# ── Documents ────────────────────────────────────────────────────────
+
+
+def documents(
+    client: Any, kind: str | None = None, year: int | None = None,
+    as_json_output: bool = False,
+) -> int:
+    """Statements, trade confirmations and tax forms, newest first."""
+    found = sorted(client.get_documents(), key=lambda d: d.date or "", reverse=True)
+    if kind:
+        found = [d for d in found if kind.lower() in (d.type or "").lower()]
+    if year:
+        found = [d for d in found if (d.date or "").startswith(str(year))]
+    if as_json_output:
+        print(as_json([{"date": d.date, "type": d.type, "id": d.id} for d in found]))
+        return 0
+    if not found:
+        print("No documents match.")
+        return 0
+    print(table(
+        ["DATE", "TYPE", "DOCUMENT ID"],
+        [[(d.date or "")[:10], d.type, d.id] for d in found],
+    ))
+    print(f"\nTo save one as a PDF: {program()} document DOCUMENT_ID")
+    return 0
+
+
+def document(client: Any, document_id: str, to: str = "documents") -> int:
+    """Save one document as a PDF, in a folder only the user can read."""
+    path = client.download_document(document_id, to)
+    print(f"Saved {path}")
+    print("It shows your account details, so the folder is readable only by you.")
+    return 0
+
+
 # ── Watchlists ───────────────────────────────────────────────────────
 
 
@@ -792,6 +827,8 @@ def stock_order(
     confirm: str | None = None,
     settle_seconds: float = 2.0,
     dollars: float | None = None,
+    trail_percent: float | None = None,
+    trail_amount: float | None = None,
 ) -> int:
     """Preview a stock order, or place it when given its confirmation code.
 
@@ -799,10 +836,25 @@ def stock_order(
     waits until the price reaches `stop`, then becomes the market or limit
     order it describes. `dollars` in place of `quantity` buys or sells that
     much money's worth, which is usually a fraction of a share.
+    `trail_percent` or `trail_amount` makes a trailing stop: a stop that
+    follows the price, staying that far behind its best level.
     """
     symbol = symbol.upper()
     if (quantity is None) == (dollars is None):
         raise UsageError("Give a number of shares, or --dollars AMOUNT, but not both.")
+    trailing = trail_percent is not None or trail_amount is not None
+    if trailing:
+        if trail_percent is not None and trail_amount is not None:
+            raise UsageError("Give --trail-percent or --trail-amount, one of them.")
+        # Robinhood has no trailing stop limit order, and the stop price
+        # is set by the trail.
+        if limit is not None or stop is not None or dollars is not None:
+            raise UsageError(
+                "A trailing stop is a market order for a number of shares: use "
+                "--market, with no --limit, --stop or --dollars."
+            )
+        if trail_percent is not None and trail_percent >= 100:
+            raise UsageError("A trail is a percentage under 100.")
     if dollars is not None:
         # Robinhood takes a fraction of a share only as a market order.
         if limit is not None or stop is not None:
@@ -818,14 +870,23 @@ def stock_order(
     trigger = "" if stop is None else plain(stop)
     where = (account or "").strip().lower()
     size = plain(quantity) if dollars is None else f"${dollars:.2f}"
+    trail = ""
+    if trail_percent is not None:
+        trail = f"{plain(trail_percent)}%"
+    elif trail_amount is not None:
+        trail = f"${plain(trail_amount)}"
     code = confirmation_code(
-        side, symbol, size, kind, trigger, time_in_force, extended_hours, where,
+        side, symbol, size, kind, trigger, time_in_force, extended_hours, where, trail,
     )
     command = f"{program()} {side} {symbol} " + (
         f"{plain(quantity)} " if dollars is None else f"--dollars {plain(dollars)} "
     )
     if stop is not None:
         command += f"--stop {plain(stop)} "
+    if trail_percent is not None:
+        command += f"--trail-percent {plain(trail_percent)} "
+    if trail_amount is not None:
+        command += f"--trail-amount {plain(trail_amount)} "
     command += "--market" if limit is None else f"--limit {plain(limit)}"
     if time_in_force != "gfd":
         command += f" --tif {time_in_force}"
@@ -843,6 +904,10 @@ def stock_order(
     terms = "at market" if limit is None else f"limit {money(limit)}"
     if stop is not None:
         terms = f"stop {money(stop)} then {terms}"
+    if trailing:
+        behind = f"{plain(trail_percent)}%" if trail_percent is not None else money(trail_amount)
+        way = "below" if side == "sell" else "above"
+        terms = f"trailing stop {behind} {way} the price, then at market"
     duration = "good for day" if time_in_force == "gfd" else "good till cancelled"
     what = f"{number(quantity)} {symbol}" if dollars is None else f"{money(dollars)} of {symbol}"
     summary = f"{side.capitalize()} {what}, {terms}, {duration}"
@@ -865,6 +930,10 @@ def stock_order(
             # Only named when used, so an ordinary order is sent exactly as before.
             if stop is not None:
                 options["stop_price"] = stop
+            if trail_percent is not None:
+                options["trail_percent"] = trail_percent
+            if trail_amount is not None:
+                options["trail_amount"] = trail_amount
         try:
             order = place(symbol, size_to_send, **options)
         except OrderError as e:
@@ -894,6 +963,14 @@ def stock_order(
     reference = limit if limit is not None else stop
     if reference is None:
         reference = (quote_now.ask if side == "buy" else quote_now.bid) or quote_now.price
+    start = None
+    if trailing and quote_now.price:
+        # Where the stop begins: the trail away from the last price.
+        gap = trail_amount if trail_amount is not None else (
+            quote_now.price * (trail_percent or 0) / 100
+        )
+        start = round(quote_now.price - gap if side == "sell" else quote_now.price + gap, 2)
+        reference = start
     if dollars is not None:
         value = dollars
         quantity = dollars / reference if reference else 0.0
@@ -906,6 +983,8 @@ def stock_order(
     print(f"  {label:<20}{money(value)}")
     if dollars is not None:
         print(f"  {'About:':<20}{number(round(quantity, 6))} shares at {money(reference)}")
+    if start is not None:
+        print(f"  {'Stop starts at:':<20}{money(start)}, and follows the price from there")
     print(f"  {symbol + ' now:':<20}{money(quote_now.price)} "
           f"(bid {money(quote_now.bid)}, ask {money(quote_now.ask)})")
 
@@ -940,6 +1019,18 @@ def stock_order(
             "Robinhood takes a fraction of a share only as a market order, so it is "
             "likely to reject this limit order."
         )
+    if trailing:
+        if start is not None and start <= 0:
+            warnings.append("The trail is larger than the price, so the stop starts at nothing.")
+        warnings.append(
+            "Robinhood has refused trailing stops from apps other than its own. It may "
+            "reject this order; if it does, nothing is placed."
+        )
+        if time_in_force == "gfd":
+            warnings.append(
+                "This stop lasts for today only. Add --tif gtc to keep it working "
+                "until it triggers or you cancel it."
+            )
     if stop is not None and quote_now.price:
         # A sell stop sits below the price and a buy stop above it.
         wrong_side = stop >= quote_now.price if side == "sell" else stop <= quote_now.price
@@ -957,7 +1048,7 @@ def stock_order(
     if limit is None:
         warnings.append(
             "A market order fills at the best price available when it "
-            + ("triggers" if stop is not None else "arrives")
+            + ("triggers" if stop is not None or trailing else "arrives")
             + ", which can differ from the quote above."
         )
     elif stop is None and quote_now.price:

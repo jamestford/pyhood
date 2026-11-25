@@ -18,6 +18,7 @@ from pyhood.exceptions import APIError, AuthError, OrderError
 from pyhood.models import (
     Candle,
     Dividend,
+    Document,
     Earnings,
     Mover,
     NewsArticle,
@@ -426,6 +427,8 @@ class TestRun:
         (["dividends", "--symbol", "KO"], cli.dividends,
          {"symbol": "KO", "as_json_output": False}),
         (["transfers"], cli.transfers, {"as_json_output": False}),
+        (["documents", "--type", "1099", "--year", "2026"], cli.documents,
+         {"kind": "1099", "year": 2026, "as_json_output": False}),
         (["watchlists"], cli.watchlists, {"as_json_output": False}),
         (["watch", "F", "GM"], cli.watch,
          {"symbols": ["F", "GM"], "list_name": "My First List", "remove": False}),
@@ -763,20 +766,24 @@ class TestOrderCommandLine:
         (["buy", "AAPL", "10", "--limit", "350"],
          {"side": "buy", "symbol": "AAPL", "quantity": 10.0, "limit": 350.0, "stop": None,
           "time_in_force": "gfd", "extended_hours": False, "account": None, "confirm": None,
-          "dollars": None}),
+          "dollars": None, "trail_percent": None, "trail_amount": None}),
         (["sell", "AAPL", "10", "--stop", "340", "--limit", "338", "--account", "roth"],
          {"side": "sell", "symbol": "AAPL", "quantity": 10.0, "limit": 338.0, "stop": 340.0,
           "time_in_force": "gfd", "extended_hours": False, "account": "roth", "confirm": None,
-          "dollars": None}),
+          "dollars": None, "trail_percent": None, "trail_amount": None}),
         (["buy", "AAPL", "--dollars", "50", "--market"],
          {"side": "buy", "symbol": "AAPL", "quantity": None, "limit": None, "stop": None,
           "time_in_force": "gfd", "extended_hours": False, "account": None, "confirm": None,
-          "dollars": 50.0}),
+          "dollars": 50.0, "trail_percent": None, "trail_amount": None}),
+        (["sell", "AAPL", "10", "--trail-percent", "5", "--market", "--tif", "gtc"],
+         {"side": "sell", "symbol": "AAPL", "quantity": 10.0, "limit": None, "stop": None,
+          "time_in_force": "gtc", "extended_hours": False, "account": None, "confirm": None,
+          "dollars": None, "trail_percent": 5.0, "trail_amount": None}),
         (["sell", "ant", "0.5", "--market", "--tif", "gtc", "--extended-hours",
           "--confirm", "abc123"],
          {"side": "sell", "symbol": "ant", "quantity": 0.5, "limit": None, "stop": None,
           "time_in_force": "gtc", "extended_hours": True, "account": None,
-          "confirm": "abc123", "dollars": None}),
+          "confirm": "abc123", "dollars": None, "trail_percent": None, "trail_amount": None}),
     ])
     def test_buy_and_sell(self, monkeypatch, argv, kwargs):
         seen = []
@@ -1257,6 +1264,152 @@ class TestDollarOrders:
         assert "only as a market order" not in capsys.readouterr().out
 
 
+class TestTrailingStops:
+    HELD = [Position("ANT", 95.0, 97.13, 82.0, 7790.0, -1437.0, -15.6)]
+
+    def client(self, **kwargs):
+        return OrderClient(stocks=self.HELD, price=82.0, bid=81.9, ask=82.1, **kwargs)
+
+    def test_a_percentage_trail(self, capsys):
+        client = self.client()
+
+        cli.stock_order(client, "sell", "ANT", 10, trail_percent=5.0, time_in_force="gtc")
+
+        out = capsys.readouterr().out
+        assert "Sell 10 ANT, trailing stop 5% below the price, then at market" in out
+        assert "Stop starts at:     $77.90, and follows the price from there" in out
+        assert "Estimated proceeds: $779.00" in out
+        assert "pyhood sell ANT 10 --trail-percent 5 --market --tif gtc --confirm" in out
+
+        cli.stock_order(client, "sell", "ANT", 10, trail_percent=5.0, time_in_force="gtc",
+                        confirm=code_from(out), settle_seconds=0)
+        assert client.writes == [("sell", "ANT", 10, {
+            "price": None, "time_in_force": "gtc", "extended_hours": False,
+            "trail_percent": 5.0,
+        })]
+
+    def test_a_dollar_trail(self, capsys):
+        cli.stock_order(self.client(), "sell", "ANT", 10, trail_amount=4.0)
+
+        out = capsys.readouterr().out
+        assert "trailing stop $4.00 below the price" in out
+        assert "Stop starts at:     $78.00" in out
+        assert "pyhood sell ANT 10 --trail-amount 4 --market --confirm" in out
+
+    def test_a_buy_trails_above_the_price(self, capsys):
+        cli.stock_order(self.client(buying_power=9999.0), "buy", "ANT", 1, trail_percent=10.0)
+
+        out = capsys.readouterr().out
+        assert "trailing stop 10% above the price" in out
+        assert "Stop starts at:     $90.20" in out
+
+    def test_the_preview_says_robinhood_may_refuse_it(self, capsys):
+        """Robinhood has rejected trailing stops from other apps. Better
+        to hear that before saying yes than after."""
+        cli.stock_order(self.client(), "sell", "ANT", 10, trail_percent=5.0)
+
+        out = capsys.readouterr().out
+        assert "Robinhood has refused trailing stops from apps other than its own" in out
+        assert "lasts for today only" in out
+
+    def test_a_code_for_one_trail_will_not_place_another(self, capsys):
+        client = self.client()
+        cli.stock_order(client, "sell", "ANT", 10, trail_percent=5.0)
+        code = code_from(capsys.readouterr().out)
+
+        for other in ({"trail_percent": 50.0}, {"trail_amount": 5.0}, {}):
+            assert cli.stock_order(client, "sell", "ANT", 10, **other, confirm=code,
+                                   settle_seconds=0) == 2
+        assert client.writes == []
+
+    @pytest.mark.parametrize(("kwargs", "message"), [
+        ({"trail_percent": 5.0, "limit": 70.0}, "is a market order"),
+        ({"trail_percent": 5.0, "stop": 70.0}, "is a market order"),
+        ({"trail_percent": 5.0, "trail_amount": 3.0}, "one of them"),
+        ({"trail_percent": 100.0}, "under 100"),
+    ])
+    def test_what_a_trailing_stop_cannot_be(self, kwargs, message):
+        with pytest.raises(cli.UsageError, match=message):
+            cli.stock_order(self.client(), "sell", "ANT", 10, **kwargs)
+
+    def test_a_refusal_reports_robinhoods_reason(self, capsys):
+        client = self.client(reject="Order rejected: trailing stops are not available")
+        cli.stock_order(client, "sell", "ANT", 10, trail_percent=5.0)
+        code = code_from(capsys.readouterr().out)
+
+        assert cli.stock_order(client, "sell", "ANT", 10, trail_percent=5.0, confirm=code,
+                               settle_seconds=0) == 1
+        assert "trailing stops are not available" in capsys.readouterr().err
+
+
+class TestDocuments:
+    DOCS = [
+        Document("doc-1", "account_statement", "2026-10-31"),
+        Document("doc-2", "1099", "2026-02-10"),
+        Document("doc-3", "trade_confirm", "2026-11-19"),
+        Document("doc-4", "account_statement", "2025-12-31"),
+    ]
+
+    def client(self):
+        client = FakeClient()
+        client.get_documents = lambda: list(self.DOCS)
+        client.saved = []
+        client.download_document = lambda document_id, to: (
+            client.saved.append((document_id, to)),
+            __import__("pathlib").Path(to) / "2026-10-31_account_statement.pdf",
+        )[1]
+        return client
+
+    def test_listed_newest_first_with_ids(self, capsys):
+        cli.documents(self.client())
+
+        rows = capsys.readouterr().out.splitlines()
+        assert [row.split() for row in rows[1:5]] == [
+            ["2026-11-19", "trade_confirm", "doc-3"],
+            ["2026-10-31", "account_statement", "doc-1"],
+            ["2026-02-10", "1099", "doc-2"],
+            ["2025-12-31", "account_statement", "doc-4"],
+        ]
+        assert "pyhood document DOCUMENT_ID" in rows[-1]
+
+    def test_filtered_by_part_of_a_type_and_by_year(self, capsys):
+        cli.documents(self.client(), kind="statement", year=2026)
+        out = capsys.readouterr().out
+        assert "doc-1" in out
+        assert "doc-4" not in out and "doc-2" not in out
+
+        cli.documents(self.client(), kind="K-1")
+        assert capsys.readouterr().out.strip() == "No documents match."
+
+    def test_json_has_no_download_links(self, capsys):
+        """A link is a way to fetch the document. The ID is enough."""
+        cli.documents(self.client(), as_json_output=True)
+        assert json.loads(capsys.readouterr().out)[0] == {
+            "date": "2026-11-19", "type": "trade_confirm", "id": "doc-3",
+        }
+
+    def test_saving_one_says_where_it_went(self, capsys):
+        client = self.client()
+
+        assert cli.document(client, "doc-1", to="papers") == 0
+
+        assert client.saved == [("doc-1", "papers")]
+        out = capsys.readouterr().out
+        assert out.startswith("Saved papers/2026-10-31_account_statement.pdf")
+        assert "readable only by you" in out
+
+    def test_command_line(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(cli, "run", lambda fn, **kw: seen.append((fn, kw)) or 0)
+
+        onboarding.main(["document", "doc-1", "--to", "papers"])
+        onboarding.main(["document", "doc-1"])
+        assert seen == [
+            (cli.document, {"document_id": "doc-1", "to": "papers"}),
+            (cli.document, {"document_id": "doc-1", "to": "documents"}),
+        ]
+
+
 # ── Accounts ─────────────────────────────────────────────────────────
 
 
@@ -1734,7 +1887,7 @@ def test_every_command_in_the_guide_parses(line):
 
 
 COMMANDS_IN_THE_GUIDE = {
-    "spread", "banks", "deposit", "withdraw", "cancel-transfer",
+    "spread", "banks", "deposit", "withdraw", "cancel-transfer", "documents", "document",
     "accounts", "positions", "orders", "buying-power", "quote", "options", "earnings",
     "ratings", "news", "movers", "history", "dividends", "transfers", "watchlists", "watch",
     "unwatch", "buy", "sell", "buy-option", "sell-option", "cancel", "crypto", "futures",

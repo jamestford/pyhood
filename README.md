@@ -153,21 +153,22 @@ So give this only to an agent you would trust with the account, and start with s
 | Positions, orders, buying power, quotes | Yes | Yes |
 | IRA and other accounts | Yes | Yes |
 | Price history, earnings dates, analyst ratings, news, movers | Yes | Yes |
-| Dividends and transfer history | Yes | Yes |
+| Dividends, transfer history, statements and tax forms | Yes | Yes |
 | Watchlists | Yes | Yes |
 | Option expirations and contracts | Yes | Yes |
-| Buy and sell stock, including stop orders | Yes, with a preview | Yes |
+| Buy and sell stock, including stop orders and trailing stops | Yes, with a preview | Yes |
 | Buy and sell single options | Yes, with a preview | Yes |
 | Cancel an order | Yes | Yes |
 | Orders by dollar amount, and option spreads | Yes, with a preview | Yes |
 | Crypto prices, holdings, and buying and selling | Yes, with a preview | Yes |
 | Futures quotes, contracts, orders and profit and loss | Yes | Yes |
 | Deposits and withdrawals to a linked bank | Yes, with a preview | Yes |
-| Trailing stops, futures orders, documents | | Yes |
 
-For anything in the Python column only, the agent writes a short script and runs it. `pyhood guide` tells it how.
+Everything here is a command, so the agent rarely needs to write code. For something no command covers, such as a calculation across several results, it writes a short script, and `pyhood guide python` tells it how.
 
-**What has been run against Robinhood for real:** every read command, buying stock with a limit, buying an option to open, and cancelling both. Selling, market orders, stop orders, orders in an IRA and crypto orders go through the same code, but those commands have not yet been run live. Orders by dollar amount, option spreads and bank transfers have never been sent: their previews have been run live, and the step that sends is covered by tests only.
+**Futures can be read but not traded.** pyhood has no way to place a futures order.
+
+**What has been run against Robinhood for real:** every read command, buying stock with a limit, buying an option to open, and cancelling both. Selling, market orders, stop orders, orders in an IRA and crypto orders go through the same code, but those commands have not yet been run live. Orders by dollar amount, option spreads and bank transfers have never been sent: their previews have been run live, and the step that sends is covered by tests only. Trailing stops may be refused by Robinhood, which has rejected them from apps other than its own.
 
 **What it has been tested with:** a local model, Qwen3.6 35B, running in the [Pi](https://github.com/earendil-works/pi) agent. Given the one-line install request above and nothing else, it fetched the instructions and installed pyhood with no errors. Asked to buy, it previewed and waited.
 

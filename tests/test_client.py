@@ -1764,6 +1764,82 @@ class TestSettings:
         assert len(responses.calls) == 0  # nothing is sent
 
 
+class TestDownloadDocument:
+    DOWNLOAD = f"{BASE}/documents/doc-1/download/"
+
+    def _add_documents(self, extra=()):
+        responses.add(
+            responses.GET, urls.DOCUMENTS,
+            json={"results": [
+                {"id": "doc-1", "type": "account_statement", "date": "2026-10-31",
+                 "url": f"{BASE}/documents/doc-1/", "download_url": self.DOWNLOAD},
+                *extra,
+            ], "next": None},
+            status=200,
+        )
+
+    @responses.activate
+    def test_saved_as_a_private_pdf_named_for_its_date_and_type(self, client, tmp_path):
+        self._add_documents()
+        responses.add(responses.GET, self.DOWNLOAD, body=b"%PDF-1.7 the statement",
+                      content_type="application/pdf", status=200)
+        folder = tmp_path / "papers"
+
+        path = client.download_document("doc-1", folder)
+
+        assert path == folder / "2026-10-31_account_statement.pdf"
+        assert path.read_bytes() == b"%PDF-1.7 the statement"
+        # A statement shows the account, so neither is readable by others.
+        assert path.stat().st_mode & 0o777 == 0o600
+        assert folder.stat().st_mode & 0o777 == 0o700
+
+    @responses.activate
+    def test_two_documents_of_one_type_on_one_day_are_both_kept(self, client, tmp_path):
+        second = f"{BASE}/documents/doc-2xxxxxx/download/"
+        for _ in range(2):
+            self._add_documents(extra=[
+                {"id": "doc-2xxxxxx", "type": "account_statement", "date": "2026-10-31",
+                 "download_url": second},
+            ])
+        responses.add(responses.GET, self.DOWNLOAD, body=b"%PDF first", status=200)
+        responses.add(responses.GET, second, body=b"%PDF second", status=200)
+
+        first = client.download_document("doc-1", tmp_path)
+        other = client.download_document("doc-2xxxxxx", tmp_path)
+
+        assert first != other
+        assert first.read_bytes() == b"%PDF first" and other.read_bytes() == b"%PDF second"
+
+    @responses.activate
+    def test_an_unknown_id_downloads_nothing(self, client, tmp_path):
+        self._add_documents()
+        with pytest.raises(SymbolNotFoundError, match="No document has the ID nope"):
+            client.download_document("nope", tmp_path)
+        assert list(tmp_path.iterdir()) == []
+
+    @responses.activate
+    def test_something_that_is_not_a_pdf_is_not_saved(self, client, tmp_path):
+        """An error page saved as statement.pdf would look like a statement."""
+        from pyhood.exceptions import APIError
+
+        self._add_documents()
+        responses.add(responses.GET, self.DOWNLOAD, body=b"<html>Sign in</html>", status=200)
+
+        with pytest.raises(APIError, match="did not download as a PDF"):
+            client.download_document("doc-1", tmp_path)
+        assert list(tmp_path.iterdir()) == []
+
+    @responses.activate
+    def test_a_failed_download_says_so(self, client, tmp_path):
+        from pyhood.exceptions import APIError
+
+        self._add_documents()
+        responses.add(responses.GET, self.DOWNLOAD, body=b"", status=404)
+
+        with pytest.raises(APIError, match="status 404"):
+            client.download_document("doc-1", tmp_path)
+
+
 class TestBanking:
     @responses.activate
     def test_get_bank_accounts(self, client):

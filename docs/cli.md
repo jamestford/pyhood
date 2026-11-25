@@ -118,6 +118,24 @@ pyhood unwatch F               # take off
 
 ## Options
 
+### `pyhood documents`
+
+Statements, trade confirmations and tax forms, newest first.
+
+```text
+DATE        TYPE               DOCUMENT ID
+2026-10-31  account_statement  1a2b3c4d-...
+2026-02-10  1099               5e6f7a8b-...
+```
+
+`--type` narrows by any part of a type's name, such as `statement`, `confirm`, `1099` or `5498`. `--year 2026` narrows by year.
+
+### `pyhood document DOCUMENT_ID`
+
+Saves one document as a PDF, named for its date and type, such as `2026-10-31_account_statement.pdf`. It goes into a `documents` folder where you are, or wherever `--to FOLDER` says.
+
+A statement shows your account details, so the folder and the file are readable only by you. Nothing in your account changes.
+
 ### `pyhood options SYMBOL`
 
 With only a symbol, the expiration dates of its options. With `--expires`, the contracts for that date nearest the stock's price:
@@ -282,6 +300,7 @@ It is a guardrail against mistakes, not a lock: anything that can run the previe
 |---|---|
 | `--limit PRICE` or `--market` | One is required. There is no default |
 | `--stop PRICE` | Make it a stop order. See below |
+| `--trail-percent PERCENT` or `--trail-amount DOLLARS` | Make it a trailing stop. See below |
 | `--account WHICH` | Place it in another account, such as `roth` |
 | `--tif gfd` | Good for day. The default |
 | `--tif gtc` | Good till cancelled |
@@ -313,6 +332,18 @@ The preview points out two things that catch people:
 
 - **A stop that would trigger at once.** A sell stop belongs below the current price and a buy stop above it.
 - **A stop that lasts only for today.** Orders are good for the day by default, and a stop meant as protection is no use once it has expired. Add `--tif gtc`.
+
+### Trailing stops
+
+`--trail-percent PERCENT` or `--trail-amount DOLLARS` makes a stop that follows the price, staying that far behind its best level.
+
+```bash
+pyhood sell AAPL 10 --trail-percent 5 --market --tif gtc
+```
+
+The preview shows where the stop starts. It is always a market order for a number of shares.
+
+**Robinhood may refuse it.** It has rejected trailing stops from apps other than its own, and pyhood has not been able to place one. The preview says so. If the order is refused, nothing is placed and the reason is printed.
 
 ### Option orders
 
@@ -401,7 +432,7 @@ CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share, placed
 - An order that has already finished is left alone, and the command says so.
 - A cancel is a request. If the order filled before it landed, the command reports that in place of `CANCELLED`, and any part that had already filled is not undone.
 
-These cover stock orders by shares or by dollar amount, stop orders, single-leg option orders and spreads, in any of your accounts, and crypto orders. Trailing stops and futures orders are placed from Python.
+These cover stock orders by shares or by dollar amount, stop orders and trailing stops, single-leg option orders and spreads, in any of your accounts, and crypto orders. Futures orders cannot be placed: pyhood has no way to place them, from the command line or from Python.
 
 ## Moving money
 

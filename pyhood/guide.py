@@ -88,6 +88,7 @@ PLACING ORDERS (two steps, every time)
       pyhood buy AAPL 10 --market
       pyhood buy AAPL --dollars 50 --market
       pyhood sell AAPL 10 --stop 340 --market --tif gtc
+      pyhood sell AAPL 10 --trail-percent 5 --market --tif gtc
       pyhood buy-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 2.50
       pyhood sell-option AAPL --expires 2026-12-18 --strike 350 --call --contracts 1 --limit 3.00
       pyhood spread AAPL --expires 2026-12-18 --leg buy:call:350 --leg sell:call:360 --contracts 1 --debit 2.50
@@ -114,6 +115,9 @@ PLACING ORDERS (two steps, every time)
   --stop PRICE makes a stop order: it waits until the price reaches PRICE,
   then places the --market or --limit order. A stop meant as protection
   needs --tif gtc, or it expires at the end of the day.
+  --trail-percent or --trail-amount makes a trailing stop, which follows
+  the price that far behind. Robinhood may refuse these; tell the user if
+  it does.
   Option prices are per share and a contract is 100 shares: --limit 2.50
   on 1 contract is $250. A crypto quantity is in the coin, not dollars:
   0.001 BTC is a thousandth of a bitcoin. Look up real expirations and
@@ -146,6 +150,8 @@ LOOKING THINGS UP (read-only, no preview needed)
       pyhood dividends            dividends paid and pending
       pyhood transfers            money moved in, out and between accounts
       pyhood banks                the bank accounts linked for transfers
+      pyhood documents            statements, trade confirmations and tax forms
+      pyhood document DOCUMENT_ID    save one as a PDF, in a private folder
 
     The market
       pyhood quote AAPL MSFT      current prices; add --fundamentals for more
@@ -188,7 +194,7 @@ LOOKING THINGS UP (read-only, no preview needed)
 
 ANYTHING ELSE
   The commands above cover most requests. For something they do not, such
-  as documents, trailing stops or a calculation over several results, write
+  as futures orders or a calculation over several results, write
   a Python script. First run:
 
       pyhood guide python

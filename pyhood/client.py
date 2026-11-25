@@ -783,6 +783,50 @@ class PyhoodClient:
             for item in data
         ]
 
+    def download_document(self, document_id: str, directory: str | Path = ".") -> Path:
+        """Download one account document as a PDF.
+
+        Args:
+            document_id: The document's `id`, from `get_documents()`.
+            directory: Folder to save into. Created if missing, readable
+                only by you, since a statement shows your account.
+
+        Returns:
+            The path of the saved file, named for the document's date and
+            type, such as `2026-10-31_account_statement.pdf`.
+
+        Raises:
+            SymbolNotFound: If no document has that ID.
+            APIError: If the download fails or is not a PDF.
+        """
+        from pyhood.exceptions import APIError
+        from pyhood.secure_files import ensure_private_dir
+
+        document = next((d for d in self.get_documents() if d.id == document_id), None)
+        if document is None:
+            raise SymbolNotFound(f"No document has the ID {document_id}")
+        if not document.download_url:
+            raise APIError(f"Document {document_id} has no download link")
+
+        content = self._session.get_bytes(document.download_url)
+        if not content.startswith(b"%PDF"):
+            raise APIError(f"Document {document_id} did not download as a PDF")
+
+        folder = Path(directory).expanduser()
+        ensure_private_dir(folder)
+        stem = f"{(document.date or 'undated')[:10]}_{document.type or 'document'}"
+        path = folder / f"{stem}.pdf"
+        if path.exists() and path.read_bytes() != content:
+            # Two documents of one type on one day, such as two trade
+            # confirmations: keep both.
+            path = folder / f"{stem}_{document_id[:8]}.pdf"
+        path.write_bytes(content)
+        try:
+            path.chmod(0o600)
+        except OSError:  # pragma: no cover - platform dependent
+            pass
+        return path
+
     # ── Day Trades / Margin ──────────────────────────────────────────
 
     def get_day_trades(self, account_id: str | None = None) -> list[dict]:
