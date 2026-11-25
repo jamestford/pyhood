@@ -2,9 +2,40 @@
 
 ## Installation
 
+### One command
+
+Run this in your own terminal, on macOS or Linux:
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh | sh
+```
+
+[The script](https://github.com/jamestford/pyhood/blob/main/install.sh) does five things, in order:
+
+1. Looks for [uv](https://docs.astral.sh/uv/getting-started/installation/), the tool pyhood is installed with. If uv is missing, it asks before installing it.
+2. Creates `~/pyhood` and installs pyhood into it, with the two commands under [By hand](#by-hand). If pyhood is already there, it upgrades it.
+3. Links the command into `~/.local/bin`, so that `pyhood` works from any folder.
+4. Runs `pyhood setup login`. See [First Login](#first-login).
+5. Runs `pyhood verify`, which reads live prices and changes nothing.
+
+It never uses `sudo`. It installs pyhood, and uv only if you say yes.
+
+Then open your AI agent in `~/pyhood` and ask it something.
+
+| If | Then |
+|---|---|
+| uv is missing and you answer no | Nothing is installed |
+| `~/pyhood` exists and is not a pyhood install | The script stops and changes nothing |
+| `~/.local/bin/pyhood` is already something else | It is left alone, and the script tells you to use `~/pyhood/bin/pyhood` |
+| `~/.local/bin` is not on your PATH | The script says so. Add it to your PATH to type just `pyhood` |
+| The login does not finish | pyhood stays installed. Log in later with `pyhood setup login` |
+| No terminal is attached, as when an agent runs it | It installs pyhood and tells you to log in yourself |
+
+A download that is cut off partway runs nothing: the script does its work only on its last line.
+
 ### Have your AI agent do it
 
-pyhood is built to be driven by an AI agent, so the quickest install is to hand it the job. Paste this into your agent:
+pyhood is built to be driven by an AI agent, so you can also hand it the job. Paste this into your agent:
 
 ```text
 Install pyhood for me. Follow the install steps in https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md
@@ -45,7 +76,7 @@ Check it worked:
 
 ### Typing just `pyhood`
 
-Link the command into a folder that is on your PATH, and it works from anywhere:
+The install script does this for you. After the other installs, link the command into a folder that is on your PATH, and it works from anywhere:
 
 ```bash
 ln -s ~/pyhood/bin/pyhood ~/.local/bin/pyhood
@@ -54,6 +85,8 @@ ln -s ~/pyhood/bin/pyhood ~/.local/bin/pyhood
 The rest of these docs write `pyhood`. If you skip the link, type `~/pyhood/bin/pyhood`. Do not add `~/pyhood/bin` itself to your PATH: that would also put its `python` ahead of your own.
 
 ### Upgrading
+
+Run the install command again, or:
 
 ```bash
 uv pip install --python ~/pyhood/bin/python --upgrade pyhood

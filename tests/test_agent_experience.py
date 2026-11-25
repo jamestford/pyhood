@@ -367,17 +367,47 @@ class TestInstallByAgent:
         assert "Do not run it for them" in steps
         assert "Do not use `pip`, `sudo` or `--break-system-packages`" in steps
 
-    def test_the_readme_summary_matches_the_file(self):
-        """The folded-away list is a promise about what the file says."""
+    def test_the_agent_steps_and_the_readme_name_the_same_commands(self):
+        """Both ways in build the same install."""
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         steps = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         for command in (
             "uv venv --managed-python --python 3.14 ~/pyhood",
             "uv pip install --python ~/pyhood/bin/python pyhood",
-            "~/pyhood/bin/pyhood version",
-            "~/pyhood/bin/pyhood verify",
         ):
             assert command in readme and command in steps, command
+
+
+class TestInstallScript:
+    """The README's first install step is one command that fetches
+    install.sh, so the docs have to name it and describe it truthfully."""
+
+    COMMAND = (
+        "curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh | sh"
+    )
+
+    def test_the_readme_and_getting_started_give_the_command(self):
+        for path in ("README.md", "docs/getting-started.md"):
+            text = (ROOT / path).read_text(encoding="utf-8")
+            assert self.COMMAND in text, path
+
+    def test_the_script_names_the_same_command(self):
+        assert self.COMMAND in (ROOT / "install.sh").read_text(encoding="utf-8")
+
+    def test_the_script_runs_the_commands_the_readme_lists(self):
+        """The folded-away list is a promise about what the script does."""
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        script = (ROOT / "install.sh").read_text(encoding="utf-8")
+        assert "uv venv --managed-python --python 3.14 ~/pyhood" in readme
+        assert "PYTHON_VERSION=3.14" in script
+        assert '"$UV" venv --managed-python --python "$PYTHON_VERSION" "$DIR"' in script
+        assert 'DIR="$HOME/pyhood"' in script
+        assert "uv pip install --python ~/pyhood/bin/python pyhood" in readme
+        assert '"$UV" pip install --python "$BIN/python" "$SPEC"' in script
+        assert 'SPEC="${PYHOOD_INSTALL_SPEC:-pyhood}"' in script
+        for command in ("setup login", "verify"):
+            assert f"`pyhood {command}`" in readme
+            assert f'"$BIN/pyhood" {command}' in script
 
 
 def test_agents_file_sends_agents_to_the_guide():

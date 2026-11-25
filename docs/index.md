@@ -4,7 +4,7 @@
 
 pyhood is a Robinhood client and command line built to be driven by an AI agent. You ask in plain language, the agent runs pyhood, and before anything is sent you see exactly what it will be. It is also a typed Python library for scripts that need to stay logged in.
 
-New here? [Getting Started](getting-started.md) has a block to paste into your agent that installs pyhood for you.
+New here? [Getting Started](getting-started.md) has one command that installs pyhood and logs you in.
 
 ## Features
 
