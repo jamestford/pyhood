@@ -28,7 +28,7 @@ include = [
 [project]
 name = "pyhood"
 version = "0.22.1"
-description = "A modern, reliable Python client for the Robinhood API"
+description = "Robinhood for AI agents: stocks, options, crypto and futures from the command line"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

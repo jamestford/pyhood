@@ -176,7 +176,7 @@ To use pyhood from some other folder, put one line in that folder's `AGENTS.md` 
 pyhood is installed on this machine. Run `pyhood guide` before using it.
 ```
 
-An agent with your session can place real orders. The guide tells it to preview an order, show you, and wait for a yes, but that is an instruction, not a lock.
+An agent with your session can place real orders. Unless you have turned confirmation off, the guide tells it to show you an order and wait for a yes, but that is an instruction, not a lock.
 
 ## Environment Variables
 

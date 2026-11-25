@@ -1,7 +1,7 @@
 """Option spreads: `pyhood spread`.
 
 A spread is two to four option contracts traded together for one net
-price. It is previewed and confirmed as a single-leg option order is.
+price. It asks and is confirmed as a single-leg option order is.
 """
 
 from __future__ import annotations
@@ -13,8 +13,10 @@ from datetime import date
 from typing import Any
 
 from pyhood.cli import (
+    NOT_PLACED,
     OPEN_STATES,
     UsageError,
+    _ask_to_confirm,
     _expiry,
     _no_such_expiration,
     _wrong_code,
@@ -81,7 +83,7 @@ def spread(
     confirm: str | None = None,
     settle_seconds: float = 2.0,
 ) -> int:
-    """Preview a spread, or place it when given its confirmation code.
+    """Show a spread, or place it when given its confirmation code.
 
     `debit` is the most to pay and `credit` the least to accept, per share
     of the spread: one spread is 100 shares.
@@ -196,7 +198,7 @@ def spread(
     def as_price(amount: float) -> str:
         return f"{money(abs(amount))} {'debit' if amount >= 0 else 'credit'}"
 
-    print("PREVIEW. Nothing has been sent.\n")
+    print(f"{NOT_PLACED}\n")
     print(f"  {summary}")
     for item, c in priced:
         print(
@@ -248,6 +250,5 @@ def spread(
     for warning in warnings:
         print(f"\n  Note: {warning}")
 
-    print("\nTo place this order, show this preview to the user. If they say yes, run:")
-    print(f"  {command} --confirm {code}")
+    _ask_to_confirm(command, code, value)
     return 0

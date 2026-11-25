@@ -324,7 +324,8 @@ class TestInstallFolder:
         assert "bin/pyhood guide" in text
         assert "Do not install anything" in text
         assert "~/.pyhood/" in text
-        assert "Never place an order without the user's yes" in text
+        assert "Place orders the way the guide says for this install" in text
+        assert "never run `pyhood setup confirmation off`" in text
         assert "Cancel an order only when the user asks you to" in text
 
     def test_it_is_not_the_file_for_the_source_folder(self):

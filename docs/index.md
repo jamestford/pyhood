@@ -1,6 +1,6 @@
 # pyhood
 
-**Let your AI agent work your Robinhood account, with a preview before every order.**
+**Robinhood for AI agents: stocks, options, crypto and futures from the command line.**
 
 pyhood is a Robinhood client and command line built to be driven by an AI agent. You ask in plain language, the agent runs pyhood, and before anything is sent you see exactly what it will be. It is also a typed Python library for scripts that need to stay logged in.
 
@@ -9,7 +9,7 @@ New here? [Getting Started](getting-started.md) has a block to paste into your a
 ## Features
 
 - 🤖 **Made for AI agents** — Commands an agent can run for positions, orders, quotes and option chains, a guide it reads first, and an `AGENTS.md` that ships in the install folder.
-- ✅ **Orders are previewed first** — `pyhood buy` sends nothing until it is run again with the code its preview printed, so what is placed is what you were shown.
+- ✅ **You choose how much it asks you** — out of the box `pyhood buy` sends nothing until it is run again with the code it printed, so what is placed is what you were shown. Turn confirmation off and orders up to an amount you set are placed at once.
 - 🔐 **Auth that just works** — Login with timeouts, automatic token refresh, and session persistence.
 - 🔄 **Automatic token refresh** — OAuth refresh tokens renew your session silently — no credentials, no device approval, no human in the loop.
 - 🏷️ **Type hints everywhere** — Full type annotations, dataclass responses, IDE-friendly.

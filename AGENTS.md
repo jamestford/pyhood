@@ -29,7 +29,7 @@ Do not run pyhood from a copy of this repository. This is its source code, not a
 2. If it is, run `~/pyhood/bin/pyhood guide` and follow it. It covers the commands, running scripts, logging in, and the rules for placing orders.
 3. If it is not, ask the user whether to install it, then follow the steps above.
 
-Never ask for, read or type a password or API key. Never place an order without showing the user exactly what will be sent first and getting a yes. Cancel an order only when the user asks you to.
+Never ask for, read or type a password or API key. Place orders the way `pyhood guide` says for that install: unless the user has turned confirmation off, show them exactly what will be sent first and get a yes. Never turn confirmation off yourself. Cancel an order only when the user asks you to.
 
 ## If you are changing pyhood
 

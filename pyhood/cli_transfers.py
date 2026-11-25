@@ -1,10 +1,11 @@
 """Moving money between a bank and Robinhood: `pyhood banks`, `deposit`,
 `withdraw` and `cancel-transfer`.
 
-A deposit or a withdrawal moves real money, so it works as an order does:
-run once it only previews, and it acts when run again with the
-confirmation code the preview printed. The code is tied to the direction,
-the amount and the bank, so what is sent is what was shown.
+A deposit or a withdrawal moves real money, so it always takes two steps,
+whatever the user's confirmation setting: run once it only shows what would
+be sent, and it acts when run again with the confirmation code that step
+printed. The code is tied to the direction, the amount and the bank, so
+what is sent is what was shown.
 """
 
 from __future__ import annotations
@@ -89,7 +90,7 @@ def transfer(
     confirm: str | None = None,
     settle_seconds: float = 0.0,
 ) -> int:
-    """Preview a deposit or a withdrawal, or make it when given its code.
+    """Show a deposit or a withdrawal, or make it when given its code.
 
     `direction` is 'deposit', bank to Robinhood, or 'withdraw', Robinhood
     to bank.
@@ -126,7 +127,7 @@ def transfer(
         print(f"\nCancel it while it is pending with: {program()} cancel-transfer {sent.id}")
         return 0
 
-    print("PREVIEW. Nothing has been sent.\n")
+    print("NOT SENT. This transfer needs your confirmation.\n")
     print(f"  {summary}")
     warnings = []
     if direction == "withdraw":
@@ -146,7 +147,7 @@ def transfer(
     warnings.append("A bank transfer takes a few business days to arrive.")
     for warning in warnings:
         print(f"\n  Note: {warning}")
-    print("\nTo make this transfer, show this preview to the user. If they say yes, run:")
+    print("\nTo make this transfer, show this to the user. If they say yes, run:")
     print(f"  {command} --confirm {code}")
     return 0
 

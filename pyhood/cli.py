@@ -16,8 +16,10 @@ once: it can only remove one named order.
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import hashlib
+import io
 import json
 import shutil
 import sys
@@ -909,30 +911,93 @@ def watch(
     return 1 if failed else 0
 
 
-# ── Orders: preview, then confirm ────────────────────────────────────
+# ── Orders: ask, then place ──────────────────────────────────────────
 
 
 def confirmation_code(*parts: object) -> str:
     """A short code tied to one exact action on one day.
 
-    A command that changes the account runs twice: once to preview, which
+    A command that changes the account runs twice: once to show it, which
     prints this code, and once with the code to act. That guarantees a
-    preview was produced before anything is sent, and that what is sent is
-    what was previewed: a different symbol, quantity or price gives a
+    order was shown before anything is sent, and that what is sent is
+    what was shown: a different symbol, quantity or price gives a
     different code, and so does a different day.
 
     It is a guardrail against mistakes, not a lock. Anything that can run
-    the preview can read the code.
+    the first step can read the code.
     """
     text = "|".join(str(part) for part in parts) + "|" + datetime.now().strftime("%Y-%m-%d")
     return hashlib.sha256(text.encode()).hexdigest()[:6]
+
+
+# The first line of the step that asks. It says the one thing that must not
+# be misread: nothing has been sent.
+NOT_PLACED = "NOT PLACED. This order needs your confirmation."
+_TO_PLACE = "To place this order, show this to the user. If they say yes, run:"
+
+# What the step that asks last worked out, for place_or_ask to act on.
+_asked: dict[str, Any] | None = None
+
+
+def _ask_to_confirm(command: str, code: str, value: float | None) -> None:
+    """End the step that asks: print the command that places the order.
+
+    `value` is what the order is worth in dollars, which decides whether it
+    may be sent unasked when the user has turned confirmation off.
+    """
+    global _asked
+    _asked = {"value": value, "code": code}
+    print(f"\n{_TO_PLACE}")
+    print(f"  {command} --confirm {code}")
+
+
+def place_or_ask(
+    client: Any, order_command: Callable[..., int], ask: bool = False, **order: Any,
+) -> int:
+    """Run an order command as the user's confirmation setting says.
+
+    With confirmation on, or `ask`, or a code already given, the command
+    runs as it always has. With confirmation off, the order is worked out
+    first without printing; if it is worth no more than the user's amount
+    it is sent at once, and if it is worth more it asks as usual.
+    """
+    from pyhood import settings as user_settings
+
+    chosen = user_settings.load()
+    if chosen.confirmation or ask or order.get("confirm") is not None:
+        return order_command(client, **order)
+
+    global _asked
+    _asked = None
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured):
+        status = order_command(client, **order)
+    text = captured.getvalue()
+    review = _asked
+    if status != 0 or review is None:
+        # It stopped before asking: a contract that does not exist, say.
+        print(text, end="")
+        return status
+    above = money(chosen.above)
+    if chosen.asks(review["value"]):
+        print(text, end="")
+        print(
+            f"\nConfirmation is off, but an order above {above} still asks. "
+            f"To change that amount: {program()} setup confirmation above AMOUNT"
+        )
+        return status
+    # The same details the step that asks would show, without the asking.
+    details = text.split(NOT_PLACED, 1)[-1].split(_TO_PLACE, 1)[0].strip("\n")
+    print(f"Confirmation is off and this order is not above {above}, so it is sent at once.\n")
+    print(details + "\n")
+    return order_command(client, **{**order, "confirm": review["code"]})
 
 
 def _wrong_code() -> int:
     print(
         "That confirmation code does not match this order, so nothing was sent.\n"
         "A code belongs to one exact order on one day. Run the command without "
-        "--confirm to preview it and get its code.",
+        "--confirm to see the order and get its code.",
         file=sys.stderr,
     )
     return 2
@@ -954,7 +1019,7 @@ def stock_order(
     trail_percent: float | None = None,
     trail_amount: float | None = None,
 ) -> int:
-    """Preview a stock order, or place it when given its confirmation code.
+    """Show a stock order, or place it when given its confirmation code.
 
     `limit` of None is a market order. `stop` makes it a stop order: it
     waits until the price reaches `stop`, then becomes the market or limit
@@ -1101,7 +1166,7 @@ def stock_order(
     else:
         value = quantity * reference  # type: ignore[operator]
 
-    print("PREVIEW. Nothing has been sent.\n")
+    print(f"{NOT_PLACED}\n")
     print(f"  {summary}")
     label = "Estimated cost:" if side == "buy" else "Estimated proceeds:"
     print(f"  {label:<20}{money(value)}")
@@ -1188,8 +1253,7 @@ def stock_order(
     for warning in warnings:
         print(f"\n  Note: {warning}")
 
-    print("\nTo place this order, show this preview to the user. If they say yes, run:")
-    print(f"  {command} --confirm {code}")
+    _ask_to_confirm(command, code, value)
     return 0
 
 
@@ -1208,7 +1272,7 @@ def option_order(
     confirm: str | None = None,
     settle_seconds: float = 2.0,
 ) -> int:
-    """Preview a single-leg option order, or place it when given its code.
+    """Show a single-leg option order, or place it when given its code.
 
     `limit` is per share, as option prices are quoted. `effect` is 'open'
     or 'close'; left out, a buy opens and a sell closes.
@@ -1293,7 +1357,7 @@ def option_order(
     value = contracts * 100 * limit
     spot = client.get_quote(symbol).price
 
-    print("PREVIEW. Nothing has been sent.\n")
+    print(f"{NOT_PLACED}\n")
     print(f"  {summary}")
     label = "Estimated cost:" if side == "buy" else "Estimated proceeds:"
     print(f"  {label:<20}{money(value)} ({contracts} {plural} x 100 shares x {money(limit)})")
@@ -1355,8 +1419,7 @@ def option_order(
     for warning in warnings:
         print(f"\n  Note: {warning}")
 
-    print("\nTo place this order, show this preview to the user. If they say yes, run:")
-    print(f"  {command} --confirm {code}")
+    _ask_to_confirm(command, code, value)
     return 0
 
 
