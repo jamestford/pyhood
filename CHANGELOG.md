@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-25
+
 ### Added
 - **`pyhood authorize` is the new name for logging in**, and `pyhood authorize --window` for the window an agent opens. "Authorize" says what you are doing: letting pyhood use your Robinhood account. `pyhood setup login` still works, with or without `--window`.
 
