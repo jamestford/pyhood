@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-25
+
 ### Added
 - **Your agent can now do the whole install.** `pyhood setup login --window`, run by an agent, opens a terminal window on your screen with the login in it, and waits for you. You type your username and password in that window and approve on your phone. Nothing you type passes through the agent or the chat. Until now the agent had to stop, ask you to copy a command into a terminal of your own, and wait to be told you were done.
   - The wait is 90 seconds, because agents stop a command that runs too long. Run again, the command goes back to waiting and does not open a second window. `--wait SECONDS` changes the wait.
