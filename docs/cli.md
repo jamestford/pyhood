@@ -318,7 +318,7 @@ pyhood buy AAPL --dollars 50 --market
 
 It is always a market order, in regular hours, of at least $1: Robinhood takes a fraction of a share no other way. The preview shows roughly how many shares the amount comes to.
 
-pyhood has not placed an order by dollar amount against Robinhood. A market order cannot be tested without trading, so this path is covered by tests only.
+A buy by dollar amount has been placed for real, with the market closed so that it could be cancelled before it traded. A sell by dollar amount has not.
 
 ### Stop orders
 
