@@ -17,7 +17,7 @@ from pyhood.crypto.models import (
     TradingPair,
 )
 from pyhood.exceptions import APIError, OrderError, SymbolNotFoundError
-from pyhood.models import FuturesContract, FuturesOrder, FuturesQuote
+from pyhood.models import FuturesContract, FuturesOrder, FuturesOrderCheck, FuturesQuote
 
 UTC = timezone.utc
 pytestmark = pytest.mark.skipif(not hasattr(time, "tzset"), reason="needs time.tzset")
@@ -475,3 +475,134 @@ class TestCommandLine:
         assert markets.run_crypto(markets.crypto_holdings) == 1
         err = capsys.readouterr().err
         assert "Crypto is not set up" in err and "pyhood setup crypto" in err
+
+
+class FuturesCheckFake(FuturesFake):
+    """Answers as Robinhood did on 2026-11-24, and records what was asked."""
+
+    def __init__(self, result="VALIDATE_ORDER_RESULT_FAILURE_INSUFFICIENT_BP", accepted=False,
+                 after=-2809.9548):
+        self.result, self.accepted, self.after = result, accepted, after
+        self.checked = []
+
+    def get_futures_contract(self, symbol):
+        return FuturesContract(symbol, "Micro E-mini S&P 500, Dec-26", "id", "2026-12-18",
+                               0.25, 5.0, "active", "MES", "stock_index")
+
+    def get_futures_product_contracts(self, product):
+        return [self.get_futures_contract(product + "Z26")]
+
+    def check_futures_order(self, symbol, side, quantity, limit_price=None, stop_price=None,
+                            time_in_force="gfd"):
+        self.checked.append((symbol, side, quantity, limit_price, stop_price, time_in_force))
+        return FuturesOrderCheck(
+            symbol, side, quantity, self.result, self.accepted, margin_required=2863.3,
+            buying_power_effect=-2864.16, buying_power_after=self.after, fees=0.86,
+            commission=0.5, gold_savings=0.25,
+        )
+
+
+class TestFuturesOrderPreview:
+    def test_it_shows_robinhoods_margin_fees_and_verdict(self, capsys):
+        client = FuturesCheckFake()
+
+        assert markets.futures_order(client, "buy", "mes", 1, limit=5000) == 0
+
+        assert client.checked == [("MESZ26", "buy", 1, 5000, None, "gfd")]
+        out = capsys.readouterr().out
+        assert out.startswith("PREVIEW ONLY. pyhood cannot place futures orders.")
+        assert "MES: the nearest contract is MESZ26" in out
+        assert "Buy 1 MESZ26 contract, limit 5,000, good for day" in out
+        assert "Position size:        $25,000.00 (1 x $5.00 a point x 5,000)" in out
+        assert "Margin required:      $2,863.30" in out
+        assert "Fees:                 $0.86, including $0.50 commission" in out
+        assert "Buying power effect:  -$2,864.16" in out
+        assert "Buying power after:   -$2,809.95" in out
+        assert "it would refuse this order: not enough buying power." in out
+
+    def test_it_offers_no_way_to_place_the_order(self, capsys):
+        """pyhood has not seen the request that submits a futures order, so
+        there is no code to hand an agent."""
+        markets.futures_order(FuturesCheckFake(), "buy", "MES", 1, limit=5000)
+
+        out = capsys.readouterr().out
+        assert "--confirm" not in out
+        assert "use the Robinhood app or Robinhood Legend" in out
+
+    def test_the_parser_has_no_confirm_for_futures(self, capsys):
+        parser = onboarding.build_parser()
+
+        with pytest.raises(SystemExit):
+            parser.parse_args(["futures", "buy", "MES", "1", "--limit", "5000",
+                               "--confirm", "abc123"])
+
+        assert "unrecognized arguments: --confirm" in capsys.readouterr().err
+
+    def test_a_pass_is_reported_as_a_pass(self, capsys):
+        client = FuturesCheckFake(result="VALIDATE_ORDER_RESULT_SUCCESS", accepted=True,
+                                  after=None)
+
+        markets.futures_order(client, "sell", "MESZ26", 2, limit=9000, time_in_force="gtc")
+
+        out = capsys.readouterr().out
+        assert "Sell 2 MESZ26 contracts, limit 9,000, good till cancelled" in out
+        assert "Robinhood says:       it would accept this order." in out
+        assert "Buying power after" not in out
+        assert "nearest contract" not in out
+
+    def test_a_refusal_pyhood_has_no_words_for_is_given_in_robinhoods(self, capsys):
+        client = FuturesCheckFake(result="VALIDATE_ORDER_RESULT_FAILURE_MARKET_CLOSED")
+
+        markets.futures_order(client, "buy", "MES", 1, limit=5000)
+
+        assert "it would refuse this order: market closed." in capsys.readouterr().out
+
+    def test_a_result_it_cannot_read_is_not_called_a_pass(self, capsys):
+        client = FuturesCheckFake(result="SOMETHING_NEW", accepted=None)
+
+        markets.futures_order(client, "buy", "MES", 1, limit=5000)
+
+        out = capsys.readouterr().out
+        assert "SOMETHING_NEW, which pyhood cannot read." in out
+        assert "would accept" not in out
+
+    def test_a_price_off_the_tick_is_pointed_out(self, capsys):
+        markets.futures_order(FuturesCheckFake(), "buy", "MES", 1, limit=5000.1)
+
+        assert "moves in steps of 0.25, and the limit of 5,000.1 is not one of them" in (
+            capsys.readouterr().out
+        )
+
+    def test_a_stop_is_sent_as_a_stop_and_warned_if_for_today_only(self, capsys):
+        client = FuturesCheckFake()
+
+        markets.futures_order(client, "sell", "MES", 1, stop=7000)
+
+        assert client.checked == [("MESZ26", "sell", 1, None, 7000, "gfd")]
+        out = capsys.readouterr().out
+        assert "stop 7,000 then at market" in out
+        assert "lasts for today's session only" in out
+
+    def test_a_market_order_says_it_trades_at_once(self, capsys):
+        markets.futures_order(FuturesCheckFake(), "buy", "MES", 1)
+
+        out = capsys.readouterr().out
+        assert "Buy 1 MESZ26 contract, at market" in out
+        assert "trades at once" in out
+
+    def test_a_stop_with_a_limit_is_refused_before_asking_robinhood(self):
+        client = FuturesCheckFake()
+
+        with pytest.raises(cli.UsageError, match="not a stop"):
+            markets.futures_order(client, "buy", "MES", 1, limit=5000, stop=6000)
+
+        assert client.checked == []
+
+    def test_json_gives_the_check_as_robinhood_reported_it(self, capsys):
+        markets.futures_order(FuturesCheckFake(), "buy", "MES", 1, limit=5000,
+                              as_json_output=True)
+
+        data = json.loads(capsys.readouterr().out)
+        assert data["result"] == "VALIDATE_ORDER_RESULT_FAILURE_INSUFFICIENT_BP"
+        assert data["accepted"] is False
+        assert data["margin_required"] == 2863.3

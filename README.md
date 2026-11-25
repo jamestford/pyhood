@@ -164,11 +164,12 @@ So give this only to an agent you would trust with the account, and start with s
 | Orders by dollar amount, and option spreads | Yes, with a preview | Yes |
 | Crypto prices, holdings, and buying and selling | Yes, with a preview | Yes |
 | Futures quotes, contracts, orders and profit and loss | Yes | Yes |
+| Preview a futures order: margin, fees and whether Robinhood would accept it | Yes | Yes |
 | Deposits and withdrawals to a linked bank | Yes, with a preview | Yes |
 
 Everything here is a command, so the agent rarely needs to write code. For something no command covers, such as a calculation across several results, it writes a short script, and `pyhood guide python` tells it how.
 
-**Futures can be read but not traded.** pyhood has no way to place a futures order.
+**Futures can be read and previewed, but not traded.** `pyhood futures buy` and `sell` show the margin an order ties up, its fees, and whether Robinhood would accept it, all as Robinhood reports them. They cannot place the order: pyhood has not seen the request that submits one, and will not guess at it with your money.
 
 **What has been run against Robinhood for real.** Tests that pass against made-up responses are not proof, and three of the orders below were refused by Robinhood the first time they were sent, with every test passing. So here is what has actually been placed, by a local model, with a real account:
 

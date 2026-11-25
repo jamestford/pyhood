@@ -435,6 +435,26 @@ class FuturesContract(Model):
 
 
 @dataclass(frozen=True)
+class FuturesOrderCheck(Model):
+    """What Robinhood says about a futures order before it is placed.
+
+    Every amount is None if Robinhood did not send it. `accepted` is None
+    when the result is one pyhood has not seen and cannot read either way.
+    """
+    symbol: str
+    side: str
+    quantity: int
+    result: str  # Robinhood's own word, e.g. VALIDATE_ORDER_RESULT_FAILURE_INSUFFICIENT_BP
+    accepted: bool | None
+    margin_required: float | None = None
+    buying_power_effect: float | None = None  # negative: what the order ties up
+    buying_power_after: float | None = None
+    fees: float | None = None
+    commission: float | None = None
+    gold_savings: float | None = None
+
+
+@dataclass(frozen=True)
 class FuturesQuote(Model):
     """Real-time futures quote."""
     symbol: str

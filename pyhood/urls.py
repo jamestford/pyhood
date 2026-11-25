@@ -127,6 +127,15 @@ def portfolio_positions_url(account_number: str) -> str:
     return f"{BONFIRE}/portfolio/{account_number}/positions_v2"
 
 
+# Asks what an order would tie up. It takes the account in its body.
+FUTURES_BUYING_POWER_EFFECT = f"{FUTURES_ACCOUNTS}buying_power_effect"
+
+
+def futures_order_checks_url(account_id: str) -> str:
+    """URL that says whether Robinhood would accept a futures order."""
+    return f"{FUTURES_ACCOUNTS}{account_id}/order_checks"
+
+
 def futures_positions_url(account_id: str) -> str:
     """URL for open futures positions on a specific account."""
     return f"{FUTURES_ACCOUNTS}{account_id}/positions/"

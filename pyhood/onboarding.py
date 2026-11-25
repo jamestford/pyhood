@@ -888,11 +888,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     futures = commands.add_parser(
         "futures",
-        help="futures quotes, contracts, orders and profit and loss (read-only)",
+        help="futures quotes, contracts, orders, and a preview of an order",
         description=(
-            "Futures, read-only. Name a product, such as ES for the E-mini S&P 500, "
-            "and the nearest contract is used. Or name a contract by product, month "
-            "and year: ESZ26 is ES for December 2026."
+            "Futures. Name a product, such as ES for the E-mini S&P 500, and the "
+            "nearest contract is used. Or name a contract by product, month and "
+            "year: ESZ26 is ES for December 2026. An order can be previewed with "
+            "buy or sell, but not placed."
         ),
     )
     futures_commands = futures.add_subparsers(dest="futures_command", required=True)
@@ -905,6 +906,37 @@ def build_parser() -> argparse.ArgumentParser:
         help="a contract's size, tick and expiration, or a product's contracts",
     )
     futures_contract.add_argument("symbol", metavar="PRODUCT_OR_CONTRACT")
+    for side in ("buy", "sell"):
+        futures_order = futures_commands.add_parser(
+            side, parents=[as_json],
+            help=f"preview a futures order to {side}: margin, fees and Robinhood's verdict",
+            description=(
+                f"Previews an order to {side} futures. It shows the margin the order "
+                "ties up, the fees, and whether Robinhood would accept it, all as "
+                "Robinhood reports them. It cannot place the order, and there is no "
+                "--confirm: use the Robinhood app or Robinhood Legend for that."
+            ),
+        )
+        futures_order.add_argument("symbol", metavar="PRODUCT_OR_CONTRACT")
+        futures_order.add_argument(
+            "quantity", type=_count, metavar="CONTRACTS", help="how many contracts",
+        )
+        futures_price = futures_order.add_mutually_exclusive_group(required=True)
+        futures_price.add_argument(
+            "--limit", type=_positive, metavar="PRICE",
+            help="the limit price, in the contract's points",
+        )
+        futures_price.add_argument(
+            "--market", action="store_true", help="at the best price available",
+        )
+        futures_order.add_argument(
+            "--stop", type=_positive, metavar="PRICE",
+            help="wait until the price reaches this, then trade at market; needs --market",
+        )
+        futures_order.add_argument(
+            "--tif", choices=("gfd", "gtc"), default="gfd",
+            help="gfd: good for day (the default). gtc: good till cancelled",
+        )
     futures_commands.add_parser(
         "orders", parents=[as_json], help="futures orders, with realized profit and loss",
     )
@@ -1113,6 +1145,12 @@ def main(argv: list[str] | None = None) -> int:
         if which == "contract":
             return cli.run(
                 markets.futures_contract, symbol=args.symbol, as_json_output=args.json,
+            )
+        if which in ("buy", "sell"):
+            return cli.run(
+                markets.futures_order, side=which, symbol=args.symbol,
+                quantity=args.quantity, limit=args.limit, stop=args.stop,
+                time_in_force=args.tif, as_json_output=args.json,
             )
         if which == "orders":
             return cli.run(markets.futures_orders, as_json_output=args.json)

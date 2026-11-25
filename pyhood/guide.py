@@ -168,9 +168,12 @@ LOOKING THINGS UP (read-only, no preview needed)
       pyhood crypto holdings      the coins held, and crypto buying power
       pyhood crypto orders        crypto orders; --open for those still open
 
-    Futures (read-only). Name the product, such as ES for the S&P 500, NQ
-    for the Nasdaq, CL for crude oil or GC for gold, and pyhood finds the
-    current contract. Do not guess contract codes like ESZ26.
+    Futures. Name the product, such as ES for the S&P 500, NQ for the
+    Nasdaq, CL for crude oil or GC for gold, and pyhood finds the current
+    contract. Do not guess contract codes like ESZ26. pyhood cannot place
+    a futures order: buy and sell only preview one, and the user places it
+    in the Robinhood app.
+      pyhood futures buy MES 1 --limit 5000    preview: margin, fees, verdict
       pyhood futures quote ES     last, bid, ask and the session's range
       pyhood futures contract ES    the product's contracts and their dates
       pyhood futures contract ESZ26    what one point and one tick are worth

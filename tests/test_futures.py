@@ -1,11 +1,13 @@
 """Tests for futures trading — contracts, quotes, orders, P&L."""
 
+import json
+
 import pytest
 import responses
 
 from pyhood import urls
 from pyhood.client import PyhoodClient
-from pyhood.exceptions import APIError, SymbolNotFoundError
+from pyhood.exceptions import APIError, OrderError, SymbolNotFoundError
 from pyhood.http import Session
 from pyhood.models import FuturesContract, FuturesOrder, FuturesPnL, FuturesQuote
 
@@ -806,3 +808,141 @@ class TestCalculateFuturesPnl:
     def test_aggregate_pnl_empty(self, client):
         total = client.calculate_futures_pnl(orders=[])
         assert total == 0.0
+
+
+# ── Checking an order before it is placed ────────────────────────────
+
+ACCOUNT_ID = "acct-futures-1"
+
+# Both as Robinhood sent them on 2026-11-24, for one Micro E-mini S&P 500
+# contract in an account with too little buying power.
+ORDER_CHECK_RESPONSE = {
+    "result": "VALIDATE_ORDER_RESULT_FAILURE_INSUFFICIENT_BP",
+    "insufficientBp": {"buyingPowerAfterOrder": "-2809.9548"},
+}
+BUYING_POWER_EFFECT_RESPONSE = {
+    "buyingPowerEffect": {"amount": "-2864.16", "currency": "USD"},
+    "totalFee": {"amount": "0.86", "currency": "USD"},
+    "staleData": False,
+    "totalCommission": {"amount": "0.5", "currency": "USD"},
+    "totalGoldSavings": {"amount": "0.25", "currency": "USD"},
+    "estimatedMarginRequired": {"amount": "2863.3", "currency": "USD"},
+}
+
+
+def add_order_check(check: dict | None = None, effect: dict | None = None) -> None:
+    add_contract("MESZ26", "contract-1", multiplier="5")
+    add_product()
+    responses.add(
+        responses.GET, urls.FUTURES_ACCOUNTS,
+        json={"results": [{"id": ACCOUNT_ID, "accountType": "FUTURES"}]}, status=200,
+    )
+    responses.add(
+        responses.POST, urls.futures_order_checks_url(ACCOUNT_ID),
+        json=ORDER_CHECK_RESPONSE if check is None else check, status=200,
+    )
+    responses.add(
+        responses.POST, urls.FUTURES_BUYING_POWER_EFFECT,
+        json=BUYING_POWER_EFFECT_RESPONSE if effect is None else effect, status=200,
+    )
+
+
+def sent(url: str) -> dict:
+    return json.loads(next(c.request.body for c in responses.calls if c.request.url == url))
+
+
+class TestCheckFuturesOrder:
+    """The request bodies are the ones Robinhood's own order ticket sent."""
+
+    CHECKS = urls.futures_order_checks_url(ACCOUNT_ID)
+
+    @responses.activate
+    def test_a_limit_order_as_the_ticket_sends_it(self, client):
+        add_order_check()
+
+        client.check_futures_order("MESZ26", "buy", 1, limit_price=7177.25)
+
+        order = sent(self.CHECKS)["orderInfo"]
+        assert order.pop("refId")
+        assert order == {
+            "accountId": ACCOUNT_ID,
+            "legs": [{"contractType": "OUTRIGHT", "contractId": "contract-1",
+                      "ratioQuantity": 1, "orderSide": "BUY"}],
+            "quantity": "1",
+            "orderType": "LIMIT",
+            "orderTrigger": "IMMEDIATE",
+            "timeInForce": "GFD",
+            "limitPrice": "7177.25",
+        }
+        assert sent(urls.FUTURES_BUYING_POWER_EFFECT) == {
+            "accountId": ACCOUNT_ID,
+            "tentativeFuturesOrder": {
+                "legs": [{"contractType": "OUTRIGHT", "contractId": "contract-1",
+                          "ratioQuantity": 1, "orderSide": "BUY"}],
+                "quantity": "1",
+            },
+        }
+
+    @responses.activate
+    def test_a_market_order_carries_no_price(self, client):
+        add_order_check()
+
+        client.check_futures_order("MESZ26", "buy", 1)
+
+        order = sent(self.CHECKS)["orderInfo"]
+        assert (order["orderType"], order["orderTrigger"]) == ("MARKET", "IMMEDIATE")
+        assert "limitPrice" not in order and "stopPrice" not in order
+
+    @responses.activate
+    def test_a_stop_is_a_market_order_with_a_stop_trigger(self, client):
+        add_order_check()
+
+        client.check_futures_order("MESZ26", "sell", 2, stop_price=7000, time_in_force="gtc")
+
+        order = sent(self.CHECKS)["orderInfo"]
+        assert (order["orderType"], order["orderTrigger"]) == ("MARKET", "STOP")
+        assert order["stopPrice"] == "7000"
+        assert order["timeInForce"] == "GTC"
+        assert order["quantity"] == "2"
+        assert order["legs"][0]["orderSide"] == "SELL"
+        assert "limitPrice" not in order
+
+    @responses.activate
+    def test_what_robinhood_said_is_read(self, client):
+        add_order_check()
+
+        check = client.check_futures_order("MESZ26", "buy", 1, limit_price=5000)
+
+        assert check.symbol == "MESZ26"
+        assert check.accepted is False
+        assert check.result == "VALIDATE_ORDER_RESULT_FAILURE_INSUFFICIENT_BP"
+        assert check.margin_required == 2863.3
+        assert check.buying_power_effect == -2864.16
+        assert check.buying_power_after == -2809.9548
+        assert check.fees == 0.86
+        assert check.commission == 0.5
+        assert check.gold_savings == 0.25
+
+    @responses.activate
+    def test_amounts_robinhood_did_not_send_are_unknown_not_zero(self, client):
+        add_order_check(check={"result": "SOMETHING_NEW"}, effect={})
+
+        check = client.check_futures_order("MESZ26", "buy", 1, limit_price=5000)
+
+        assert check.accepted is None
+        assert check.margin_required is None
+        assert check.fees is None
+        assert check.buying_power_after is None
+
+    def test_a_stop_with_a_limit_is_refused_before_any_request(self, client):
+        with pytest.raises(OrderError, match="not a stop with a limit"):
+            client.check_futures_order("MESZ26", "buy", 1, limit_price=5000, stop_price=6000)
+
+    @responses.activate
+    def test_nothing_is_sent_to_the_orders_address(self, client):
+        add_order_check()
+
+        client.check_futures_order("MESZ26", "buy", 1, limit_price=5000)
+
+        assert not [c for c in responses.calls
+                    if c.request.url.rstrip("/").endswith("/orders")]
