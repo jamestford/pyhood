@@ -48,9 +48,10 @@ Stock and option orders, newest first.
 
 ```text
 Orders since 2026-10-25 (times are EST; today is 2026-11-24)
-PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT  FILLED  AVG PRICE  STATUS
-2026-11-19 12:36 EST  buy   AAPL    stock       10  $350.00      10    $349.80  filled
-2026-11-19 11:31 EST  buy   AAPL    stock       10  $340.00       0          -  cancelled
+PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT     STOP  FILLED  AVG PRICE  STATUS
+2026-11-19 12:36 EST  buy   AAPL    stock       10  $350.00        -      10    $349.80  filled
+2026-11-19 11:31 EST  buy   AAPL    stock       10  $340.00        -       0          -  cancelled
+2026-11-18 10:02 EST  sell  AAPL    stock       10        -  $330.00       0          -  cancelled
 ```
 
 | Option | Effect |
@@ -117,6 +118,24 @@ pyhood unwatch F               # take off
 `watch` and `unwatch` act at once. No money is involved, so there is no preview. Each reads the list back afterwards and tells you if a symbol did not take.
 
 ## Options
+
+### `pyhood documents`
+
+Statements, trade confirmations and tax forms, newest first.
+
+```text
+DATE        TYPE               DOCUMENT ID
+2026-10-31  account_statement  1a2b3c4d-...
+2026-02-10  1099               5e6f7a8b-...
+```
+
+`--type` narrows by any part of a type's name, such as `statement`, `confirm`, `1099` or `5498`. `--year 2026` narrows by year.
+
+### `pyhood document DOCUMENT_ID`
+
+Saves one document as a PDF, named for its date and type, such as `2026-10-31_account_statement.pdf`. It goes into a `documents` folder where you are, or wherever `--to FOLDER` says.
+
+A statement shows your account details, so the folder and the file are readable only by you. Nothing in your account changes.
 
 ### `pyhood options SYMBOL`
 
@@ -282,6 +301,7 @@ It is a guardrail against mistakes, not a lock: anything that can run the previe
 |---|---|
 | `--limit PRICE` or `--market` | One is required. There is no default |
 | `--stop PRICE` | Make it a stop order. See below |
+| `--trail-percent PERCENT` or `--trail-amount DOLLARS` | Make it a trailing stop. See below |
 | `--account WHICH` | Place it in another account, such as `roth` |
 | `--tif gfd` | Good for day. The default |
 | `--tif gtc` | Good till cancelled |
@@ -298,7 +318,7 @@ pyhood buy AAPL --dollars 50 --market
 
 It is always a market order, in regular hours, of at least $1: Robinhood takes a fraction of a share no other way. The preview shows roughly how many shares the amount comes to.
 
-pyhood has not placed an order by dollar amount against Robinhood. A market order cannot be tested without trading, so this path is covered by tests only.
+A buy by dollar amount has been placed for real, with the market closed so that it could be cancelled before it traded. A sell by dollar amount has not.
 
 ### Stop orders
 
@@ -313,6 +333,18 @@ The preview points out two things that catch people:
 
 - **A stop that would trigger at once.** A sell stop belongs below the current price and a buy stop above it.
 - **A stop that lasts only for today.** Orders are good for the day by default, and a stop meant as protection is no use once it has expired. Add `--tif gtc`.
+
+### Trailing stops
+
+`--trail-percent PERCENT` or `--trail-amount DOLLARS` makes a stop that follows the price, staying that far behind its best level.
+
+```bash
+pyhood sell AAPL 10 --trail-percent 5 --market --tif gtc
+```
+
+The preview shows where the stop starts. It is always a market order for a number of shares.
+
+A trailing stop that sells has been placed for real. One that buys has not yet, and the preview says so. If Robinhood refuses an order, nothing is placed and the reason is printed.
 
 ### Option orders
 
@@ -401,7 +433,7 @@ CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share, placed
 - An order that has already finished is left alone, and the command says so.
 - A cancel is a request. If the order filled before it landed, the command reports that in place of `CANCELLED`, and any part that had already filled is not undone.
 
-These cover stock orders by shares or by dollar amount, stop orders, single-leg option orders and spreads, in any of your accounts, and crypto orders. Trailing stops and futures orders are placed from Python.
+These cover stock orders by shares or by dollar amount, stop orders and trailing stops, single-leg option orders and spreads, in any of your accounts, and crypto orders. Futures orders cannot be placed: pyhood has no way to place them, from the command line or from Python.
 
 ## Moving money
 

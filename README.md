@@ -34,10 +34,12 @@ Once it is set up, talk to your agent the way you would to a person:
 | "Buy 10 shares of AAPL at $350 or better" | It shows you a preview and waits for your yes |
 | "Buy one of those $350 calls for $2.50" | It shows you a preview and waits for your yes |
 | "Sell my AAPL if it drops to $340" | It previews a stop order and waits for your yes |
+| "Sell my AAPL if it falls 10% from its high" | It previews a trailing stop and waits for your yes |
 | "Put $50 into Apple" | It previews a $50 order and waits for your yes |
 | "Move $500 to my bank" | It previews the withdrawal and waits for your yes |
 | "Buy $50 of bitcoin... how much is that?" then "buy 0.0008 BTC" | It previews the order with Robinhood's fee and waits for your yes |
 | "Cancel that order" | It cancels it and tells you what happened |
+| "Save my latest statement" | It saves the PDF into a folder only you can read |
 
 ## Get started
 
@@ -153,21 +155,35 @@ So give this only to an agent you would trust with the account, and start with s
 | Positions, orders, buying power, quotes | Yes | Yes |
 | IRA and other accounts | Yes | Yes |
 | Price history, earnings dates, analyst ratings, news, movers | Yes | Yes |
-| Dividends and transfer history | Yes | Yes |
+| Dividends, transfer history, statements and tax forms | Yes | Yes |
 | Watchlists | Yes | Yes |
 | Option expirations and contracts | Yes | Yes |
-| Buy and sell stock, including stop orders | Yes, with a preview | Yes |
+| Buy and sell stock, including stop orders and trailing stops | Yes, with a preview | Yes |
 | Buy and sell single options | Yes, with a preview | Yes |
 | Cancel an order | Yes | Yes |
 | Orders by dollar amount, and option spreads | Yes, with a preview | Yes |
 | Crypto prices, holdings, and buying and selling | Yes, with a preview | Yes |
 | Futures quotes, contracts, orders and profit and loss | Yes | Yes |
 | Deposits and withdrawals to a linked bank | Yes, with a preview | Yes |
-| Trailing stops, futures orders, documents | | Yes |
 
-For anything in the Python column only, the agent writes a short script and runs it. `pyhood guide` tells it how.
+Everything here is a command, so the agent rarely needs to write code. For something no command covers, such as a calculation across several results, it writes a short script, and `pyhood guide python` tells it how.
 
-**What has been run against Robinhood for real:** every read command, buying stock with a limit, buying an option to open, and cancelling both. Selling, market orders, stop orders, orders in an IRA and crypto orders go through the same code, but those commands have not yet been run live. Orders by dollar amount, option spreads and bank transfers have never been sent: their previews have been run live, and the step that sends is covered by tests only.
+**Futures can be read but not traded.** pyhood has no way to place a futures order.
+
+**What has been run against Robinhood for real.** Tests that pass against made-up responses are not proof, and three of the orders below were refused by Robinhood the first time they were sent, with every test passing. So here is what has actually been placed, by a local model, with a real account:
+
+| Placed for real, then cancelled | Not placed yet |
+|---|---|
+| Buy and sell stock at a limit | Any order in an IRA |
+| Buy stock at market, and by dollar amount | Selling an option |
+| Stop orders, at market and with a limit | A trailing stop that buys |
+| A trailing stop that sells | Selling crypto, and crypto at market |
+| Buy an option to open | A withdrawal, and cancelling a transfer |
+| An option spread | |
+| Buy crypto at a limit | |
+| A deposit from a bank | |
+
+Every read command has been run for real too, and so has saving a statement. The orders on the right go through the same code as those on the left, but until one has been sent, treat its first use as a test: start small, and far from the market price.
 
 **What it has been tested with:** a local model, Qwen3.6 35B, running in the [Pi](https://github.com/earendil-works/pi) agent. Given the one-line install request above and nothing else, it fetched the instructions and installed pyhood with no errors. Asked to buy, it previewed and waited.
 

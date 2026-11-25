@@ -5,6 +5,20 @@ All notable changes to pyhood will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Documents.** `pyhood documents` lists statements, trade confirmations and tax forms, newest first, and `--type` and `--year` narrow the list. `pyhood document DOCUMENT_ID` saves one as a PDF named for its date and type. A statement shows your account, so the folder and the file are readable only by you.
+- `download_document(document_id, directory)` is the library method behind it. It refuses to save anything that is not a PDF, so an error page cannot be left on disk looking like a statement.
+- **Trailing stops.** `--trail-percent` and `--trail-amount` on `pyhood buy` and `pyhood sell` place a stop that follows the price. The preview shows where the stop starts. A trailing stop sell has been placed for real, which earlier versions of this library said Robinhood would not allow from an app other than its own; what it refused was the price pyhood sent with the order. A trailing stop that buys has not been placed yet, and its preview says so.
+
+### Fixed
+- **Stop market sells were refused.** `pyhood sell SYMBOL N --stop PRICE --market`, `sell_stock(stop_price=...)` with no limit, and every trailing stop sell sent a price with the order, and Robinhood rejects a stop market sell that carries one: "Stop market sell order requested, but price provided." No price is sent now. Stop market buys, which must carry one, are unchanged.
+- `pyhood orders` has a STOP column, and `pyhood cancel` names an order's stop. A stop order that then trades at market has no limit, so it read as a plain market order.
+- A refused order gives Robinhood's reason as a sentence. It printed the raw response: `{'non_field_errors': ['...']}`.
+- `pyhood orders` shows `market` under LIMIT for a market order. It showed the price ceiling Robinhood requires on one, which read as a limit you had set.
+- **Crypto limit orders were refused.** Robinhood now requires a limit, stop loss or stop limit crypto order to say how long it lasts, and pyhood did not: "limit_order_config.time_in_force: A non-null value is required for this field." `place_order()` sends good till cancelled unless the configuration gives its own `time_in_force`, which is what `pyhood crypto buy` and `sell` have always said the order is.
+
 ## [0.20.0] - 2026-11-24
 
 ### Added

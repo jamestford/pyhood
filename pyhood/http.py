@@ -133,6 +133,26 @@ class Session:
     def get(self, url: str, params: dict | None = None, **kwargs: Any) -> dict[str, Any]:
         return self._request("GET", url, params=params, **kwargs)
 
+    def get_bytes(self, url: str, timeout: float | None = None) -> bytes:
+        """Fetch a URL and return its body as bytes, for a file such as a PDF.
+
+        `get()` parses JSON, which a document is not. Redirects are
+        followed; `requests` drops the Authorization header when one leads
+        to another host, as a document's does, so the token is not sent on.
+        """
+        self._rate_limit()
+        self._last_request_at = time.monotonic()
+        try:
+            resp = self._session.get(url, timeout=timeout or self._timeout)
+        except (requests.ConnectionError, requests.Timeout) as e:
+            raise APIError(f"Download failed: {e}") from e
+        if resp.status_code != 200:
+            raise APIError(
+                f"Download failed with status {resp.status_code}",
+                status_code=resp.status_code,
+            )
+        return resp.content
+
     def post(
         self,
         url: str,

@@ -370,6 +370,13 @@ class TestCryptoClient:
             order_config={"asset_quantity": "0.0001", "limit_price": "32548.38"},
         )
 
+        # Robinhood: "limit_order_config.time_in_force: A non-null value is
+        # required for this field."
+        sent = json.loads(responses.calls[-1].request.body)
+        assert sent["limit_order_config"] == {
+            "asset_quantity": "0.0001", "limit_price": "32548.38", "time_in_force": "gtc",
+        }
+
         assert isinstance(order, CryptoOrder)
         assert order.order_id == "order-123"
         assert order.status == "open"
@@ -385,10 +392,28 @@ class TestCryptoClient:
         assert "account_number=12345" in request.url
         body = json.loads(request.body)
         assert "account_number" not in body
-        assert body["limit_order_config"] == {
-            "asset_quantity": "0.0001", "limit_price": "32548.38",
-        }
         assert body["client_order_id"]
+
+    @responses.activate
+    def test_a_market_order_is_sent_without_a_duration(self):
+        responses.add(responses.POST, CRYPTO_ORDERS, json={"id": "order-1"}, status=200)
+
+        self.client.place_order("12345", "buy", "market", "BTC-USD", {"asset_quantity": "0.0001"})
+
+        body = json.loads(responses.calls[-1].request.body)
+        assert body["market_order_config"] == {"asset_quantity": "0.0001"}
+
+    @responses.activate
+    def test_a_duration_the_caller_gave_is_kept(self):
+        responses.add(responses.POST, CRYPTO_ORDERS, json={"id": "order-1"}, status=200)
+
+        self.client.place_order(
+            "12345", "sell", "stop_loss", "BTC-USD",
+            {"asset_quantity": "0.0001", "stop_price": "30000", "time_in_force": "gfd"},
+        )
+
+        body = json.loads(responses.calls[-1].request.body)
+        assert body["stop_loss_order_config"]["time_in_force"] == "gfd"
 
     @responses.activate
     def test_get_order(self):

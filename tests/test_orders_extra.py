@@ -441,3 +441,26 @@ class TestFractionalSizing:
         qty = float(body.split("quantity=")[1].split("&")[0])
         # Must clear $1 even if it fills at the bid
         assert qty * 311.19 >= 1.0
+
+
+class TestRejectionWording:
+    """A refusal is read by a person, or by a model that repeats it to one."""
+
+    def test_a_reason_about_the_whole_order_is_given_as_a_sentence(self):
+        from pyhood.client import _rejection
+
+        text = _rejection({"non_field_errors": ["Answer some questions first."]})
+
+        assert text == "Answer some questions first."
+
+    def test_a_reason_about_one_field_names_the_field(self):
+        from pyhood.client import _rejection
+
+        assert _rejection({"quantity": ["Too many.", "Whole shares only."]}) == (
+            "quantity: Too many. Whole shares only."
+        )
+
+    def test_an_empty_refusal_says_so(self):
+        from pyhood.client import _rejection
+
+        assert _rejection({}) == "Robinhood gave no reason."

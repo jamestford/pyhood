@@ -783,6 +783,50 @@ class PyhoodClient:
             for item in data
         ]
 
+    def download_document(self, document_id: str, directory: str | Path = ".") -> Path:
+        """Download one account document as a PDF.
+
+        Args:
+            document_id: The document's `id`, from `get_documents()`.
+            directory: Folder to save into. Created if missing, readable
+                only by you, since a statement shows your account.
+
+        Returns:
+            The path of the saved file, named for the document's date and
+            type, such as `2026-10-31_account_statement.pdf`.
+
+        Raises:
+            SymbolNotFound: If no document has that ID.
+            APIError: If the download fails or is not a PDF.
+        """
+        from pyhood.exceptions import APIError
+        from pyhood.secure_files import ensure_private_dir
+
+        document = next((d for d in self.get_documents() if d.id == document_id), None)
+        if document is None:
+            raise SymbolNotFound(f"No document has the ID {document_id}")
+        if not document.download_url:
+            raise APIError(f"Document {document_id} has no download link")
+
+        content = self._session.get_bytes(document.download_url)
+        if not content.startswith(b"%PDF"):
+            raise APIError(f"Document {document_id} did not download as a PDF")
+
+        folder = Path(directory).expanduser()
+        ensure_private_dir(folder)
+        stem = f"{(document.date or 'undated')[:10]}_{document.type or 'document'}"
+        path = folder / f"{stem}.pdf"
+        if path.exists() and path.read_bytes() != content:
+            # Two documents of one type on one day, such as two trade
+            # confirmations: keep both.
+            path = folder / f"{stem}_{document_id[:8]}.pdf"
+        path.write_bytes(content)
+        try:
+            path.chmod(0o600)
+        except OSError:  # pragma: no cover - platform dependent
+            pass
+        return path
+
     # ── Day Trades / Margin ──────────────────────────────────────────
 
     def get_day_trades(self, account_id: str | None = None) -> list[dict]:
@@ -1587,8 +1631,7 @@ class PyhoodClient:
             account_number: Specific account (e.g. IRA). None = default.
             trail_amount: Trail by a dollar amount, for a trailing stop.
             trail_percent: Trail by a percentage, for a trailing stop.
-                Note that Robinhood currently blocks trailing stops for
-                third-party clients — see the module docs.
+                A trailing stop sell was placed live on 2026-11-24.
             market_hours: Trading session — 'regular_hours', 'extended_hours'
                 or 'all_day_hours'. Defaults to regular hours. Anything other
                 than regular hours sets extended_hours automatically; the two
@@ -1654,18 +1697,23 @@ class PyhoodClient:
         elif price is None and stop_price is not None:
             order_type = "market"
             trigger = "stop"
-            price = stop_price  # For stop market orders, price = stop_price
+            # A stop market buy carries its stop as the price. A stop market
+            # sell carries none: Robinhood rejects it with "Stop market sell
+            # order requested, but price provided."
+            price = stop_price if side == "buy" else None
         else:  # both price and stop_price
             order_type = "limit"
             trigger = "stop"
 
-        # Robinhood requires a collar price on market orders: submitting one
-        # without it is rejected with "Market buy order requested, but no price
-        # provided." The collar is the current ask for a buy, bid for a sell.
+        # Robinhood requires a collar price on a market order sent at once:
+        # without it the order is rejected with "Market buy order requested,
+        # but no price provided." The collar is the current ask for a buy, bid
+        # for a sell. A stop market order is not collared: a sell must carry no
+        # price at all, and a buy already carries one.
         ask_price = None
         bid_price = None
         collar_price = None
-        if order_type == "market" and price is None:
+        if order_type == "market" and trigger == "immediate" and price is None:
             quote = self.get_quote(symbol)
             ask_price = quote.ask or quote.price
             bid_price = quote.bid or quote.price
@@ -1745,7 +1793,7 @@ class PyhoodClient:
                     "has likely moved to a newer one — raise ORDER_FORM_VERSION in "
                     f"pyhood/client.py. Server said: {errors}"
                 )
-            raise OrderError(f"Order rejected: {data}")
+            raise OrderError(f"Order rejected: {_rejection(data)}")
 
         # Parse successful response
         created_at = None
@@ -1936,7 +1984,7 @@ class PyhoodClient:
         # Field-level validation errors carry neither key; without this an
         # order with a blank id is returned as if it succeeded.
         if "id" not in data:
-            raise OrderError(f"Option order rejected: {data}")
+            raise OrderError(f"Option order rejected: {_rejection(data)}")
 
         # Parse successful response
         created_at = None
@@ -3155,6 +3203,23 @@ def _safe_float(val: Any) -> float | None:
         return float(val)
     except (ValueError, TypeError):
         return None
+
+
+def _rejection(data: Any) -> str:
+    """Robinhood's reasons for refusing a request, in plain words.
+
+    Validation errors arrive as {field: [messages]}, with the ones about the
+    request as a whole under 'non_field_errors'.
+    """
+    if not isinstance(data, dict) or not data:
+        return str(data) if data else "Robinhood gave no reason."
+    parts = []
+    for field, messages in data.items():
+        if not isinstance(messages, (list, tuple)):
+            messages = [messages]
+        text = " ".join(str(message) for message in messages)
+        parts.append(text if field == "non_field_errors" else f"{field}: {text}")
+    return " ".join(parts)
 
 
 def _safe_int(val: Any) -> int | None:

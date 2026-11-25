@@ -565,6 +565,17 @@ def build_parser() -> argparse.ArgumentParser:
             ),
         )
         order.add_argument(
+            "--trail-percent", type=_positive, metavar="PERCENT",
+            help=(
+                "make it a trailing stop that follows the price this many percent "
+                "behind; needs --market"
+            ),
+        )
+        order.add_argument(
+            "--trail-amount", type=_positive, metavar="DOLLARS",
+            help="the same, with the trail as a dollar amount",
+        )
+        order.add_argument(
             "--tif", choices=("gfd", "gtc"), default="gfd",
             help="gfd (default): good for day. gtc: good till cancelled",
         )
@@ -760,6 +771,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="the code a preview of this exact spread printed; places the order",
     )
 
+    documents = commands.add_parser(
+        "documents", parents=[as_json],
+        help="list statements, trade confirmations and tax forms (read-only)",
+        description="Lists account documents, newest first, with the ID that saves each.",
+    )
+    documents.add_argument(
+        "--type", dest="kind", metavar="TYPE",
+        help="only this kind: statement, confirm, 1099, 5498, or any part of a type's name",
+    )
+    documents.add_argument(
+        "--year", type=_count, metavar="YYYY", help="only documents dated in this year",
+    )
+    document = commands.add_parser(
+        "document",
+        help="save one document as a PDF",
+        description=(
+            "Downloads one document as a PDF into a folder that only you can read. "
+            "Nothing in your account changes."
+        ),
+    )
+    document.add_argument("document_id", metavar="DOCUMENT_ID", help="from `pyhood documents`")
+    document.add_argument(
+        "--to", default="documents", metavar="FOLDER",
+        help="where to save it (default: a `documents` folder here)",
+    )
     commands.add_parser(
         "banks", parents=[as_json],
         help="show the bank accounts linked to Robinhood (read-only)",
@@ -1081,6 +1117,16 @@ def main(argv: list[str] | None = None) -> int:
         if which == "orders":
             return cli.run(markets.futures_orders, as_json_output=args.json)
         return cli.run(markets.futures_positions, as_json_output=args.json)
+    if args.command == "documents":
+        from pyhood import cli
+
+        return cli.run(
+            cli.documents, kind=args.kind, year=args.year, as_json_output=args.json,
+        )
+    if args.command == "document":
+        from pyhood import cli
+
+        return cli.run(cli.document, document_id=args.document_id, to=args.to)
     if args.command in ("watch", "unwatch"):
         from pyhood import cli
 
@@ -1113,7 +1159,8 @@ def main(argv: list[str] | None = None) -> int:
             cli.stock_order, side=args.command, symbol=args.symbol, quantity=args.quantity,
             limit=args.limit, stop=args.stop, time_in_force=args.tif,
             extended_hours=args.extended_hours, account=args.account, confirm=args.confirm,
-            dollars=args.dollars,
+            dollars=args.dollars, trail_percent=args.trail_percent,
+            trail_amount=args.trail_amount,
         )
     if args.command in ("positions", "orders", "buying-power", "quote"):
         from pyhood import cli
