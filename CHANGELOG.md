@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Without a terminal, as when an agent runs it, it installs pyhood and leaves the login to you.
   - Asking your agent to install pyhood still works, and is now the second way in.
 
+## [0.23.2] - 2026-11-25
+
+### Changed
+- `AGENTS.md` says that every merge is released as soon as it is merged, however small the change. It said that a change users would not notice waits for the next release.
+
 ## [0.23.1] - 2026-11-25
 
 ### Fixed
