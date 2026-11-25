@@ -1,0 +1,2825 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Robinhood for AI agents: stocks, options, crypto and futures from the command line">
+      
+      
+      
+        <link rel="canonical" href="https://jamestford.github.io/pyhood/cli/">
+      
+      
+        <link rel="prev" href="../authentication/">
+      
+      
+        <link rel="next" href="../quotes/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
+    
+    
+      
+        <title>Command Line - pyhood</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="lime">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#command-line" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="pyhood" class="md-header__button md-logo" aria-label="pyhood" data-md-component="logo">
+      
+  <img src="../assets/logo-128.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            pyhood
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Command Line
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="lime"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jamestford/pyhood" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jamestford/pyhood
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="pyhood" class="md-nav__button md-logo" aria-label="pyhood" data-md-component="logo">
+      
+  <img src="../assets/logo-128.png" alt="logo">
+
+    </a>
+    pyhood
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jamestford/pyhood" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jamestford/pyhood
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migrating-from-robin-stocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from robin_stocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migrating-from-pyrh/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from pyrh
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Usage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command Line
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command Line
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#account-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Account commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Account commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-accounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood accounts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --account
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-orders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood orders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-buying-power" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood buying-power
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-quote-symbol-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood quote SYMBOL [SYMBOL ...]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-dividends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood dividends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-transfers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood transfers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#market-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Market commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Market commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-history-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood history SYMBOL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-earnings-symbol-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood earnings SYMBOL [SYMBOL ...]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-ratings-symbol-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood ratings SYMBOL [SYMBOL ...]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-news-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood news SYMBOL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-movers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood movers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#watchlists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watchlists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood documents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-document-document_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood document DOCUMENT_ID
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-options-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood options SYMBOL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --json
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#crypto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crypto
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Crypto">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#buying-and-selling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Buying and selling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#futures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Futures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Futures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#estimating-a-futures-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Estimating a futures order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#order-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Order commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-see-the-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: see the order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-confirm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: confirm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-confirmation-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The confirmation code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#turning-confirmation-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Turning confirmation off
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#options_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#orders-by-dollar-amount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Orders by dollar amount
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stop-orders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stop orders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trailing-stops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trailing stops
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-orders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option orders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spreads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spreads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cancelling-an-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancelling an order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#moving-money" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moving money
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup-and-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup and checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scripts-and-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scripts and agents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-a-command-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a command fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quotes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Stock Quotes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Options Chains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../futures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Futures Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../account/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Account & Positions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../crypto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Crypto Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rate-limits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rate Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-endpoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Endpoints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyhoodClient
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/crypto/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CryptoClient
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/onboarding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/exceptions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exceptions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#account-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Account commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Account commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-accounts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood accounts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --account
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood positions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-orders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood orders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-buying-power" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood buying-power
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-quote-symbol-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood quote SYMBOL [SYMBOL ...]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-dividends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood dividends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-transfers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood transfers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#market-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Market commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Market commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-history-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood history SYMBOL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-earnings-symbol-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood earnings SYMBOL [SYMBOL ...]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-ratings-symbol-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood ratings SYMBOL [SYMBOL ...]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-news-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood news SYMBOL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-movers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood movers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#watchlists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Watchlists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood documents
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-document-document_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood document DOCUMENT_ID
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyhood-options-symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pyhood options SYMBOL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --json
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#crypto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crypto
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Crypto">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#buying-and-selling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Buying and selling
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#futures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Futures
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Futures">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#estimating-a-futures-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Estimating a futures order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#order-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order commands
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Order commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-see-the-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: see the order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-confirm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: confirm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-confirmation-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The confirmation code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#turning-confirmation-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Turning confirmation off
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#options_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#orders-by-dollar-amount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Orders by dollar amount
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stop-orders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stop orders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trailing-stops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trailing stops
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-orders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option orders
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spreads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spreads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cancelling-an-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cancelling an order
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#moving-money" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moving money
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup-and-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup and checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scripts-and-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scripts and agents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-a-command-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When a command fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="command-line">Command Line<a class="headerlink" href="#command-line" title="Permanent link">&para;</a></h1>
+<p>The <code>pyhood</code> command answers the most common questions about an account without any code, and sets up and checks your login.</p>
+<p>The account commands are <strong>read-only</strong>. The order commands change your account. Placing an order takes two steps, unless you have turned confirmation off: a first step that shows the order and sends nothing, then a second that places it. Cancelling one takes a single step.</p>
+<h2 id="account-commands">Account commands<a class="headerlink" href="#account-commands" title="Permanent link">&para;</a></h2>
+<h3 id="pyhood-accounts"><code>pyhood accounts</code><a class="headerlink" href="#pyhood-accounts" title="Permanent link">&para;</a></h3>
+<p>The accounts under your login, such as an individual account and an IRA, with what each is worth.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ACCOUNT     NUMBER      VALUE       CASH  BUYING POWER
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Individual  …2223   $7,785.45    $168.85       $168.85
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>Roth IRA    …5556   $7,000.00  $7,000.00     $7,000.00
+</code></pre></div>
+<p>Account numbers show only their last four characters. <code>--json</code> gives them in full.</p>
+<h3 id="-account"><code>--account</code><a class="headerlink" href="#-account" title="Permanent link">&para;</a></h3>
+<p><code>positions</code>, <code>orders</code> and <code>buying-power</code> cover every account under your login. Add <code>--account</code> to see one. An order uses the first account unless it names another the same way. Name an account by part of its type, such as <code>roth</code>, <code>ira</code> or <code>individual</code>, or by the last four characters of its number.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pyhood<span class="w"> </span>positions<span class="w"> </span>--account<span class="w"> </span>roth
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pyhood<span class="w"> </span>buy<span class="w"> </span>AAPL<span class="w"> </span><span class="m">10</span><span class="w"> </span>--limit<span class="w"> </span><span class="m">350</span><span class="w"> </span>--account<span class="w"> </span>roth
+</code></pre></div>
+<p>It works on <code>positions</code>, <code>orders</code>, <code>buying-power</code>, <code>buy</code>, <code>sell</code>, <code>buy-option</code> and <code>sell-option</code>. If what you type fits no account, or more than one, the command stops and lists your accounts. It does not guess.</p>
+<h3 id="pyhood-positions"><code>pyhood positions</code><a class="headerlink" href="#pyhood-positions" title="Permanent link">&para;</a></h3>
+<p>What you hold: stocks, then options, with cost, value and unrealized profit or loss.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>STOCKS
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>SYMBOL  SHARES  AVG COST    PRICE      VALUE  UNREALIZED P/L   P/L %
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>AAPL        10   $340.00  $352.01  $3,520.10        +$120.10  +3.53%
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>TOTAL                              $3,520.10        +$120.10
+</code></pre></div>
+<p>With more than one account, such as an individual account and an IRA, each is listed under its own heading:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Individual (…2223)
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>STOCKS
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>SYMBOL  SHARES  AVG COST    PRICE      VALUE  UNREALIZED P/L   P/L %
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>AAPL        10   $340.00  $352.01  $3,520.10        +$120.10  +3.53%
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>TOTAL                              $3,520.10        +$120.10
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>Roth IRA (…5556)
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>No open positions.
+</code></pre></div>
+<p>A stock held in two accounts shows as two positions, because each is sold from its own account. <code>--account roth</code> shows one account. With <code>--json</code>, <code>stocks</code> and <code>options</code> are the first account's and <code>accounts</code> lists them all.</p>
+<p>Option prices are per share; one contract is 100 shares.</p>
+<h3 id="pyhood-orders"><code>pyhood orders</code><a class="headerlink" href="#pyhood-orders" title="Permanent link">&para;</a></h3>
+<p>Stock and option orders in every account, newest first. With more than one account, an ACCOUNT column says which each order is in.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Orders since 2026-10-25 (times are EST; today is 2026-11-24)
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT     STOP  FILLED  AVG PRICE  STATUS
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>2026-11-19 12:36 EST  buy   AAPL    stock       10  $350.00        -      10    $349.80  filled
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>2026-11-19 11:31 EST  buy   AAPL    stock       10  $340.00        -       0          -  cancelled
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>2026-11-18 10:02 EST  sell  AAPL    stock       10        -  $330.00       0          -  cancelled
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>(none)</em></td>
+<td>Orders from the last 30 days</td>
+</tr>
+<tr>
+<td><code>--since YYYY-MM-DD</code></td>
+<td>Orders placed on or after that date</td>
+</tr>
+<tr>
+<td><code>--all</code></td>
+<td>Every order on record</td>
+</tr>
+<tr>
+<td><code>--symbol AAPL</code></td>
+<td>Orders for one symbol only</td>
+</tr>
+<tr>
+<td><code>--open</code></td>
+<td>Only orders that can still fill, which are the ones that can be cancelled</td>
+</tr>
+<tr>
+<td><code>--account roth</code></td>
+<td>One account's orders only</td>
+</tr>
+</tbody>
+</table>
+<p>The last column is the order ID, which <code>pyhood cancel</code> takes.</p>
+<p>An option order reads as a trade in a contract: <code>buy to open</code> under <code>SIDE</code>, and the contract, such as <code>$12.00 call 2026-12-11</code>, under <code>TYPE</code>. A spread shows as <code>2-leg option</code>.</p>
+<p><code>ORDERED</code> is what was asked for and <code>FILLED</code> is what actually traded. They differ on a partial fill, such as an IPO Access allocation. An order that never filled shows <code>0</code> and <code>-</code>.</p>
+<h3 id="pyhood-buying-power"><code>pyhood buying-power</code><a class="headerlink" href="#pyhood-buying-power" title="Permanent link">&para;</a></h3>
+<p>The cash available to trade with. With one account it is one line. With more than one, such as an individual account and an IRA, each account has its own row:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>ACCOUNT     NUMBER  BUYING POWER
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Individual  …2223        $168.85
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>Roth IRA    …5556      $7,000.00
+</code></pre></div>
+<p>The figures are not added up, because an account spends only its own cash: money in an IRA cannot pay for an order in another account. <code>--account roth</code> shows one account. With <code>--json</code>, <code>buying_power</code> is the first account's and <code>accounts</code> lists them all.</p>
+<h3 id="pyhood-quote-symbol-symbol"><code>pyhood quote SYMBOL [SYMBOL ...]</code><a class="headerlink" href="#pyhood-quote-symbol-symbol" title="Permanent link">&para;</a></h3>
+<p>Price, change, previous close, bid and ask for each symbol. Add <code>--fundamentals</code> for volume, P/E, market cap and the 52-week range, at the cost of one more request.</p>
+<h3 id="pyhood-dividends"><code>pyhood dividends</code><a class="headerlink" href="#pyhood-dividends" title="Permanent link">&para;</a></h3>
+<p>Dividends paid and pending, newest first, with the total paid. <code>--symbol KO</code> shows one stock's.</p>
+<h3 id="pyhood-transfers"><code>pyhood transfers</code><a class="headerlink" href="#pyhood-transfers" title="Permanent link">&para;</a></h3>
+<p>Money moved in, out and between your accounts, newest first. It cannot make a transfer.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>CREATED     AMOUNT     WHAT              FROM                       TO                  STATE      TRANSFER ID
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>2026-11-24  $100.00    deposit           Savings …1234 (Rainy day)  Individual account  pending    1a2b3c4d-...
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>2026-03-23  $7,000.00  IRA Contribution  Individual account         Roth IRA            completed  5e6f7a8b-...
+</code></pre></div>
+<p>A transfer with a bank is a <code>deposit</code> or a <code>withdrawal</code>, and the bank is named by its type, last four digits and nickname. The ID is what <code>pyhood cancel-transfer</code> takes, which works while a bank transfer is still pending. <code>--json</code> gives Robinhood's own record of each transfer.</p>
+<h2 id="market-commands">Market commands<a class="headerlink" href="#market-commands" title="Permanent link">&para;</a></h2>
+<h3 id="pyhood-history-symbol"><code>pyhood history SYMBOL</code><a class="headerlink" href="#pyhood-history-symbol" title="Permanent link">&para;</a></h3>
+<p>Past prices: open, high, low, close and volume, with the change over the period. <code>--span</code> takes <code>week</code>, <code>month</code> (the default), <code>3month</code>, <code>year</code> or <code>5year</code>. The first three give one row a day, the last two one a week.</p>
+<h3 id="pyhood-earnings-symbol-symbol"><code>pyhood earnings SYMBOL [SYMBOL ...]</code><a class="headerlink" href="#pyhood-earnings-symbol-symbol" title="Permanent link">&para;</a></h3>
+<p>When each company next reports, whether before the open or after the close, and the estimate. <code>--days N</code> sets how far ahead to look; the default is 90.</p>
+<h3 id="pyhood-ratings-symbol-symbol"><code>pyhood ratings SYMBOL [SYMBOL ...]</code><a class="headerlink" href="#pyhood-ratings-symbol-symbol" title="Permanent link">&para;</a></h3>
+<p>Analysts' buy, hold and sell counts, and their low, mean and high price targets.</p>
+<h3 id="pyhood-news-symbol"><code>pyhood news SYMBOL</code><a class="headerlink" href="#pyhood-news-symbol" title="Permanent link">&para;</a></h3>
+<p>Recent headlines with their source, time and link. <code>--count N</code> sets how many; the default is 5.</p>
+<h3 id="pyhood-movers"><code>pyhood movers</code><a class="headerlink" href="#pyhood-movers" title="Permanent link">&para;</a></h3>
+<p>The S&amp;P 500 stocks that have risen most today, with price and change. <code>--down</code> shows the biggest falls.</p>
+<h2 id="watchlists">Watchlists<a class="headerlink" href="#watchlists" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pyhood<span class="w"> </span>watchlists<span class="w">              </span><span class="c1"># your lists and what is on them</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>pyhood<span class="w"> </span>watch<span class="w"> </span>F<span class="w"> </span>GM<span class="w">              </span><span class="c1"># add to 'My First List'</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>pyhood<span class="w"> </span>watch<span class="w"> </span>NVDA<span class="w"> </span>--list<span class="w"> </span>Tech<span class="w">  </span><span class="c1"># add to another list</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>pyhood<span class="w"> </span>unwatch<span class="w"> </span>F<span class="w">               </span><span class="c1"># take off</span>
+</code></pre></div>
+<p><code>watch</code> and <code>unwatch</code> act at once. No money is involved, so there is nothing to confirm. Each reads the list back afterwards and tells you if a symbol did not take.</p>
+<h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">&para;</a></h2>
+<h3 id="pyhood-documents"><code>pyhood documents</code><a class="headerlink" href="#pyhood-documents" title="Permanent link">&para;</a></h3>
+<p>Statements, trade confirmations and tax forms, newest first.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>DATE        TYPE               DOCUMENT ID
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>2026-10-31  account_statement  1a2b3c4d-...
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>2026-02-10  1099               5e6f7a8b-...
+</code></pre></div>
+<p><code>--type</code> narrows by any part of a type's name, such as <code>statement</code>, <code>confirm</code>, <code>1099</code> or <code>5498</code>. <code>--year 2026</code> narrows by year.</p>
+<h3 id="pyhood-document-document_id"><code>pyhood document DOCUMENT_ID</code><a class="headerlink" href="#pyhood-document-document_id" title="Permanent link">&para;</a></h3>
+<p>Saves one document as a PDF, named for its date and type, such as <code>2026-10-31_account_statement.pdf</code>. It goes into a <code>documents</code> folder where you are, or wherever <code>--to FOLDER</code> says.</p>
+<p>A statement shows your account details, so the folder and the file are readable only by you. Nothing in your account changes.</p>
+<h3 id="pyhood-options-symbol"><code>pyhood options SYMBOL</code><a class="headerlink" href="#pyhood-options-symbol" title="Permanent link">&para;</a></h3>
+<p>With only a symbol, the expiration dates of its options. With <code>--expires</code>, the contracts for that date nearest the stock's price:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>$ pyhood options F --expires 2026-12-11 --strikes 4
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>F is at $11.95. Options expiring 2026-12-11 (17 days).
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>Prices are per share. One contract is 100 shares, so $2.50 costs $250.
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>CALLS, the 4 strikes nearest the price
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>STRIKE    BID    ASK   MARK   DELTA     IV  VOLUME  OPEN INT
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>$11.00  $0.89  $1.12  $1.01  +0.901  31.3%     117       209
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>$11.50  $0.60  $0.66  $0.63  +0.721  34.1%     253     1,558
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>$12.00  $0.28  $0.33  $0.31  +0.500  31.4%     560     3,547
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>$12.50  $0.11  $0.14  $0.13  +0.272  31.3%   1,171     1,467
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--expires YYYY-MM-DD</code></td>
+<td>Show the contracts for that expiration</td>
+</tr>
+<tr>
+<td><code>--call</code> or <code>--put</code></td>
+<td>Show one side only</td>
+</tr>
+<tr>
+<td><code>--strikes N</code></td>
+<td>How many strikes nearest the price to show. The default is 10</td>
+</tr>
+</tbody>
+</table>
+<p>Delta and IV print as <code>-</code> when Robinhood publishes none, as on a contract's expiration day.</p>
+<h3 id="-json"><code>--json</code><a class="headerlink" href="#-json" title="Permanent link">&para;</a></h3>
+<p>Each account command takes <code>--json</code> to print exact values in place of the table:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>pyhood<span class="w"> </span>orders<span class="w"> </span>--symbol<span class="w"> </span>AAPL<span class="w"> </span>--json
+</code></pre></div>
+<p>Two differences from the tables:</p>
+<ul>
+<li><strong>Times are UTC</strong>, as Robinhood sends them, in ISO-8601 form. The tables convert them to your computer's time zone.</li>
+<li><strong>Unknown values are <code>null</code></strong>, where the tables print <code>-</code>.</li>
+</ul>
+<h2 id="crypto">Crypto<a class="headerlink" href="#crypto" title="Permanent link">&para;</a></h2>
+<p>Crypto goes through Robinhood's official Crypto Trading API, which has its own credentials. Set them up once with <code>pyhood setup crypto</code>. A coin can be written <code>BTC</code> or <code>BTC-USD</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>pyhood<span class="w"> </span>crypto<span class="w"> </span>quote<span class="w"> </span>BTC<span class="w"> </span>ETH<span class="w">    </span><span class="c1"># best bid and ask</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>pyhood<span class="w"> </span>crypto<span class="w"> </span>holdings<span class="w">         </span><span class="c1"># the coins you hold, and crypto buying power</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>pyhood<span class="w"> </span>crypto<span class="w"> </span>orders<span class="w">           </span><span class="c1"># crypto orders, newest first; --open for open ones</span>
+</code></pre></div>
+<h3 id="buying-and-selling">Buying and selling<a class="headerlink" href="#buying-and-selling" title="Permanent link">&para;</a></h3>
+<p><code>pyhood crypto buy</code> and <code>pyhood crypto sell</code> work in the same two steps as stock orders. The quantity is in the coin, not in dollars.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>$ pyhood crypto buy BTC 0.001 --limit 50000
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>NOT PLACED. This order needs your confirmation.
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>  Buy 0.001 BTC, limit $50,000.00
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>  Estimated cost:     $50.57 ($50.00 plus a fee of about $0.57)
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>  BTC now:            $60,000.00 to buy
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>  Buying power:       $500.00
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>  Note: The limit is 16.7% below the current price of $60,000.00.
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>  Note: A crypto limit order stays open until it fills or you cancel it.
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>To place this order, show this to the user. If they say yes, run:
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>  pyhood crypto buy BTC 0.001 --limit 50000 --confirm 4c1f0e
+</code></pre></div>
+<p>The first step differs from a stock order's in three ways:</p>
+<ul>
+<li><strong>It shows Robinhood's fee</strong>, as part of what a buy costs and taken off what a sale brings in. The fee comes from Robinhood's own estimate for that order.</li>
+<li><strong>It checks the coin can be traded through the API.</strong> Some coins trade in the app but not here, and those are refused.</li>
+<li><strong>It points out an order under Robinhood's minimum</strong>, which is a dollar value, about ten cents.</li>
+</ul>
+<p><code>pyhood crypto cancel ORDER_ID</code> cancels an open crypto order at once.</p>
+<h2 id="futures">Futures<a class="headerlink" href="#futures" title="Permanent link">&para;</a></h2>
+<p>Futures can be read, and an order estimated, but not placed. Name a product, such as <code>ES</code> for the E-mini S&amp;P 500, <code>NQ</code> for the Nasdaq, <code>CL</code> for crude oil or <code>GC</code> for gold, and pyhood uses its nearest contract. You do not have to know which month is current.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>pyhood<span class="w"> </span>futures<span class="w"> </span>quote<span class="w"> </span>ES<span class="w"> </span>NQ<span class="w">      </span><span class="c1"># last, bid, ask, and the session's high, low and volume</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>pyhood<span class="w"> </span>futures<span class="w"> </span>contract<span class="w"> </span>ES<span class="w">      </span><span class="c1"># the product's contracts and when each expires</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>pyhood<span class="w"> </span>futures<span class="w"> </span>contract<span class="w"> </span>ESZ26<span class="w">   </span><span class="c1"># one contract: what a point and a tick are worth</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>pyhood<span class="w"> </span>futures<span class="w"> </span>orders<span class="w">           </span><span class="c1"># orders, with realized profit and loss</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>pyhood<span class="w"> </span>futures<span class="w"> </span>positions<span class="w">        </span><span class="c1"># open positions</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>$ pyhood futures quote ES
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>ES: the nearest contract is ESZ26, expiring 2026-12-18.
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>SYMBOL      LAST  CHANGE      BID       ASK   HIGH       LOW  PREV CLOSE  VOLUME
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>ESZ26   7,206.75  -0.15%  7,206.5  7,206.75  7,224  7,205.75     7,217.5   4,172
+</code></pre></div>
+<p>A contract can also be named in full, by product, month and year: <code>ESZ26</code> is <code>ES</code> for December 2026.</p>
+<p><code>pyhood futures positions</code> prints what Robinhood sends without arranging it into columns. pyhood has not seen an open futures position, and does not guess at field names.</p>
+<h3 id="estimating-a-futures-order">Estimating a futures order<a class="headerlink" href="#estimating-a-futures-order" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>$ pyhood futures buy MES 1 --limit 5000
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>ESTIMATE ONLY. pyhood cannot place futures orders. Nothing has been sent.
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>  MES: the nearest contract is MESZ26, expiring 2026-12-18.
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>  Buy 1 MESZ26 contract, limit 5,000, good for day
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>  Contract:             Micro E-mini S&amp;P 500 Stock Price Index Futures, Dec-26, expires 2026-12-18
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>  Position size:        $25,000.00 (1 x $5.00 a point x 5,000)
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>  MESZ26 now:           7,179.5 (bid 7,179.25, ask 7,179.5)
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>  Margin required:      $2,863.30
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>  Fees:                 $0.86, including $0.50 commission
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>  Buying power effect:  -$2,864.16
+<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>  Buying power after:   -$2,809.95
+<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a>  Robinhood says:       it would refuse this order: not enough buying power.
+<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a>
+<a id="__codelineno-15-15" name="__codelineno-15-15" href="#__codelineno-15-15"></a>This is an estimate only, and there is no step that places it. To place this order, use the Robinhood app or Robinhood Legend.
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--limit PRICE</code></td>
+<td>A limit order, with the price in the contract's points</td>
+</tr>
+<tr>
+<td><code>--market</code></td>
+<td>A market order</td>
+</tr>
+<tr>
+<td><code>--stop PRICE --market</code></td>
+<td>A stop order: it waits for the price, then trades at market</td>
+</tr>
+<tr>
+<td><code>--tif gtc</code></td>
+<td>Good till cancelled. The default is good for day</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td>The check as Robinhood reported it</td>
+</tr>
+</tbody>
+</table>
+<p>The margin, the fees and the verdict are Robinhood's own. They come from the two requests its order ticket makes before it lets you submit an order, and neither places anything. Position size is worked out by pyhood: contracts, times dollars per point, times the price.</p>
+<p>There is no <code>--confirm</code>, because there is nothing to confirm. pyhood has not seen the request that submits a futures order, so it does not send one. Robinhood offers limit, market and stop orders on futures, and no stop with a limit.</p>
+<h2 id="order-commands">Order commands<a class="headerlink" href="#order-commands" title="Permanent link">&para;</a></h2>
+<p>Out of the box, <code>pyhood buy</code> and <code>pyhood sell</code> never act the first time they are run. You can change that: see <a href="#turning-confirmation-off">Turning confirmation off</a>.</p>
+<h3 id="step-1-see-the-order">Step 1: see the order<a class="headerlink" href="#step-1-see-the-order" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>$ pyhood buy AAPL 10 --limit 350
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>NOT PLACED. This order needs your confirmation.
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>  Buy 10 AAPL, limit $350.00, good for day
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>  Estimated cost:     $3,500.00
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>  AAPL now:           $352.01 (bid $351.99, ask $352.01)
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>  Buying power:       $5,000.00
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>  Market open:        yes
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>To place this order, show this to the user. If they say yes, run:
+<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>  pyhood buy AAPL 10 --limit 350 --confirm 98dee3
+</code></pre></div>
+<p>This step reads your quote, buying power or holdings, and points out anything that looks wrong:</p>
+<ul>
+<li>the cost is more than your buying power</li>
+<li>a sell is for more shares than you hold</li>
+<li>the limit is 5% or more away from the last price</li>
+<li>the order is a market order, which fills at whatever price is available</li>
+</ul>
+<h3 id="step-2-confirm">Step 2: confirm<a class="headerlink" href="#step-2-confirm" title="Permanent link">&para;</a></h3>
+<p>Run the command the first step printed. The order is placed and its status reported:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>$ pyhood buy AAPL 10 --limit 350 --confirm 98dee3
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>PLACED: Buy 10 AAPL, limit $350.00, good for day
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>  Status:    confirmed
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>  Order ID:  1a2b3c4d-...
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>Check it with:  pyhood orders --symbol AAPL
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>Cancel it with: pyhood cancel 1a2b3c4d-...
+</code></pre></div>
+<h3 id="the-confirmation-code">The confirmation code<a class="headerlink" href="#the-confirmation-code" title="Permanent link">&para;</a></h3>
+<p>The code is worked out from the order itself and today's date. So:</p>
+<ul>
+<li><strong>What is placed is what was shown.</strong> A different symbol, quantity, price or duration has a different code, and the wrong code is refused before anything is sent.</li>
+<li><strong>The order is always shown first</strong>, because that is the only place the code appears.</li>
+<li><strong>A code stops working at the end of the day.</strong></li>
+</ul>
+<p>It is a guardrail against mistakes, not a lock: anything that can run the first step can read the code. It makes an agent show its work. It does not stop an agent that ignores its instructions.</p>
+<h3 id="turning-confirmation-off">Turning confirmation off<a class="headerlink" href="#turning-confirmation-off" title="Permanent link">&para;</a></h3>
+<p>If you would rather your agent placed orders without asking, turn confirmation off. Run this yourself, in your own terminal:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>$ pyhood setup confirmation off
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>Turning confirmation off means:
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>  - An order worth up to $5,000.00 is sent to Robinhood as soon as your
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    agent runs it. You are not shown it first and are not asked.
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>  ...
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>Type yes to turn confirmation off: yes
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>Confirmation is off. Orders up to $5,000.00 are placed at once.
+</code></pre></div>
+<p>After that an order is placed on the first run:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>$ pyhood buy AAPL 10 --limit 350
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>Confirmation is off and this order is not above $5,000.00, so it is sent at once.
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>  Buy 10 AAPL, limit $350.00, good for day
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>  Estimated cost:     $3,500.00
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>  AAPL now:           $352.01 (bid $351.99, ask $352.01)
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>  Buying power:       $5,000.00
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>  Market open:        yes
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>PLACED: Buy 10 AAPL, limit $350.00, good for day
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>  Status:    queued
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>  Order ID:  ...
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pyhood setup confirmation</code></td>
+<td>Shows the setting</td>
+</tr>
+<tr>
+<td><code>pyhood setup confirmation off</code></td>
+<td>Orders are placed at once, except above your amount</td>
+</tr>
+<tr>
+<td><code>pyhood setup confirmation above 500</code></td>
+<td>Sets the amount. An order worth more still asks</td>
+</tr>
+<tr>
+<td><code>pyhood setup confirmation on</code></td>
+<td>Every order asks first. This is how pyhood starts</td>
+</tr>
+</tbody>
+</table>
+<p>How it behaves:</p>
+<ul>
+<li><strong>The amount is a backstop.</strong> It starts at $5,000. An order worth more is not refused: it takes the usual two steps, and says why.</li>
+<li><strong>It measures what the order is worth</strong>: the estimated cost or proceeds the first step shows. Selling counts the same as buying. An option order counts its whole cost, 100 shares a contract.</li>
+<li><strong>Each order is judged on its own.</strong> Several orders under the amount all go through. It catches a mistake, such as 100 shares for 10. It is not a spending limit.</li>
+<li><strong>An order whose worth cannot be worked out asks.</strong></li>
+<li><strong><code>--ask</code> makes one order ask</strong>, whatever the setting.</li>
+<li><strong>Bank transfers always ask.</strong> Cancelling never does.</li>
+<li><strong>Warnings are still printed</strong>, above the line that says the order was placed. By then it has been sent.</li>
+<li><strong>The agent is told.</strong> <code>pyhood guide</code> describes whichever way this install is set, with the amount.</li>
+</ul>
+<p>Turning confirmation off, or changing the amount, needs a person at the terminal. Run by an agent, the command changes nothing and tells the agent to ask you. Turning it back on works from anywhere. The setting is kept in <code>~/.pyhood/settings.json</code>; an agent that can run commands could edit that file by hand, so this too is a guardrail and not a lock.</p>
+<h3 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pyhood buy SYMBOL QUANTITY --limit PRICE</code></td>
+<td>Buy at that price or better</td>
+</tr>
+<tr>
+<td><code>pyhood buy SYMBOL QUANTITY --market</code></td>
+<td>Buy at the best price available</td>
+</tr>
+<tr>
+<td><code>pyhood sell SYMBOL QUANTITY --limit PRICE</code></td>
+<td>Sell at that price or better</td>
+</tr>
+<tr>
+<td><code>pyhood sell SYMBOL QUANTITY --market</code></td>
+<td>Sell at the best price available</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--limit PRICE</code> or <code>--market</code></td>
+<td>One is required. There is no default</td>
+</tr>
+<tr>
+<td><code>--stop PRICE</code></td>
+<td>Make it a stop order. See below</td>
+</tr>
+<tr>
+<td><code>--trail-percent PERCENT</code> or <code>--trail-amount DOLLARS</code></td>
+<td>Make it a trailing stop. See below</td>
+</tr>
+<tr>
+<td><code>--account WHICH</code></td>
+<td>Place it in another account, such as <code>roth</code></td>
+</tr>
+<tr>
+<td><code>--tif gfd</code></td>
+<td>Good for day. The default</td>
+</tr>
+<tr>
+<td><code>--tif gtc</code></td>
+<td>Good till cancelled</td>
+</tr>
+<tr>
+<td><code>--extended-hours</code></td>
+<td>Allow the order to trade outside regular hours</td>
+</tr>
+<tr>
+<td><code>--confirm CODE</code></td>
+<td>Place the order, using the code the first step printed</td>
+</tr>
+<tr>
+<td><code>--ask</code></td>
+<td>Ask first for this order, even with confirmation off</td>
+</tr>
+</tbody>
+</table>
+<h3 id="orders-by-dollar-amount">Orders by dollar amount<a class="headerlink" href="#orders-by-dollar-amount" title="Permanent link">&para;</a></h3>
+<p><code>--dollars AMOUNT</code> in place of a number of shares buys or sells that much money's worth, which is usually a fraction of a share.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>pyhood<span class="w"> </span>buy<span class="w"> </span>AAPL<span class="w"> </span>--dollars<span class="w"> </span><span class="m">50</span><span class="w"> </span>--market
+</code></pre></div>
+<p>It is always a market order, in regular hours, of at least $1: Robinhood takes a fraction of a share no other way. The first step shows roughly how many shares the amount comes to.</p>
+<p>A buy by dollar amount has been placed for real, with the market closed so that it could be cancelled before it traded. A sell by dollar amount has not.</p>
+<h3 id="stop-orders">Stop orders<a class="headerlink" href="#stop-orders" title="Permanent link">&para;</a></h3>
+<p><code>--stop PRICE</code> makes an order wait. Nothing happens until the stock reaches the stop price; then the <code>--market</code> or <code>--limit</code> order is placed.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>pyhood<span class="w"> </span>sell<span class="w"> </span>AAPL<span class="w"> </span><span class="m">10</span><span class="w"> </span>--stop<span class="w"> </span><span class="m">340</span><span class="w"> </span>--market<span class="w"> </span>--tif<span class="w"> </span>gtc<span class="w">   </span><span class="c1"># sell if it falls to $340</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>pyhood<span class="w"> </span>sell<span class="w"> </span>AAPL<span class="w"> </span><span class="m">10</span><span class="w"> </span>--stop<span class="w"> </span><span class="m">340</span><span class="w"> </span>--limit<span class="w"> </span><span class="m">338</span><span class="w"> </span>--tif<span class="w"> </span>gtc<span class="w">   </span><span class="c1"># ... but not below $338</span>
+</code></pre></div>
+<p>The first step points out two things that catch people:</p>
+<ul>
+<li><strong>A stop that would trigger at once.</strong> A sell stop belongs below the current price and a buy stop above it.</li>
+<li><strong>A stop that lasts only for today.</strong> Orders are good for the day by default, and a stop meant as protection is no use once it has expired. Add <code>--tif gtc</code>.</li>
+</ul>
+<h3 id="trailing-stops">Trailing stops<a class="headerlink" href="#trailing-stops" title="Permanent link">&para;</a></h3>
+<p><code>--trail-percent PERCENT</code> or <code>--trail-amount DOLLARS</code> makes a stop that follows the price, staying that far behind its best level.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>pyhood<span class="w"> </span>sell<span class="w"> </span>AAPL<span class="w"> </span><span class="m">10</span><span class="w"> </span>--trail-percent<span class="w"> </span><span class="m">5</span><span class="w"> </span>--market<span class="w"> </span>--tif<span class="w"> </span>gtc
+</code></pre></div>
+<p>The first step shows where the stop starts. It is always a market order for a number of shares.</p>
+<p>A trailing stop that sells has been placed for real. One that buys has not yet, and the first step says so. If Robinhood refuses an order, nothing is placed and the reason is printed.</p>
+<h3 id="option-orders">Option orders<a class="headerlink" href="#option-orders" title="Permanent link">&para;</a></h3>
+<p><code>pyhood buy-option</code> and <code>pyhood sell-option</code> work in the same two steps. Every term of the contract is named, and none has a default:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>$ pyhood buy-option F --expires 2026-12-11 --strike 12 --call --contracts 1 --limit 0.30
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>NOT PLACED. This order needs your confirmation.
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>  Buy to open 1 contract of F $12.00 call expiring 2026-12-11, limit $0.30 per share, good for day
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>  Estimated cost:     $30.00 (1 contract x 100 shares x $0.30)
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>  Contract now:       mark $0.31 (bid $0.28, ask $0.33)
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>  F now:              $11.95
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>  Delta, IV:          +0.500, 31.4%
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>  Expires:            2026-12-11 (17 days)
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a>  Buying power:       $500.00
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>  Market open:        yes
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>To place this order, show this to the user. If they say yes, run:
+<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>  pyhood buy-option F --expires 2026-12-11 --strike 12 --call --contracts 1 --limit 0.3 --confirm fdf2a6
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--expires YYYY-MM-DD</code></td>
+<td>The contract's expiration. Required</td>
+</tr>
+<tr>
+<td><code>--strike PRICE</code></td>
+<td>The contract's strike. Required</td>
+</tr>
+<tr>
+<td><code>--call</code> or <code>--put</code></td>
+<td>Required</td>
+</tr>
+<tr>
+<td><code>--contracts N</code></td>
+<td>How many contracts, each 100 shares. Required</td>
+</tr>
+<tr>
+<td><code>--limit PRICE</code></td>
+<td>Per share, as option prices are quoted: <code>2.50</code> is $250 a contract. Required; there are no market orders for options</td>
+</tr>
+<tr>
+<td><code>--to open</code> or <code>--to close</code></td>
+<td>Whether the order opens a position or closes one. A buy opens and a sell closes unless you say otherwise</td>
+</tr>
+<tr>
+<td><code>--tif gfd</code> or <code>--tif gtc</code></td>
+<td>Good for day (the default) or good till cancelled</td>
+</tr>
+</tbody>
+</table>
+<p>The first step checks that the contract exists and names the nearest expirations or strikes if it does not. It also points out:</p>
+<ul>
+<li>a cost of more than your buying power</li>
+<li>a sell to close of more contracts than you hold</li>
+<li>a sell to open, which writes a contract and takes on its obligation</li>
+<li>a limit 20% or more from the contract's mark, which catches a price typed per contract in place of per share</li>
+<li>a contract that expires today</li>
+</ul>
+<h3 id="spreads">Spreads<a class="headerlink" href="#spreads" title="Permanent link">&para;</a></h3>
+<p><code>pyhood spread</code> places two to four option contracts as one order, for one net price.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>$ pyhood spread F --expires 2026-12-11 --leg buy:call:12 --leg sell:call:13 --contracts 1 --debit 0.25
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>NOT PLACED. This order needs your confirmation.
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>  Open 1 F spread for a debit of $0.25 per share, good for day
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>    buy  $12.00 call 2026-12-11   mark $0.31 (bid $0.29, ask $0.33)
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>    sell $13.00 call 2026-12-11   mark $0.04 (bid $0.02, ask $0.06)
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>  Estimated cost:     $25.00 (1 spread x 100 shares x $0.25)
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>  Spread now:         about $0.27 debit at the marks, $0.31 debit to trade at once
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>  F now:              $11.95
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--expires YYYY-MM-DD</code></td>
+<td>The expiration of every leg that does not name its own. Required</td>
+</tr>
+<tr>
+<td><code>--leg SIDE:TYPE:STRIKE</code></td>
+<td>One contract: <code>buy:call:350</code>, <code>sell:put:340</code>. Give it two to four times. Add <code>:YYYY-MM-DD</code> for a leg with its own expiration</td>
+</tr>
+<tr>
+<td><code>--contracts N</code></td>
+<td>How many spreads. Required</td>
+</tr>
+<tr>
+<td><code>--debit PRICE</code> or <code>--credit PRICE</code></td>
+<td>The most to pay, or the least to accept, per share. One is required</td>
+</tr>
+<tr>
+<td><code>--to open</code> or <code>--to close</code></td>
+<td>Opening is the default</td>
+</tr>
+<tr>
+<td><code>--tif</code>, <code>--account</code></td>
+<td>As for other orders</td>
+</tr>
+</tbody>
+</table>
+<p>The first step checks that every leg is a real contract, and prices the spread from its legs. It points out:</p>
+<ul>
+<li><strong>legs the wrong way round.</strong> If you ask for a debit but the legs as written pay a credit, the bought and sold legs are probably swapped.</li>
+<li><strong>a price 20% or more from what the spread is worth</strong> at the marks.</li>
+</ul>
+<p>pyhood has not placed a spread against Robinhood. The order is built the way other clients build it and is covered by tests, but start with one contract.</p>
+<h3 id="cancelling-an-order">Cancelling an order<a class="headerlink" href="#cancelling-an-order" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>$ pyhood cancel 1a2b3c4d-...
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>CANCELLED: buy 10 AAPL, limit $350.00, placed 2026-11-24 16:54 EST
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>$ pyhood cancel 5e6f7a8b-...
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share, placed 2026-11-24 17:17 EST
+</code></pre></div>
+<p><code>pyhood cancel ORDER_ID</code> acts at once, for stock and option orders alike. There is no first step and no code. A cancel names one order and can only remove it, so there is no symbol, quantity or price to get wrong, and when you want out of an order a second step is time in which it can fill.</p>
+<ul>
+<li>Find the ID with <code>pyhood orders --open</code>.</li>
+<li>An order that has already finished is left alone, and the command says so.</li>
+<li>A cancel is a request. If the order filled before it landed, the command reports that in place of <code>CANCELLED</code>, and any part that had already filled is not undone.</li>
+</ul>
+<p>These cover stock orders by shares or by dollar amount, stop orders and trailing stops, single-leg option orders and spreads, in any of your accounts, and crypto orders. Futures orders cannot be placed, from the command line or from Python. They can be estimated: see <a href="#estimating-a-futures-order">Estimating a futures order</a>.</p>
+<h2 id="moving-money">Moving money<a class="headerlink" href="#moving-money" title="Permanent link">&para;</a></h2>
+<p><code>pyhood deposit</code> and <code>pyhood withdraw</code> move money between a linked bank account and Robinhood. They always take two steps, whatever your confirmation setting.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>$ pyhood withdraw 500
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>NOT SENT. This transfer needs your confirmation.
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>  Withdraw $500.00 from Robinhood to Savings …1234 (Rainy day)
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>  Withdrawable cash:  $1,250.00
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>  Note: A bank transfer takes a few business days to arrive.
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>
+<a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a>To make this transfer, show this to the user. If they say yes, run:
+<a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a>  pyhood withdraw 500 --confirm 98fafd
+</code></pre></div>
+<ul>
+<li><strong>The code is tied to the direction, the amount and the bank.</strong> A code for $50 will not move $500, and a code for a withdrawal will not make a deposit.</li>
+<li><strong><code>pyhood banks</code></strong> lists your linked banks by nickname, type and last four digits. With one bank linked there is nothing to choose. With more, add <code>--bank</code> and part of a nickname, a type, or the last four digits.</li>
+<li><strong>A withdrawal of more than your withdrawable cash is pointed out.</strong> Money from a recent sale or deposit takes time to become withdrawable.</li>
+<li><strong><code>pyhood cancel-transfer TRANSFER_ID</code></strong> cancels a transfer that has not gone through, at once. The ID is printed when the transfer is made.</li>
+</ul>
+<p>pyhood has not made a transfer against Robinhood through these commands. The first step has been run live; the step that sends has only been tested against a stand-in.</p>
+<h2 id="setup-and-checks">Setup and checks<a class="headerlink" href="#setup-and-checks" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pyhood setup</code></td>
+<td>Reports what is configured. See <a href="../setup/">Setup</a></td>
+</tr>
+<tr>
+<td><code>pyhood authorize</code></td>
+<td>Asks you to log in, and saves the key Robinhood hands back. <code>pyhood setup login</code> is an older name for it</td>
+</tr>
+<tr>
+<td><code>pyhood authorize --window</code></td>
+<td>For an AI agent: opens a terminal window for the user to log in, and waits. See <a href="../setup/#authorizing-from-an-ai-agent">Setup</a></td>
+</tr>
+<tr>
+<td><code>pyhood setup crypto</code></td>
+<td>Generates and registers a Crypto API key pair</td>
+</tr>
+<tr>
+<td><code>pyhood setup confirmation</code></td>
+<td>Shows or changes whether orders ask first. See <a href="#turning-confirmation-off">Turning confirmation off</a></td>
+</tr>
+<tr>
+<td><code>pyhood verify</code></td>
+<td>Reads live prices to confirm the saved login works</td>
+</tr>
+<tr>
+<td><code>pyhood verify crypto</code></td>
+<td>The same for the Crypto API key pair</td>
+</tr>
+<tr>
+<td><code>pyhood version</code></td>
+<td>Prints the installed version</td>
+</tr>
+</tbody>
+</table>
+<h2 id="scripts-and-agents">Scripts and agents<a class="headerlink" href="#scripts-and-agents" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pyhood run script.py</code></td>
+<td>Runs a script with the Python pyhood is installed in, so <code>import pyhood</code> works however pyhood was installed. <code>pyhood run -c "..."</code> works too</td>
+</tr>
+<tr>
+<td><code>pyhood guide</code></td>
+<td>Prints how to use pyhood, written for an AI agent: these commands and the rules for placing orders. Short enough to be read whole</td>
+</tr>
+<tr>
+<td><code>pyhood guide python</code></td>
+<td>The reference for writing a script: how to log in, the main methods, and the fields of what they return</td>
+</tr>
+</tbody>
+</table>
+<h2 id="when-a-command-fails">When a command fails<a class="headerlink" href="#when-a-command-fails" title="Permanent link">&para;</a></h2>
+<p>A wrong confirmation code exits with status 2, and nothing is sent. Any other failure prints one line to standard error and exits with status 1:</p>
+<ul>
+<li>
+<p><code>Robinhood did not accept the order: ...</code> with Robinhood's reason</p>
+</li>
+<li>
+<p><code>pyhood is not authorized: ...</code> followed by <code>Run: pyhood authorize</code></p>
+</li>
+<li><code>Robinhood request failed: ...</code></li>
+<li><code>No quote for XYZ.</code> when a symbol is not recognized</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/jamestford/pyhood" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "content.code.copy", "content.code.annotate", "search.highlight", "search.suggest"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+    
+  </body>
+</html>
