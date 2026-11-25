@@ -18,6 +18,7 @@ from pyhood.cli import (
     _amount,
     _wrong_code,
     as_json,
+    bank_name,
     confirmation_code,
     money,
     plain,
@@ -30,16 +31,6 @@ from pyhood.exceptions import PyhoodError
 FINISHED_STATES = frozenset({
     "completed", "cancelled", "canceled", "failed", "rejected", "reversed", "returned",
 })
-
-
-def bank_name(bank: Any) -> str:
-    """'Savings …1234 (Rainy day)'."""
-    name = (bank.account_type or "account").capitalize()
-    if bank.last_four:
-        name += f" …{bank.last_four}"
-    if bank.account_nickname:
-        name += f" ({bank.account_nickname})"
-    return name
 
 
 def banks(client: Any, as_json_output: bool = False) -> int:

@@ -82,7 +82,15 @@ Dividends paid and pending, newest first, with the total paid. `--symbol KO` sho
 
 ### `pyhood transfers`
 
-Money moved in, out and between your accounts, newest first. It cannot make a transfer. The direction, type and account columns are Robinhood's own terms, shown as sent.
+Money moved in, out and between your accounts, newest first. It cannot make a transfer.
+
+```text
+CREATED     AMOUNT     WHAT              FROM                       TO                  STATE      TRANSFER ID
+2026-11-24  $100.00    deposit           Savings …1234 (Rainy day)  Individual account  pending    1a2b3c4d-...
+2026-03-23  $7,000.00  IRA Contribution  Individual account         Roth IRA            completed  5e6f7a8b-...
+```
+
+A transfer with a bank is a `deposit` or a `withdrawal`, and the bank is named by its type, last four digits and nickname. The ID is what `pyhood cancel-transfer` takes, which works while a bank transfer is still pending. `--json` gives Robinhood's own record of each transfer.
 
 ## Market commands
 

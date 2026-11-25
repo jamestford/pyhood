@@ -694,6 +694,68 @@ def dividends(client: Any, symbol: str | None = None, as_json_output: bool = Fal
     return 0
 
 
+# What Robinhood calls each end of a transfer, in plain words.
+TRANSFER_ENDS = {
+    "rhs_account": "Individual account",
+    "rhs_roth_ira": "Roth IRA",
+    "rhs_traditional_ira": "Traditional IRA",
+    "ach_relationship": "Bank",
+}
+BANK_END = "ach_relationship"
+
+
+def bank_name(bank: Any) -> str:
+    """'Savings …1234 (Rainy day)'."""
+    name = (bank.account_type or "account").capitalize()
+    if bank.last_four:
+        name += f" …{bank.last_four}"
+    if bank.account_nickname:
+        name += f" ({bank.account_nickname})"
+    return name
+
+
+def _transfer_end(kind: str, account_id: str, banks: dict[str, Any]) -> str | None:
+    """One end of a transfer by name: a linked bank, or a Robinhood account."""
+    if kind == BANK_END and account_id in banks:
+        return bank_name(banks[account_id])
+    if kind in TRANSFER_ENDS:
+        return TRANSFER_ENDS[kind]
+    return kind.removeprefix("rhs_").replace("_", " ").capitalize() if kind else None
+
+
+def transfer_route(transfer: Any, banks: dict[str, Any]) -> tuple[str, str | None, str | None]:
+    """What a transfer is, where the money came from and where it went.
+
+    Robinhood records who asked and in which direction, not where the money
+    went. A 'push' sends money from the originating account to the receiving
+    one. A 'pull' brings it the other way: a deposit is the Robinhood account
+    pulling from the bank, so the bank is the 'receiving' end of the request
+    and the source of the money.
+    """
+    origin = _transfer_end(
+        transfer.originating_account_type, transfer.originating_account_id, banks)
+    target = _transfer_end(
+        transfer.receiving_account_type, transfer.receiving_account_id, banks)
+    if transfer.direction == "pull":
+        source, destination = target, origin
+        from_bank = transfer.receiving_account_type == BANK_END
+        to_bank = transfer.originating_account_type == BANK_END
+    elif transfer.direction == "push":
+        source, destination = origin, target
+        from_bank = transfer.originating_account_type == BANK_END
+        to_bank = transfer.receiving_account_type == BANK_END
+    else:
+        # A direction pyhood has not seen. Do not guess which way money went.
+        return transfer.direction or "transfer", None, None
+    if from_bank:
+        what = "deposit"
+    elif to_bank:
+        what = "withdrawal"
+    else:
+        what = transfer.description or "transfer"
+    return what, source, destination
+
+
 def transfers(client: Any, as_json_output: bool = False) -> int:
     """Transfers into, out of and between accounts. Read-only."""
     found = sorted(
@@ -705,18 +767,29 @@ def transfers(client: Any, as_json_output: bool = False) -> int:
     if not found:
         print("No transfers on record.")
         return 0
+    banks: dict[str, Any] = {}
+    if any(BANK_END in (t.originating_account_type, t.receiving_account_type) for t in found):
+        try:
+            banks = {b.id: b for b in client.get_bank_accounts()}
+        except PyhoodError:
+            pass  # The table still reads; a bank is then just 'Bank'.
+    rows = []
+    pending = False
+    for t in found:
+        what, source, destination = transfer_route(t, banks)
+        if what in ("deposit", "withdrawal") and t.state == "pending":
+            pending = True
+        rows.append([
+            (t.created_at or "")[:10], money(t.amount), what, source, destination, t.state, t.id,
+        ])
     print(table(
-        ["CREATED", "AMOUNT", "DIRECTION", "TYPE", "ORIGINATING", "RECEIVING", "STATE",
-         "DESCRIPTION"],
-        [[(t.created_at or "")[:10], money(t.amount), t.direction, t.transfer_type,
-          t.originating_account_type, t.receiving_account_type, t.state, t.description]
-         for t in found],
-        right={1},
+        ["CREATED", "AMOUNT", "WHAT", "FROM", "TO", "STATE", "TRANSFER ID"], rows, right={1},
     ))
-    print(
-        "\nDIRECTION, TYPE and the two account columns are Robinhood's own terms, "
-        "shown as sent."
-    )
+    if pending:
+        print(
+            "\nA deposit or withdrawal that is still pending can be cancelled with: "
+            f"{program()} cancel-transfer TRANSFER_ID"
+        )
     return 0
 
 

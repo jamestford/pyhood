@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`pyhood transfers` says what happened in plain words.** A deposit printed as `pull`, from `rhs_account` to `ach_relationship`, which are Robinhood's terms and read as money leaving. It now prints `deposit`, from the bank by name to `Individual account`. Each row ends with the transfer's ID, which `pyhood cancel-transfer` takes and which the table did not show, and a pending bank transfer is followed by how to cancel it. `--json` still gives Robinhood's own record.
+
 ## [0.21.0] - 2026-11-24
 
 ### Added
