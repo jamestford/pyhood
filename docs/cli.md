@@ -224,7 +224,7 @@ The preview differs from a stock order's in three ways:
 
 ## Futures
 
-Futures are read-only. Name a product, such as `ES` for the E-mini S&P 500, `NQ` for the Nasdaq, `CL` for crude oil or `GC` for gold, and pyhood uses its nearest contract. You do not have to know which month is current.
+Futures can be read, and an order previewed, but not placed. Name a product, such as `ES` for the E-mini S&P 500, `NQ` for the Nasdaq, `CL` for crude oil or `GC` for gold, and pyhood uses its nearest contract. You do not have to know which month is current.
 
 ```bash
 pyhood futures quote ES NQ      # last, bid, ask, and the session's high, low and volume
@@ -244,6 +244,38 @@ ESZ26   7,206.75  -0.15%  7,206.5  7,206.75  7,224  7,205.75     7,217.5   4,172
 A contract can also be named in full, by product, month and year: `ESZ26` is `ES` for December 2026.
 
 `pyhood futures positions` prints what Robinhood sends without arranging it into columns. pyhood has not seen an open futures position, and does not guess at field names.
+
+### Previewing a futures order
+
+```text
+$ pyhood futures buy MES 1 --limit 5000
+PREVIEW ONLY. pyhood cannot place futures orders. Nothing has been sent.
+
+  MES: the nearest contract is MESZ26, expiring 2026-12-18.
+  Buy 1 MESZ26 contract, limit 5,000, good for day
+  Contract:             Micro E-mini S&P 500 Stock Price Index Futures, Dec-26, expires 2026-12-18
+  Position size:        $25,000.00 (1 x $5.00 a point x 5,000)
+  MESZ26 now:           7,179.5 (bid 7,179.25, ask 7,179.5)
+  Margin required:      $2,863.30
+  Fees:                 $0.86, including $0.50 commission
+  Buying power effect:  -$2,864.16
+  Buying power after:   -$2,809.95
+  Robinhood says:       it would refuse this order: not enough buying power.
+
+This is a preview only, and there is no step that places it. To place this order, use the Robinhood app or Robinhood Legend.
+```
+
+| Option | Effect |
+|---|---|
+| `--limit PRICE` | A limit order, with the price in the contract's points |
+| `--market` | A market order |
+| `--stop PRICE --market` | A stop order: it waits for the price, then trades at market |
+| `--tif gtc` | Good till cancelled. The default is good for day |
+| `--json` | The check as Robinhood reported it |
+
+The margin, the fees and the verdict are Robinhood's own. They come from the two requests its order ticket makes before it lets you submit an order, and neither places anything. Position size is worked out by pyhood: contracts, times dollars per point, times the price.
+
+There is no `--confirm`, because there is nothing to confirm. pyhood has not seen the request that submits a futures order, so it does not send one. Robinhood offers limit, market and stop orders on futures, and no stop with a limit.
 
 ## Order commands
 
@@ -441,7 +473,7 @@ CANCELLED: buy to open 1 F $12.00 call 2026-12-11, limit $0.30 per share, placed
 - An order that has already finished is left alone, and the command says so.
 - A cancel is a request. If the order filled before it landed, the command reports that in place of `CANCELLED`, and any part that had already filled is not undone.
 
-These cover stock orders by shares or by dollar amount, stop orders and trailing stops, single-leg option orders and spreads, in any of your accounts, and crypto orders. Futures orders cannot be placed: pyhood has no way to place them, from the command line or from Python.
+These cover stock orders by shares or by dollar amount, stop orders and trailing stops, single-leg option orders and spreads, in any of your accounts, and crypto orders. Futures orders cannot be placed, from the command line or from Python. They can be previewed: see [Previewing a futures order](#previewing-a-futures-order).
 
 ## Moving money
 

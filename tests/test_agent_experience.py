@@ -278,7 +278,7 @@ class TestVerify:
 # Words that follow "pyhood" inside a code span without being a command,
 # as in the lines users paste into an agent: "pyhood is installed at ..."
 # and "Install pyhood for me."
-NOT_COMMANDS = {"is", "for"}
+NOT_COMMANDS = {"is", "for", "cannot"}
 
 
 def documented_commands():

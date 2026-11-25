@@ -5,8 +5,10 @@ own client and its own credentials (`pyhood setup crypto`). Buying and
 selling work as stock orders do: a preview that sends nothing and prints a
 confirmation code, then the same command with the code.
 
-Futures are read-only here: quotes, contract details, orders and realized
-profit and loss.
+Futures can be read here: quotes, contract details, orders and realized
+profit and loss. A futures order can be previewed, with Robinhood's own
+margin, fees and verdict, but not placed: pyhood has not seen the request
+that submits one.
 """
 
 from __future__ import annotations
@@ -408,6 +410,120 @@ def futures_contract(client: Any, symbol: str, as_json_output: bool = False) -> 
     print(f"  {'Product:':<16}{contract.underlying or '-'} "
           f"({contract.asset_class.replace('_', ' ') or '-'})")
     print(f"  {'Status:':<16}{contract.status}")
+    return 0
+
+
+# What Robinhood's check says when it refuses, in plain words. These two
+# have been seen; any other is printed in Robinhood's own words.
+FUTURES_CHECK_RESULTS = {
+    "VALIDATE_ORDER_RESULT_FAILURE_INSUFFICIENT_BP": "not enough buying power",
+    "VALIDATE_ORDER_RESULT_FAILURE_INVALID_TICK": "the price is not one the contract trades at",
+}
+
+
+def futures_order(
+    client: Any,
+    side: str,
+    symbol: str,
+    quantity: int,
+    limit: float | None = None,
+    stop: float | None = None,
+    time_in_force: str = "gfd",
+    as_json_output: bool = False,
+) -> int:
+    """Preview a futures order: what it ties up, what it costs, and whether
+    Robinhood would take it. It cannot be placed from here.
+
+    The margin, fees and verdict are Robinhood's own, from the two requests
+    its order ticket makes before it lets an order be submitted.
+    """
+    if limit is not None and stop is not None:
+        raise UsageError(
+            "Robinhood offers limit, market and stop orders on futures, not a stop "
+            "with a limit. Give --stop PRICE --market, or --limit PRICE."
+        )
+    code, note = front_contract(client, symbol)
+    contract = client.get_futures_contract(code)
+    check = client.check_futures_order(
+        code, side, quantity, limit_price=limit, stop_price=stop, time_in_force=time_in_force,
+    )
+    if as_json_output:
+        print(as_json(check))
+        return 0
+    quote = client.get_futures_quotes([code]).get(code)
+
+    if stop is not None:
+        terms = f"stop {number(stop)} then at market"
+    elif limit is not None:
+        terms = f"limit {number(limit)}"
+    else:
+        terms = "at market"
+    duration = "good for day" if time_in_force == "gfd" else "good till cancelled"
+    plural = "contract" if quantity == 1 else "contracts"
+
+    print("PREVIEW ONLY. pyhood cannot place futures orders. Nothing has been sent.\n")
+    if note:
+        print(f"  {note}")
+    print(f"  {side.capitalize()} {quantity} {code} {plural}, {terms}, {duration}")
+    if contract.name:
+        print(f"  {'Contract:':<22}{contract.name}, expires {contract.expiration or '-'}")
+    price = stop if stop is not None else limit if limit is not None else (
+        quote.last_price if quote else None
+    )
+    if price is not None and contract.multiplier:
+        print(
+            f"  {'Position size:':<22}{money(quantity * contract.multiplier * price)} "
+            f"({quantity} x {money(contract.multiplier)} a point x {number(price)})"
+        )
+    if quote:
+        print(f"  {code + ' now:':<22}{number(quote.last_price)} "
+              f"(bid {number(quote.bid)}, ask {number(quote.ask)})")
+    print(f"  {'Margin required:':<22}{money(check.margin_required)}")
+    fees = money(check.fees)
+    if check.fees is not None and check.commission is not None:
+        fees += f", including {money(check.commission)} commission"
+    print(f"  {'Fees:':<22}{fees}")
+    if check.buying_power_effect is not None:
+        print(f"  {'Buying power effect:':<22}{signed_money(check.buying_power_effect)}")
+    if check.buying_power_after is not None:
+        print(f"  {'Buying power after:':<22}{signed_money(check.buying_power_after)}")
+
+    if check.accepted is False:
+        reason = FUTURES_CHECK_RESULTS.get(check.result) or (
+            check.result.removeprefix("VALIDATE_ORDER_RESULT_").removeprefix("FAILURE_")
+            .replace("_", " ").lower()
+        )
+        verdict = f"it would refuse this order: {reason}."
+    elif check.accepted:
+        verdict = "it would accept this order."
+    else:
+        verdict = f"{check.result or 'nothing'}, which pyhood cannot read."
+    print(f"  {'Robinhood says:':<22}{verdict}")
+
+    warnings = []
+    tick = contract.tick_size
+    for label, value in (("limit", limit), ("stop", stop)):
+        if value is not None and tick:
+            steps = value / tick
+            if abs(steps - round(steps)) > 1e-6:
+                warnings.append(
+                    f"{code} moves in steps of {number(tick)}, and the {label} of "
+                    f"{number(value)} is not one of them."
+                )
+    if limit is None and stop is None:
+        warnings.append(
+            "A market order trades at once at the best price available. Futures trade "
+            "nearly around the clock."
+        )
+    if stop is not None and time_in_force == "gfd":
+        warnings.append("This stop lasts for today's session only. Add --tif gtc to keep it.")
+    for warning in warnings:
+        print(f"\n  Note: {warning}")
+
+    print(
+        "\nThis is a preview only, and there is no step that places it. To place this "
+        "order, use the Robinhood app or Robinhood Legend."
+    )
     return 0
 
 

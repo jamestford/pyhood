@@ -29,6 +29,7 @@ from pyhood.models import (
     Earnings,
     FuturesContract,
     FuturesOrder,
+    FuturesOrderCheck,
     FuturesPnL,
     FuturesQuote,
     InterestPayment,
@@ -3026,6 +3027,103 @@ class PyhoodClient:
                 logger.warning(f"Failed to fetch futures quote for {sym}")
         return results
 
+    def check_futures_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: int = 1,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
+        time_in_force: str = "gfd",
+        account_id: str | None = None,
+    ) -> FuturesOrderCheck:
+        """Ask Robinhood what a futures order would cost and whether it
+        would be accepted. Places nothing.
+
+        These are the two requests Robinhood's own order ticket makes before
+        it lets an order be submitted. pyhood cannot place a futures order:
+        the request that submits one has not been seen.
+
+        Args:
+            symbol: A contract, such as 'MESZ26'.
+            side: 'buy' or 'sell'.
+            quantity: Number of contracts.
+            limit_price: Limit price, in the contract's points. With neither
+                price this is a market order.
+            stop_price: Stop price, for a stop order, which then trades at
+                market.
+            time_in_force: 'gfd' or 'gtc'.
+            account_id: Futures account ID. Auto-discovered if None.
+
+        Raises:
+            OrderError: For both prices at once. Robinhood offers limit,
+                market and stop orders on futures, and no stop limit.
+        """
+        if side not in ("buy", "sell"):
+            raise OrderError("side must be 'buy' or 'sell'")
+        if time_in_force not in ("gfd", "gtc"):
+            raise OrderError("time_in_force must be 'gfd' or 'gtc'")
+        if limit_price is not None and stop_price is not None:
+            raise OrderError(
+                "Robinhood offers limit, market and stop orders on futures, "
+                "not a stop with a limit"
+            )
+        contract = self.get_futures_contract(symbol)
+        if not account_id:
+            account_id = self.get_futures_account_id()
+        self._set_futures_header()
+
+        legs = [{
+            "contractType": "OUTRIGHT",
+            "contractId": contract.contract_id,
+            "ratioQuantity": 1,
+            "orderSide": side.upper(),
+        }]
+        order: dict[str, Any] = {
+            "accountId": account_id,
+            "legs": legs,
+            "quantity": str(quantity),
+            "orderType": "LIMIT" if limit_price is not None else "MARKET",
+            "orderTrigger": "STOP" if stop_price is not None else "IMMEDIATE",
+            "timeInForce": time_in_force.upper(),
+            "refId": str(uuid.uuid4()),
+        }
+        if limit_price is not None:
+            order["limitPrice"] = _plain_number(limit_price)
+        if stop_price is not None:
+            order["stopPrice"] = _plain_number(stop_price)
+
+        checked = self._session.post(
+            urls.futures_order_checks_url(account_id), json_data={"orderInfo": order},
+        )
+        effect = self._session.post(urls.FUTURES_BUYING_POWER_EFFECT, json_data={
+            "accountId": account_id,
+            "tentativeFuturesOrder": {"legs": legs, "quantity": str(quantity)},
+        })
+
+        def amount(key: str) -> float | None:
+            value = effect.get(key) if isinstance(effect, dict) else None
+            return _safe_float(value.get("amount")) if isinstance(value, dict) else None
+
+        result = str(checked.get("result") or "")
+        # Only a refusal has been seen. A pass is read from the word, and a
+        # result that says neither is left as unknown.
+        accepted = False if "FAILURE" in result else True if "SUCCESS" in result else None
+        after = (checked.get("insufficientBp") or {}).get("buyingPowerAfterOrder")
+        return FuturesOrderCheck(
+            symbol=contract.symbol,
+            side=side,
+            quantity=quantity,
+            result=result,
+            accepted=accepted,
+            margin_required=amount("estimatedMarginRequired"),
+            buying_power_effect=amount("buyingPowerEffect"),
+            buying_power_after=_safe_float(after),
+            fees=amount("totalFee"),
+            commission=amount("totalCommission"),
+            gold_savings=amount("totalGoldSavings"),
+        )
+
     def get_futures_orders(
         self, account_id: str | None = None,
         start_date: str | datetime | None = None,
@@ -3203,6 +3301,11 @@ def _safe_float(val: Any) -> float | None:
         return float(val)
     except (ValueError, TypeError):
         return None
+
+
+def _plain_number(value: float) -> str:
+    """A price as Robinhood's own ticket sends one: '7177.25', '5000'."""
+    return f"{value:.8f}".rstrip("0").rstrip(".")
 
 
 def _rejection(data: Any) -> str:

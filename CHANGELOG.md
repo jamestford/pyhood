@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A preview of a futures order.** `pyhood futures buy MES 1 --limit 5000`, and `sell`, show the margin the order ties up, its fees and commission, what it does to buying power, and whether Robinhood would accept it. These are Robinhood's own figures, from the two requests its order ticket makes before it lets an order be submitted. `--market`, `--stop PRICE --market` and `--tif gtc` are taken, and a price that is not on the contract's tick is pointed out.
+- It is a preview only. pyhood cannot place a futures order, and the command has no `--confirm`: the request that submits one has not been seen, and pyhood does not send a guess to an order endpoint.
+- `check_futures_order()` is the library method behind it, returning a `FuturesOrderCheck`.
+
 ## [0.21.1] - 2026-11-24
 
 ### Changed
