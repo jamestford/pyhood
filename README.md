@@ -218,6 +218,7 @@ Everything here is a command, so the agent rarely needs to write code. For somet
 | Buy crypto at a limit | |
 | A deposit from a bank | |
 | Buy stock in a Roth IRA | |
+| Buy stock with confirmation turned off | |
 
 Every read command has been run for real too, and so has saving a statement. The orders on the right go through the same code as those on the left, but until one has been sent, treat its first use as a test: start small, and far from the market price.
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-24
+
 ### Added
 - **You can turn confirmation off.** `pyhood setup confirmation off`, run in your own terminal, makes orders go through on the first run: no second step and no code. This covers stocks, options, spreads and crypto, buying and selling, in every account. `pyhood setup confirmation on` puts the two steps back, and confirmation is on unless you turn it off.
 - **A backstop for large orders.** With confirmation off, an order worth more than $5,000 still asks first. `pyhood setup confirmation above AMOUNT` sets the amount. It is judged order by order, by the order's estimated cost or proceeds, so it catches a mistake such as 100 shares for 10. It is not a spending limit.
