@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **One command installs pyhood and logs you in.** `curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh | sh` creates `~/pyhood`, installs pyhood into it, links `pyhood` into `~/.local/bin`, asks you to log in, and reads live prices to check the login. Until now the install was three things across two windows: paste a request into an agent, log in from your own terminal, then go back and tell the agent. The script is for macOS and Linux.
+  - If uv is missing it asks before installing it, and installs nothing if you say no.
+  - Run again, it upgrades the pyhood that is there.
+  - It never uses `sudo`, leaves alone a `~/pyhood` or a `~/.local/bin/pyhood` that is something else, and does nothing if the download is cut off.
+  - Without a terminal, as when an agent runs it, it installs pyhood and leaves the login to you.
+  - Asking your agent to install pyhood still works, and is now the second way in.
+
 ## [0.23.0] - 2026-11-24
 
 ### Added

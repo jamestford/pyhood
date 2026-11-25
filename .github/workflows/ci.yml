@@ -40,3 +40,47 @@ jobs:
           file: ./coverage.xml
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  install-script:
+    name: install.sh on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install uv and build the wheel
+        run: |
+          python -m pip install --upgrade pip uv build
+          python -m build --wheel
+
+      - name: Check the script with shellcheck
+        if: runner.os == 'Linux'
+        run: shellcheck install.sh
+
+      # Piped into sh, as the README tells people to run it. There is no
+      # terminal here, so it installs and leaves the login alone.
+      - name: Run the script
+        run: |
+          export PYHOOD_INSTALL_SPEC="$(ls "$PWD"/dist/*.whl)"
+          cat install.sh | sh
+
+      - name: Check what it installed
+        run: |
+          ~/pyhood/bin/pyhood version
+          test -f ~/pyhood/AGENTS.md
+          test -L ~/.local/bin/pyhood
+          ~/.local/bin/pyhood guide | head -5
+
+      - name: Run it again, which upgrades
+        run: |
+          export PYHOOD_INSTALL_SPEC="$(ls "$PWD"/dist/*.whl)"
+          cat install.sh | sh | tee again.txt
+          grep -q "is already installed in ~/pyhood. Upgrading it." again.txt

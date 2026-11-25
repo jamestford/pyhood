@@ -43,9 +43,46 @@ Once it is set up, talk to your agent the way you would to a person:
 
 ## Get started
 
-There are three steps. Your agent does the first, you do the second.
+Run this in your own terminal:
 
-### 1. Ask your agent to install it
+```bash
+curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh | sh
+```
+
+It installs pyhood into a folder of its own, `~/pyhood`, asks you to log in to Robinhood, and reads live prices to check the login works.
+
+Then open your agent in that folder and ask it something:
+
+```bash
+cd ~/pyhood
+```
+
+```text
+What is Tesla trading at?
+```
+
+That is the whole setup. The install put a file called `AGENTS.md` in the folder. Many agents read a file of that name when they start, and this one tells them how to use pyhood.
+
+<details>
+<summary><strong>What the script does</strong></summary>
+
+1. Looks for [uv](https://docs.astral.sh/uv/), a free tool for installing Python programs. If uv is missing, it asks before installing it.
+2. Runs `uv venv --managed-python --python 3.14 ~/pyhood`, then `uv pip install --python ~/pyhood/bin/python pyhood`. If pyhood is already there, it upgrades it.
+3. Links the command into `~/.local/bin`, so that `pyhood` works from any folder.
+4. Runs `pyhood setup login`, which asks for your username and password.
+5. Runs `pyhood verify`, which reads live prices and changes nothing.
+
+It never uses `sudo`, and it installs nothing but pyhood, and uv if you say yes. Nothing is installed system-wide, and your other Python setups are not touched. uv downloads a copy of Python for pyhood to run on, which it keeps in its own folder.
+
+The script is short: [read it](https://github.com/jamestford/pyhood/blob/main/install.sh) before you run it, or follow the same steps [by hand](https://jamestford.github.io/pyhood/getting-started/). It is for macOS and Linux. On Windows, use one of the other two ways.
+
+</details>
+
+### The login
+
+The script asks for your Robinhood username and password, then waits for you to approve the login in the Robinhood app on your phone. Your password is not stored and your agent never sees it. What is saved is a session, in `~/.pyhood/session.json`, readable only by you. pyhood renews that session on its own, so you should rarely need to log in again.
+
+### Or have your agent install it
 
 Paste this into your agent:
 
@@ -53,49 +90,19 @@ Paste this into your agent:
 Install pyhood for me. Follow the install steps in https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md
 ```
 
-That file is written for AI agents. It tells yours to put pyhood in a folder of its own, `~/pyhood`, to stop and hand you the login, and not to install anything else.
+[That file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) is written for AI agents. It has the same steps as the script, with rules that keep an agent from improvising: stop if a step fails, do not use `pip` or `sudo`, install nothing else, and never ask for your password. It needs uv installed first.
 
-<details>
-<summary><strong>What the file tells your agent to do</strong></summary>
-
-1. If `~/pyhood/bin/pyhood` already exists, say so and skip the install.
-2. Check that [uv](https://docs.astral.sh/uv/getting-started/installation/) is installed, and stop to ask you if it is not.
-3. Run `uv venv --managed-python --python 3.14 ~/pyhood`
-4. Run `uv pip install --python ~/pyhood/bin/python pyhood`
-5. Run `~/pyhood/bin/pyhood version` to check it.
-6. Ask you to log in yourself. It must never ask for your password or type it.
-7. Run `~/pyhood/bin/pyhood verify`, which reads live prices and changes nothing.
-8. Read `~/pyhood/AGENTS.md`, the instructions that came with the install.
-
-It is also told not to use `pip`, `sudo` or `--break-system-packages`, and not to install anything but pyhood. You can [read the file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) yourself, or follow the same steps [by hand](https://jamestford.github.io/pyhood/getting-started/).
-
-</details>
-
-The install creates one folder, `~/pyhood`, with pyhood in it. uv is a free tool for installing Python programs (`brew install uv` on macOS). It also downloads a copy of Python for pyhood to run on, which it keeps in its own folder. Nothing is installed system-wide, and your other Python setups are not touched.
-
-### 2. Log in yourself
-
-Your agent will stop and ask you to run this in your own terminal:
+The agent stops at the login and asks you to run this yourself, in your own terminal:
 
 ```bash
 ~/pyhood/bin/pyhood setup login
 ```
 
-It asks for your Robinhood username and password, then waits for you to approve the login in the Robinhood app on your phone. Your password is not stored and your agent never sees it. What is saved is a session, in `~/.pyhood/session.json`, readable only by you. pyhood renews that session on its own, so you should rarely need to log in again.
-
 Then tell your agent you are logged in.
 
-### 3. Open your agent in the pyhood folder
+### If your agent reads a different file
 
-From now on, start your agent in `~/pyhood`:
-
-```bash
-cd ~/pyhood
-```
-
-The install put a file called `AGENTS.md` in that folder. Many agents read a file of that name when they start, and this one tells them how to use pyhood. There is nothing else to configure.
-
-If your agent reads a different file, such as `CLAUDE.md`, or you want to work from another folder, put this one line in the file it does read:
+Some agents read `CLAUDE.md` or another file, not `AGENTS.md`. For those, or to work from another folder, put this one line in the file your agent does read:
 
 ```text
 pyhood is installed at ~/pyhood. Run `~/pyhood/bin/pyhood guide` before using it.
@@ -226,7 +233,7 @@ Every read command has been run for real too, and so has saving a statement. The
 
 ## Using it without an agent
 
-Everything the agent does, you can do yourself. To type `pyhood` instead of `~/pyhood/bin/pyhood`, link it into a folder on your PATH:
+Everything the agent does, you can do yourself. The install script links `pyhood` into `~/.local/bin`, so the command works from any folder. If you installed another way, type `~/pyhood/bin/pyhood`, or make the link yourself:
 
 ```bash
 ln -s ~/pyhood/bin/pyhood ~/.local/bin/pyhood
@@ -245,7 +252,7 @@ pyhood cancel ORDER_ID       # cancel an open order
 
 Add `--json` to any of the first six for exact values, and `--account roth` to work in another account. The [command line page](https://jamestford.github.io/pyhood/cli/) covers every command and option.
 
-To upgrade pyhood later:
+To upgrade pyhood later, run the install command again, or:
 
 ```bash
 uv pip install --python ~/pyhood/bin/python --upgrade pyhood
