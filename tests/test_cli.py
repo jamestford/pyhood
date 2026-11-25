@@ -236,6 +236,22 @@ class TestOrders:
         filled = next(line for line in lines if line.split()[-2:] == ["filled", "order-1"])
         assert "$95.00" in filled
 
+    def test_a_stop_order_shows_its_stop(self, capsys):
+        """Without it a stop market order reads as a plain market order."""
+        stop = stock_order(
+            order_id="order-3", side="sell", status="confirmed", price=None,
+            stop_price=40.0, average_price=None, filled_at=None, filled_quantity=0.0,
+        )
+
+        cli.orders(FakeClient(stock_orders=[stop, stock_order()]))
+
+        lines = capsys.readouterr().out.splitlines()
+        assert lines[1].split()[3:7] == ["TYPE", "ORDERED", "LIMIT", "STOP"]
+        row = next(line for line in lines if line.endswith("order-3"))
+        assert row.split()[-6:] == ["-", "$40.00", "0", "-", "confirmed", "order-3"]
+        plain = next(line for line in lines if line.endswith("order-1"))
+        assert plain.split()[-5] == "-"  # no stop
+
     def test_times_are_local_and_the_header_says_so(self, capsys):
         cli.orders(FakeClient(stock_orders=[stock_order()]))
 
@@ -690,6 +706,17 @@ class TestCancel:
         out = capsys.readouterr().out
         assert out.startswith("CANCELLED: buy 40 ANT, limit $90.00, placed 2026-11-19")
         assert "PREVIEW" not in out and "--confirm" not in out
+
+    def test_a_stop_order_is_described_with_its_stop(self, capsys):
+        stop = stock_order(
+            order_id="order-9", side="sell", status="confirmed", quantity=1.0, price=None,
+            stop_price=40.0, average_price=None, filled_at=None, filled_quantity=0.0,
+        )
+
+        cli.cancel(OrderClient(existing=stop), "order-9", settle_seconds=0)
+
+        out = capsys.readouterr().out
+        assert out.startswith("CANCELLED: sell 1 ANT, stop $40.00 then at market, placed")
 
     def test_an_order_that_filled_before_the_cancel_landed_says_so(self, capsys):
         client = OrderClient(existing=self.OPEN, after_cancel="filled")

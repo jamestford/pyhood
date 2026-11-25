@@ -48,9 +48,10 @@ Stock and option orders, newest first.
 
 ```text
 Orders since 2026-10-25 (times are EST; today is 2026-11-24)
-PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT  FILLED  AVG PRICE  STATUS
-2026-11-19 12:36 EST  buy   AAPL    stock       10  $350.00      10    $349.80  filled
-2026-11-19 11:31 EST  buy   AAPL    stock       10  $340.00       0          -  cancelled
+PLACED                SIDE  SYMBOL  TYPE   ORDERED    LIMIT     STOP  FILLED  AVG PRICE  STATUS
+2026-11-19 12:36 EST  buy   AAPL    stock       10  $350.00        -      10    $349.80  filled
+2026-11-19 11:31 EST  buy   AAPL    stock       10  $340.00        -       0          -  cancelled
+2026-11-18 10:02 EST  sell  AAPL    stock       10        -  $330.00       0          -  cancelled
 ```
 
 | Option | Effect |

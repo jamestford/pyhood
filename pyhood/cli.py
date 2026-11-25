@@ -370,20 +370,21 @@ def orders(
     rows = [
         [
             local_time(o.created_at), order_side(o), o.symbol, order_kind(o), number(o.quantity),
-            money(o.price), number(o.filled_quantity), money(o.average_price), o.status,
-            o.order_id,
+            money(o.price), money(getattr(o, "stop_price", None)),
+            number(o.filled_quantity), money(o.average_price), o.status, o.order_id,
         ]
         for o in found
     ]
     print(table(
-        ["PLACED", "SIDE", "SYMBOL", "TYPE", "ORDERED", "LIMIT", "FILLED", "AVG PRICE",
-         "STATUS", "ORDER ID"],
-        rows, right={4, 5, 6, 7},
+        ["PLACED", "SIDE", "SYMBOL", "TYPE", "ORDERED", "LIMIT", "STOP", "FILLED",
+         "AVG PRICE", "STATUS", "ORDER ID"],
+        rows, right={4, 5, 6, 7, 8},
     ))
     print(
         "\nFILLED is the quantity that actually traded and AVG PRICE the price it "
-        "traded at. An order that never filled shows 0 and '-'. Option prices are "
-        "per share."
+        "traded at. An order that never filled shows 0 and '-'. A STOP is the price "
+        "that sets the order off; with no LIMIT it then trades at market. Option "
+        "prices are per share."
     )
     return 0
 
@@ -1248,6 +1249,8 @@ def cancel(
     """
     order = client.get_order(order_id)
     limit = "at market" if order.price is None else f"limit {money(order.price)}"
+    if getattr(order, "stop_price", None) is not None:
+        limit = f"stop {money(order.stop_price)} then {limit}"
     what = order.symbol
     if order.instrument_type == "option":
         # '1 F $12.00 call 2026-12-11', or '2 F 2-leg option' for a spread.
