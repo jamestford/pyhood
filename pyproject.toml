@@ -27,7 +27,7 @@ include = [
 
 [project]
 name = "pyhood"
-version = "0.23.0"
+version = "0.23.1"
 description = "Robinhood for AI agents: stocks, options, crypto and futures from the command line"
 readme = "README.md"
 license = "MIT"
