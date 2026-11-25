@@ -16,6 +16,7 @@ import pytest
 from pyhood import cli, guide, onboarding
 from pyhood.exceptions import APIError, AuthError, OrderError
 from pyhood.models import (
+    BankAccount,
     Candle,
     Dividend,
     Document,
@@ -1689,19 +1690,35 @@ class ResearchClient(FakeClient):
     def get_dividends_by_symbol(self, symbol):
         return [d for d in self.DIVIDENDS if d.symbol == symbol]
 
+    TRANSFERS = [
+        # A deposit, as Robinhood records one: the Robinhood account 'pulls'
+        # from the bank, so the bank is the receiving end of the request.
+        UnifiedTransfer("t1", 500.0, direction="pull", transfer_type="originated_ach",
+                        state="completed", description=None,
+                        originating_account_id="acct-1",
+                        originating_account_type="rhs_account",
+                        receiving_account_id="bank-1",
+                        receiving_account_type="ach_relationship",
+                        created_at="2024-12-29T10:00:00Z", completed_at=None),
+        UnifiedTransfer("t2", 7000.0, direction="push", transfer_type="internal",
+                        state="completed", description="IRA Contribution",
+                        originating_account_id="acct-1",
+                        originating_account_type="rhs_account",
+                        receiving_account_id="acct-2",
+                        receiving_account_type="rhs_roth_ira",
+                        created_at="2026-03-23T10:00:00Z", completed_at=None),
+    ]
+    banks_fail = False
+
     def get_unified_transfers(self):
-        return [
-            UnifiedTransfer("t1", 500.0, direction="pull", transfer_type="originated_ach",
-                            state="completed", description=None,
-                            originating_account_type="rhs_account",
-                            receiving_account_type="ach_relationship",
-                            created_at="2024-12-29T10:00:00Z", completed_at=None),
-            UnifiedTransfer("t2", 7000.0, direction="push", transfer_type="internal",
-                            state="completed", description="IRA Contribution",
-                            originating_account_type="rhs_account",
-                            receiving_account_type="rhs_roth_ira",
-                            created_at="2026-03-23T10:00:00Z", completed_at=None),
-        ]
+        return list(self.TRANSFERS)
+
+    def get_bank_accounts(self):
+        if self.banks_fail:
+            raise APIError("no banks today")
+        return [BankAccount("bank-1", "Pat Example", "savings", "Rainy day", "approved",
+                            "https://api.robinhood.com/ach/relationships/bank-1/",
+                            last_four="1234")]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1791,15 +1808,76 @@ class TestResearch:
         cli.dividends(ResearchClient(), symbol="NVDA")
         assert capsys.readouterr().out.strip() == "No dividends for NVDA on record."
 
-    def test_transfers_show_robinhoods_terms_and_survive_missing_values(self, capsys):
-        """A transfer with no description once broke the table."""
+    def test_a_transfer_says_what_it_was_and_where_the_money_went(self, capsys):
+        """It used to print Robinhood's terms: 'pull', 'rhs_account',
+        'ach_relationship'. A deposit read as money leaving."""
         cli.transfers(ResearchClient())
 
-        rows = capsys.readouterr().out.splitlines()
-        assert rows[1].split()[:4] == ["2026-03-23", "$7,000.00", "push", "internal"]
-        assert rows[1].endswith("IRA Contribution")
-        assert rows[2].split()[-1] == "-"
-        assert "Robinhood's own terms, shown as sent" in rows[-1]
+        out = capsys.readouterr().out
+        rows = out.splitlines()
+        assert rows[0].split() == ["CREATED", "AMOUNT", "WHAT", "FROM", "TO", "STATE",
+                                   "TRANSFER", "ID"]
+        contribution = [cell.strip() for cell in rows[1].split("  ") if cell.strip()]
+        assert contribution == ["2026-03-23", "$7,000.00", "IRA Contribution",
+                                "Individual account", "Roth IRA", "completed", "t2"]
+        deposit = [cell.strip() for cell in rows[2].split("  ") if cell.strip()]
+        assert deposit == ["2024-12-29", "$500.00", "deposit", "Savings …1234 (Rainy day)",
+                           "Individual account", "completed", "t1"]
+        for term in ("pull", "push", "rhs_", "ach_relationship", "originated_ach"):
+            assert term not in out
+
+    def test_a_withdrawal_goes_from_robinhood_to_the_bank(self):
+        withdrawal = UnifiedTransfer(
+            "t3", 50.0, direction="push", transfer_type="originated_ach", state="pending",
+            originating_account_id="acct-1", originating_account_type="rhs_account",
+            receiving_account_id="bank-9", receiving_account_type="ach_relationship",
+        )
+
+        assert cli.transfer_route(withdrawal, {}) == ("withdrawal", "Individual account", "Bank")
+
+    def test_a_direction_never_seen_is_shown_as_sent_with_no_guess(self):
+        odd = UnifiedTransfer(
+            "t4", 50.0, direction="sweep", originating_account_type="rhs_account",
+            receiving_account_type="ach_relationship",
+        )
+
+        assert cli.transfer_route(odd, {}) == ("sweep", None, None)
+
+    def test_an_account_type_never_seen_is_still_readable(self):
+        odd = UnifiedTransfer(
+            "t5", 50.0, direction="push", originating_account_type="rhs_account",
+            receiving_account_type="rhs_joint_account",
+        )
+
+        assert cli.transfer_route(odd, {})[2] == "Joint account"
+
+    def test_a_pending_bank_transfer_shows_how_to_cancel_it(self, capsys):
+        client = ResearchClient()
+        client.TRANSFERS = [UnifiedTransfer(
+            "t6", 1.0, direction="pull", transfer_type="originated_ach", state="pending",
+            originating_account_id="acct-1", originating_account_type="rhs_account",
+            receiving_account_id="bank-1", receiving_account_type="ach_relationship",
+            created_at="2026-11-24T21:35:00-05:00",
+        )]
+
+        cli.transfers(client)
+
+        out = capsys.readouterr().out
+        assert out.splitlines()[1].split()[-2:] == ["pending", "t6"]
+        assert "cancel-transfer TRANSFER_ID" in out
+
+    def test_nothing_pending_means_no_cancel_hint(self, capsys):
+        cli.transfers(ResearchClient())
+
+        assert "cancel-transfer" not in capsys.readouterr().out
+
+    def test_the_table_survives_the_bank_list_failing(self, capsys):
+        client = ResearchClient()
+        client.banks_fail = True
+
+        assert cli.transfers(client) == 0
+
+        assert "deposit" in capsys.readouterr().out
 
     def test_every_new_command_has_json(self, capsys):
         client = ResearchClient()
