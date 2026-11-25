@@ -40,7 +40,7 @@ price = client.get_quote("AAPL").price
 `pyhood.login()` with no arguments reuses the cached session and falls back to `refresh()` before ever asking for credentials. There is also a guided command:
 
 ```bash
-pyhood setup login
+pyhood authorize
 ```
 
 ## Quotes

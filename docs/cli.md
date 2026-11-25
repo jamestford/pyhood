@@ -583,8 +583,8 @@ pyhood has not made a transfer against Robinhood through these commands. The fir
 | Command | What it does |
 |---|---|
 | `pyhood setup` | Reports what is configured. See [Setup](setup.md) |
-| `pyhood setup login` | Logs in and saves a session |
-| `pyhood setup login --window` | For an AI agent: opens a terminal window for the user to log in, and waits. See [Setup](setup.md#logging-in-from-an-ai-agent) |
+| `pyhood authorize` | Asks you to log in, and saves the key Robinhood hands back. `pyhood setup login` is an older name for it |
+| `pyhood authorize --window` | For an AI agent: opens a terminal window for the user to log in, and waits. See [Setup](setup.md#authorizing-from-an-ai-agent) |
 | `pyhood setup crypto` | Generates and registers a Crypto API key pair |
 | `pyhood setup confirmation` | Shows or changes whether orders ask first. See [Turning confirmation off](#turning-confirmation-off) |
 | `pyhood verify` | Reads live prices to confirm the saved login works |
@@ -605,6 +605,6 @@ A wrong confirmation code exits with status 2, and nothing is sent. Any other fa
 
 - `Robinhood did not accept the order: ...` with Robinhood's reason
 
-- `Not logged in: ...` followed by `Run: pyhood setup login`
+- `pyhood is not authorized: ...` followed by `Run: pyhood authorize`
 - `Robinhood request failed: ...`
 - `No quote for XYZ.` when a symbol is not recognized

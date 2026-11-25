@@ -13,8 +13,8 @@ Run interactively, either as the ``pyhood`` console script or as a module
 
     pyhood version         # the installed version
     pyhood setup           # what is configured, and what is not
-    pyhood setup login     # obtain session tokens
-    pyhood setup login --window   # open a window for the user to do that in
+    pyhood authorize       # log in, so pyhood may use the account
+    pyhood authorize --window     # open a window for the user to do that in
     pyhood setup crypto    # generate and register a key pair
 
 Handling of secrets, which the rest of this module is built around:
@@ -36,6 +36,7 @@ import argparse
 import base64
 import getpass
 import json
+import os
 import stat
 import sys
 import time
@@ -190,7 +191,7 @@ def print_status(out: Printer = print) -> int:
         if note:
             out(note)
     else:
-        out(f"    not configured — run: {invocation()} setup login")
+        out(f"    not configured — run: {invocation()} authorize")
 
     out("")
     out("Crypto API (official Crypto Trading API)")
@@ -444,94 +445,119 @@ def _has_terminal() -> bool:
         return False
 
 
+IN_WINDOW_VARIABLE = "PYHOOD_AUTHORIZATION_WINDOW"
+"""Set by the window `pyhood authorize --window` opens, so that the text
+can tell the user what to do with the window."""
+
+TITLE = "pyhood Authorization"
+
+
 def setup_login(
     prompt: Prompt = input,
     secret_prompt: Prompt = getpass.getpass,
     out: Printer = print,
 ) -> int:
-    """Obtain session tokens, reusing an existing session where possible.
+    """Authorize pyhood to use the user's Robinhood account.
 
-    A stored session that is still valid, or that can be refreshed, needs no
-    password at all — so that is tried first.
+    The user logs in, Robinhood hands back tokens, and the tokens are saved.
+    A saved authorization that still works, or that can be renewed, needs no
+    password at all, so that is tried first.
 
     Args:
-        prompt: Reads the username and any MFA code. Injected for testing.
+        prompt: Reads the username and any code. Injected for testing.
         secret_prompt: Reads the password. Injected for testing.
         out: Receives progress output. Injected for testing.
 
     Returns:
-        Process exit code — 0 on success.
+        Process exit code: 0 on success.
     """
     from pyhood import login
-    from pyhood.exceptions import AuthError, MFARequiredError
+    from pyhood.exceptions import (
+        AuthError,
+        DeviceApprovalRequiredError,
+        LoginTimeoutError,
+        MFARequiredError,
+    )
 
-    status = session_status()
-    if status["exists"]:
-        out(f"Found a stored session at {status['path']}.")
-        out("Trying it first — a valid or refreshable session needs no password.")
+    in_window = os.environ.get(IN_WINDOW_VARIABLE) == "1"
+    close = " You can close this window." if in_window else ""
+    again = " Close this window and try again." if in_window else " Run this again to retry."
+
+    out(TITLE)
+    out("")
+
+    expired = False
+    if session_status()["exists"]:
         try:
             login()
-        except Exception as e:
-            out(f"    Could not reuse it ({type(e).__name__}). Falling back to a full login.")
+        except Exception:
+            expired = True
         else:
-            out("    OK — the stored session works. Nothing else to do.")
+            out(f"pyhood is already authorized. There is nothing to do.{close}")
             return 0
-        out("")
 
     if prompt is input and not _has_terminal():
         # Run by an AI agent, or from a script: nobody can type here.
         out("There is no terminal here to type a password into.")
-        out("An AI agent can open a login window on the user's screen with:")
-        out(f"    {invocation()} setup login --window")
+        out("An AI agent can open an authorization window on the user's screen with:")
+        out(f"    {invocation()} authorize --window")
         out("Otherwise, run this in a terminal of your own.")
         return 1
 
-    out("Robinhood needs your username and password for a fresh login.")
-    out("The password is read without echoing, is not stored, and is not")
-    out("written anywhere — only the resulting tokens are saved to disk.")
+    if expired:
+        out("The saved authorization no longer works, so it has to be made again.")
+        out("")
+    out("pyhood needs you to log in and authorize the connection between pyhood")
+    out("and Robinhood. pyhood sends your password to Robinhood and does not save")
+    out("it. Do not share your password with your agent or anyone else.")
     out("")
-    out("Afterwards Robinhood sends a device approval prompt to your phone —")
-    out("open the Robinhood app and tap 'Yes, it's me' when it appears.")
+    out("Once authorized, you will not be asked for your username and password")
+    out("again. To remove this authorization, open the Robinhood app and go to")
+    out("Account > Menu > Security and privacy > Devices, then remove the device.")
     out("")
 
     try:
-        username = _ask(prompt, "Robinhood email/username: ").strip()
+        username = _ask(prompt, "Robinhood email or username: ").strip()
         if not username:
-            out("Nothing entered — no login attempted.")
+            out(f"Nothing was entered, so nothing was sent.{again}")
             return 1
-        password = _ask(secret_prompt, "Password (hidden): ")
+        password = _ask(secret_prompt, "Password (nothing shows as you type): ")
         if not password:
-            out("Nothing entered — no login attempted.")
+            out(f"Nothing was entered, so nothing was sent.{again}")
             return 1
     except CancelledError:
         out("")
-        out("Cancelled — no login attempted. Nothing was saved.")
-        out("Run this again when you have the Robinhood app to hand.")
+        out(f"Cancelled. Nothing was saved.{close}")
         return 1
 
     out("")
-    out("Logging in. Approve the device in your Robinhood app if prompted.")
+    out('Now open the Robinhood app on your phone and tap "Yes, it\'s me".')
+    out("Waiting for you...")
     try:
         try:
             login(username, password)
         except MFARequiredError:
-            code = _ask(prompt, "MFA code: ").strip()
+            code = _ask(prompt, "Robinhood sent you a code. Enter it here: ").strip()
             login(username, password, mfa_code=code)
     except CancelledError:
         out("")
-        out("Cancelled — no login attempted.")
+        out(f"Cancelled. Nothing was saved.{close}")
+        return 1
+    except (LoginTimeoutError, DeviceApprovalRequiredError):
+        out("")
+        out("Robinhood did not get an approval from your phone in time.")
+        out(f"Nothing was saved.{again}")
         return 1
     except AuthError as e:
-        out(f"    FAILED — {type(e).__name__}: {e}")
+        out("")
+        out("Robinhood did not accept the login.")
+        out(f"    {e}")
+        out(f"Nothing was saved.{again}")
         return 1
 
-    saved = session_status()
     out("")
-    out(f"Logged in. Session saved to {saved['path']}, readable only by you.")
+    out(f"Authorized.{close}")
     return 0
-
-
-# ── Command line ─────────────────────────────────────────────────────
 
 
 def invocation() -> str:
@@ -546,6 +572,38 @@ def invocation() -> str:
     except (IndexError, TypeError):  # pragma: no cover - defensive
         return "python -m pyhood"
     return "pyhood" if name == "pyhood" else "python -m pyhood"
+
+
+def _add_window_options(command: argparse.ArgumentParser) -> None:
+    command.add_argument(
+        "--window",
+        action="store_true",
+        help=(
+            "open a terminal window on the user's screen for them to log in, and "
+            "wait. For an AI agent, which has no terminal to type in"
+        ),
+    )
+    command.add_argument(
+        "--wait", type=float, default=None, metavar="SECONDS",
+        help=(
+            "with --window: how long to wait for the user before handing back "
+            "(default 90). Run the command again to keep waiting"
+        ),
+    )
+
+
+def _authorize(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    """Run `pyhood authorize`, or its older name `pyhood setup login`."""
+    if args.window:
+        from pyhood import login_window
+
+        return login_window.login_in_window(
+            wait=login_window.DEFAULT_WAIT if args.wait is None else args.wait,
+            program=invocation(),
+        )
+    if args.wait is not None:
+        parser.error("--wait goes with --window")
+    return setup_login()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -564,6 +622,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("version", help="print the installed pyhood version")
+    authorize = commands.add_parser(
+        "authorize",
+        help="log in to Robinhood, so that pyhood may use the account",
+        description=(
+            "Authorizes pyhood to use your Robinhood account. You log in, "
+            "Robinhood hands pyhood a key, and pyhood saves the key so that you "
+            "are not asked again. Your password is sent to Robinhood and is not "
+            "saved. An AI agent has no terminal to type in, so it adds --window."
+        ),
+    )
+    _add_window_options(authorize)
     setup = commands.add_parser(
         "setup",
         help="configure credentials, or report what is configured",
@@ -578,7 +647,8 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         choices=("crypto", "login", "confirmation"),
         help=(
-            "crypto: generate a Crypto API key pair. login: obtain session tokens. "
+            "crypto: generate a Crypto API key pair. login: the same as "
+            "`pyhood authorize`. "
             "confirmation: show or change whether orders ask before they are placed"
         ),
     )
@@ -599,21 +669,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip the signed read-only call that confirms new crypto keys work",
     )
-    setup.add_argument(
-        "--window",
-        action="store_true",
-        help=(
-            "for login: open a terminal window on the user's screen for them to "
-            "log in, and wait. For an AI agent, which has no terminal to type in"
-        ),
-    )
-    setup.add_argument(
-        "--wait", type=float, default=None, metavar="SECONDS",
-        help=(
-            "with --window: how long to wait for the user before handing back "
-            "(default 90). Run the command again to keep waiting"
-        ),
-    )
+    _add_window_options(setup)
     verify = commands.add_parser(
         "verify",
         help="read live data to confirm a saved login works (read-only)",
@@ -1421,24 +1477,17 @@ def main(argv: list[str] | None = None) -> int:
         from pyhood import verify
 
         return verify.verify_crypto() if args.target == "crypto" else verify.verify_stocks()
+    if args.command == "authorize":
+        return _authorize(parser, args)
     if args.command != "setup":
         parser.print_help()
         return 0
     if (args.window or args.wait is not None) and args.target != "login":
-        parser.error("--window and --wait go with: setup login")
+        parser.error("--window and --wait go with: authorize")
     if args.target == "crypto":
         return setup_crypto(force=args.force, verify=not args.no_verify)
     if args.target == "login":
-        if args.window:
-            from pyhood import login_window
-
-            return login_window.login_in_window(
-                wait=login_window.DEFAULT_WAIT if args.wait is None else args.wait,
-                program=invocation(),
-            )
-        if args.wait is not None:
-            parser.error("--wait goes with --window")
-        return setup_login()
+        return _authorize(parser, args)
     if args.target == "confirmation":
         return setup_confirmation(args.values)
     if args.values:

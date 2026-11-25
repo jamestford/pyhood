@@ -49,7 +49,7 @@ Paste this into your agent:
 Install pyhood for me. Follow the install steps in https://raw.githubusercontent.com/jamestford/pyhood/main/AGENTS.md
 ```
 
-Your agent installs pyhood into a folder of its own, `~/pyhood`. Then a terminal window opens on your screen. Type your Robinhood username and password there, and approve the login in the Robinhood app on your phone. Your agent sees none of it. When you are done, it reads live prices to check the login, and tells you it is ready.
+Your agent installs pyhood into a folder of its own, `~/pyhood`. Then a terminal window titled "pyhood Authorization" opens on your screen. Type your Robinhood username and password there, and approve the request in the Robinhood app on your phone. Your agent sees none of it. When you are done, it reads live prices to check it worked, and tells you it is ready.
 
 From then on, open your agent in that folder and ask it something:
 
@@ -69,7 +69,7 @@ That is the whole setup. The install put a file called `AGENTS.md` in the folder
 [The file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) in that request is written for AI agents. It tells yours to:
 
 1. Run the [install script](https://github.com/jamestford/pyhood/blob/main/install.sh), which runs `uv venv --managed-python --python 3.14 ~/pyhood`, then `uv pip install --python ~/pyhood/bin/python pyhood`. If [uv](https://docs.astral.sh/uv/) is missing, it stops and asks you.
-2. Run `pyhood setup login --window`, which opens the login window and waits for you. If no window can be opened, it asks you to run `pyhood setup login` yourself.
+2. Run `pyhood authorize --window`, which opens the authorization window and waits for you. If no window can be opened, it asks you to run `pyhood authorize` yourself.
 3. Run `pyhood verify`, which reads live prices and changes nothing.
 4. Read the instructions that came with the install.
 
@@ -79,11 +79,33 @@ Nothing is installed system-wide, and your other Python setups are not touched. 
 
 </details>
 
-### The login
+### Authorizing pyhood
 
-The window asks for your Robinhood username and password, then waits for you to approve the login in the Robinhood app on your phone. Your password goes to Robinhood and is not stored. It never passes through your agent, or through the chat. What is saved is a session, in `~/.pyhood/session.json`, readable only by you. pyhood renews that session on its own, so you should rarely need to log in again.
+The window says this:
 
-The window opens on macOS, and on Linux with a desktop. Where it cannot open, such as on Windows or over SSH, your agent asks you to run `pyhood setup login` in a terminal of your own.
+```text
+pyhood Authorization
+
+pyhood needs you to log in and authorize the connection between pyhood
+and Robinhood. pyhood sends your password to Robinhood and does not save
+it. Do not share your password with your agent or anyone else.
+
+Once authorized, you will not be asked for your username and password
+again. To remove this authorization, open the Robinhood app and go to
+Account > Menu > Security and privacy > Devices, then remove the device.
+
+Robinhood email or username:
+Password (nothing shows as you type):
+
+Now open the Robinhood app on your phone and tap "Yes, it's me".
+Waiting for you...
+
+Authorized. You can close this window.
+```
+
+What you type never passes through your agent, or through the chat. What pyhood saves is a key that Robinhood hands back, in `~/.pyhood/session.json`. pyhood renews that key on its own, so you should rarely need to do this again.
+
+The window opens on macOS, and on Linux with a desktop. Where it cannot open, such as on Windows or over SSH, your agent asks you to run `pyhood authorize` in a terminal of your own.
 
 ### Or install it yourself
 
@@ -93,7 +115,7 @@ Run this in your own terminal, on macOS or Linux:
 curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh | sh
 ```
 
-It does the same install, asks for your login in that terminal, and reads live prices to check it.
+It does the same install, asks you to authorize pyhood in that terminal, and reads live prices to check it.
 
 <details>
 <summary><strong>What the script does</strong></summary>
@@ -101,7 +123,7 @@ It does the same install, asks for your login in that terminal, and reads live p
 1. Looks for uv. If uv is missing, it asks before installing it.
 2. Creates `~/pyhood` and installs pyhood into it, with the two commands above. If pyhood is already there, it upgrades it.
 3. Links the command into `~/.local/bin`, so that `pyhood` works from any folder.
-4. Runs `pyhood setup login`, which asks for your username and password.
+4. Runs `pyhood authorize`, which asks for your username and password.
 5. Runs `pyhood verify`.
 
 It never uses `sudo`, and it installs nothing but pyhood, and uv if you say yes. The script is short: [read it](https://github.com/jamestford/pyhood/blob/main/install.sh) before you run it, or follow the same steps [by hand](https://jamestford.github.io/pyhood/getting-started/).

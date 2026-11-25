@@ -73,7 +73,8 @@ This guide is for an AI agent. It describes the installed version.
 RULES
   1. pyhood is installed. Do not install it or its dependencies, and do
      not import it from a source folder.
-  2. Never ask for, read or type a password or API key. Login is saved.
+  2. Never ask for, read or type a password or API key. If pyhood is not
+     authorized, run `pyhood authorize --window` for the user to log in.
 @@RULE_THREE@@
   4. Do not guess command, field or method names. The commands are all
      listed below.
@@ -180,9 +181,8 @@ LOOKING THINGS UP (read-only, nothing to confirm)
   there is nothing to confirm.
 
 ANYTHING ELSE
-  The commands above cover most requests. For something they do not, such
-  as futures orders or a calculation over several results, write
-  a Python script. First run:
+  The commands above cover most requests. For anything else, such as a
+  calculation over several results, write a Python script. First run:
 
       pyhood guide python
 
@@ -208,8 +208,8 @@ RUNNING A SCRIPT
       pyhood run -c "import pyhood; print(pyhood.__version__)"
 
   Other commands:
-      pyhood setup      show whether a login is saved
-      pyhood verify     read live prices, to prove the login works
+      pyhood setup      show whether pyhood is authorized
+      pyhood verify     read live prices, to prove the authorization works
       pyhood guide      print this guide
 
 EVERY SCRIPT STARTS WITH
@@ -219,11 +219,11 @@ EVERY SCRIPT STARTS WITH
 
       client = PyhoodClient(pyhood.login())
 
-  pyhood.login() takes no arguments here: it loads the saved login and
-  renews it if needed. If it raises AuthError, the user has to log in
-  again. Run `pyhood setup login --window`: it opens a terminal window on
-  the user's screen for them to log in, and waits. Never ask for, read or
-  type their password.
+  pyhood.login() takes no arguments here: it loads the saved authorization
+  and renews it if needed. If it raises AuthError, the user has to
+  authorize pyhood again. Run `pyhood authorize --window`: it opens a
+  terminal window on the user's screen for them to log in, and waits.
+  Never ask for, read or type their password.
 
 EXAMPLE: what do I own, and what did I buy this month?
 

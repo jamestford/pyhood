@@ -269,7 +269,10 @@ class TestVerify:
         monkeypatch.setattr(pyhood, "login", no_session)
 
         assert verify.verify_stocks() == 1
-        assert "pyhood setup login" in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert "pyhood is not authorized" in out
+        assert "Run: pyhood authorize\n" in out
+        assert "pyhood authorize --window" in out
 
 
 # ── The docs name commands that exist ────────────────────────────────
@@ -278,7 +281,7 @@ class TestVerify:
 # Words that follow "pyhood" inside a code span without being a command,
 # as in the lines users paste into an agent: "pyhood is installed at ..."
 # and "Install pyhood for me."
-NOT_COMMANDS = {"is", "for", "cannot"}
+NOT_COMMANDS = {"is", "for", "cannot", "Authorization", "needs", "sends"}
 
 
 def documented_commands():
@@ -366,7 +369,8 @@ class TestInstallByAgent:
 
     def test_the_agent_opens_the_login_window(self):
         steps = self.steps()
-        assert "~/pyhood/bin/pyhood setup login --window" in steps
+        assert "~/pyhood/bin/pyhood authorize --window" in steps
+        assert 'titled "pyhood Authorization"' in steps
         assert "allow it two minutes" in steps
         assert "run it again. It does not open a second window" in steps
         assert "ask the user what happened before running it again" in steps
@@ -374,14 +378,14 @@ class TestInstallByAgent:
     def test_the_agent_has_a_way_on_when_no_window_opens(self):
         steps = self.steps()
         assert "could not open a window" in steps
-        assert "run `~/pyhood/bin/pyhood setup login` themselves" in steps
+        assert "run `~/pyhood/bin/pyhood authorize` themselves" in steps
 
     def test_the_agent_is_told_what_not_to_do(self):
         steps = self.steps()
         assert "If one fails, stop" in steps
         assert "already installed" in steps
         assert "Never ask for, read or type their password" in steps
-        assert "Do not run `setup login` without `--window`" in steps
+        assert "Do not run `authorize` without `--window`" in steps
         assert "Do not install it yourself without asking" in steps
         assert "Do not use `pip`, `sudo` or `--break-system-packages`" in steps
 
@@ -389,11 +393,35 @@ class TestInstallByAgent:
         """The folded-away list is a promise about what the file says."""
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         for promise in (
-            "`pyhood setup login --window`",
+            "`pyhood authorize --window`",
             "`pyhood verify`",
             "never to ask for, read or type your password",
         ):
             assert promise in readme, promise
+
+    def test_the_readme_shows_the_words_the_window_uses(self):
+        """The README quotes the window, so it has to match the code."""
+        from pyhood import onboarding
+
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        said = []
+        monkeypatch = pytest.MonkeyPatch()
+        try:
+            monkeypatch.setenv(onboarding.IN_WINDOW_VARIABLE, "1")
+            monkeypatch.setattr("pyhood.login", lambda *a, **k: object())
+            monkeypatch.setattr(
+                onboarding, "session_status", lambda: {"exists": False},
+            )
+            onboarding.setup_login(
+                prompt=lambda q: said.append(q.rstrip()) or "me@example.com",
+                secret_prompt=lambda q: said.append(q.rstrip()) or "secret",
+                out=said.append,
+            )
+        finally:
+            monkeypatch.undo()
+
+        for line in said:
+            assert line in readme, line
 
     def test_the_agent_steps_and_the_readme_name_the_same_commands(self):
         """Both ways in build the same install."""
@@ -433,7 +461,7 @@ class TestInstallScript:
         assert "uv pip install --python ~/pyhood/bin/python pyhood" in readme
         assert '"$UV" pip install --python "$BIN/python" "$SPEC"' in script
         assert 'SPEC="${PYHOOD_INSTALL_SPEC:-pyhood}"' in script
-        for command in ("setup login", "verify"):
+        for command in ("authorize", "verify"):
             assert f"`pyhood {command}`" in readme
             assert f'"$BIN/pyhood" {command}' in script
 

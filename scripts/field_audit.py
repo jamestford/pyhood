@@ -25,7 +25,7 @@ listed at the end.
 
 Set up a session first with:
 
-    pyhood setup login
+    pyhood authorize
 """
 
 from __future__ import annotations
@@ -267,7 +267,7 @@ def main() -> int:
         session = pyhood.login()
     except AuthError as e:
         print(f"Not authenticated: {e}")
-        print("Run: pyhood setup login")
+        print("Run: pyhood authorize")
         return 1
 
     client = PyhoodClient(session)

@@ -1,4 +1,4 @@
-"""`pyhood setup login --window`: a login window for the user, opened by an agent."""
+"""`pyhood authorize --window`: a window for the user to log in, opened by an agent."""
 
 from __future__ import annotations
 
@@ -86,7 +86,7 @@ class TestAlreadyLoggedIn:
 
         assert code == 0
         assert opener.opened == []
-        assert "Logged in: the saved login works." in text
+        assert "pyhood is already authorized. No window was needed." in text
 
     def test_clears_what_an_earlier_run_left(self, home):
         folder = home / "login-window"
@@ -109,8 +109,12 @@ class TestOpening:
         _, text = run(home, opener)
 
         assert opener.opened == [home / "login-window" / "login.command"]
-        assert "A terminal window has opened on the user's screen" in text
+        assert (
+            'A terminal window titled "pyhood Authorization" has opened on the user\'s screen.'
+            in text
+        )
         assert "type your Robinhood username and password in that window" in text
+        assert "then approve the request in the Robinhood app on your phone." in text
         assert "Never ask for, read or type their password." in text
 
     def test_the_script_and_its_folder_are_the_owners_alone(self, home):
@@ -125,7 +129,8 @@ class TestOpening:
 
         assert code == 2
         assert "Could not open a terminal window here." in text
-        assert "    pyhood setup login" in text
+        assert "    pyhood authorize" in text
+        assert "--window" not in text
         assert "Never ask for, read or type their password." in text
         assert not (home / "login-window" / "login.command").exists()
 
@@ -148,7 +153,7 @@ class TestWaiting:
         code, text = run(home, Opener(), clock=clock, wait=60)
 
         assert code == 0
-        assert "Logged in." in text
+        assert "Authorized." in text
         assert "Check it with: pyhood verify" in text
         assert clock.now < 5
 
@@ -167,9 +172,9 @@ class TestWaiting:
         code, text = run(home, Opener(), clock=clock)
 
         assert code == 1
-        assert "The login in the window did not finish." in text
-        assert "pyhood setup login --window" in text
-        assert "Logged in" not in text
+        assert "The authorization in the window did not finish." in text
+        assert "pyhood authorize --window" in text
+        assert "Authorized." not in text
 
     def test_a_closed_window_is_reported(self, home):
         clock = Clock()
@@ -207,9 +212,9 @@ class TestWaiting:
 
         assert code == 3
         assert 5 <= clock.now < 6
-        assert "The user has not finished logging in yet." in text
+        assert "The user has not finished yet." in text
         assert "It will not open a second window:" in text
-        assert "    pyhood setup login --window" in text
+        assert "    pyhood authorize --window" in text
 
     def test_says_how_long_it_waits(self, home):
         _, text = run(home, Opener(), wait=90)
@@ -229,7 +234,7 @@ class TestRunAgain:
             home / "login-window" / "login.command") + 30)
 
         assert len(opener.opened) == 1
-        assert "The login window is already open" in text
+        assert 'The "pyhood Authorization" window is already open' in text
         assert code == 3
 
     def test_picks_up_a_login_finished_in_the_first_window(self, home):
@@ -264,7 +269,7 @@ class TestRunAgain:
 
         assert code == 1
         assert len(opener.opened) == 1
-        assert "The login in the window did not finish." in text
+        assert "The authorization in the window did not finish." in text
         assert "already open" not in text
 
     def test_after_a_failure_is_reported_the_next_run_opens_a_window(self, home):
@@ -306,13 +311,30 @@ class TestScript:
         status, done = self.run_script(tmp_path, monkeypatch, "exit 0")
 
         assert status.read_text().strip() == "0"
-        assert "You can close this window and go back to your agent." in done.stdout
 
     def test_writes_a_failure(self, tmp_path, monkeypatch):
         status, done = self.run_script(tmp_path, monkeypatch, "exit 1")
 
         assert status.read_text().strip() == "1"
-        assert "The login did not finish." in done.stdout
+
+    def test_tells_the_login_it_is_in_the_window(self, tmp_path, monkeypatch):
+        _, done = self.run_script(
+            tmp_path, monkeypatch, f'echo "in window: ${onboarding.IN_WINDOW_VARIABLE}"',
+        )
+
+        assert "in window: 1" in done.stdout
+
+    def test_titles_the_window(self, tmp_path):
+        text = login_window.script_text(tmp_path / "status")
+
+        assert "\\033]0;pyhood Authorization\\007" in text
+
+    def test_adds_no_words_of_its_own(self, tmp_path, monkeypatch):
+        """What the user reads comes from the login, in one voice."""
+        _, done = self.run_script(tmp_path, monkeypatch, "exit 0")
+
+        printable = done.stdout.split("\x07")[-1].strip()
+        assert printable == ""
 
     def test_the_login_saves_where_the_waiting_command_looks(self, tmp_path, monkeypatch):
         monkeypatch.setattr(login_window.Path, "home", lambda: tmp_path / "their home")
@@ -327,13 +349,13 @@ class TestScript:
         (bin_dir / "pyhood").write_text("")
         monkeypatch.setattr(sys, "executable", str(bin_dir / "python"))
 
-        assert login_window._login_command() == [str(bin_dir / "pyhood"), "setup", "login"]
+        assert login_window._login_command() == [str(bin_dir / "pyhood"), "authorize"]
 
     def test_falls_back_to_the_module(self, tmp_path, monkeypatch):
         monkeypatch.setattr(sys, "executable", str(tmp_path / "python"))
 
         assert login_window._login_command() == [
-            str(tmp_path / "python"), "-m", "pyhood", "setup", "login",
+            str(tmp_path / "python"), "-m", "pyhood", "authorize",
         ]
 
 
@@ -434,7 +456,8 @@ class TestOpenWindow:
 
 
 class TestCommandLine:
-    def test_window_routes_to_the_window(self, monkeypatch):
+    @pytest.mark.parametrize("command", [["authorize"], ["setup", "login"]])
+    def test_window_routes_to_the_window(self, monkeypatch, command):
         seen = {}
 
         def fake(wait, program):
@@ -443,7 +466,7 @@ class TestCommandLine:
 
         monkeypatch.setattr(login_window, "login_in_window", fake)
 
-        assert onboarding.main(["setup", "login", "--window"]) == 0
+        assert onboarding.main([*command, "--window"]) == 0
         assert seen["wait"] == login_window.DEFAULT_WAIT
 
     def test_wait_sets_how_long(self, monkeypatch):
@@ -453,7 +476,7 @@ class TestCommandLine:
             lambda wait, program: seen.update(wait=wait) or 3,
         )
 
-        assert onboarding.main(["setup", "login", "--window", "--wait", "20"]) == 3
+        assert onboarding.main(["authorize", "--window", "--wait", "20"]) == 3
         assert seen["wait"] == 20
 
     def test_window_only_goes_with_login(self, monkeypatch):
@@ -465,9 +488,10 @@ class TestCommandLine:
         with pytest.raises(SystemExit):
             onboarding.main(["setup", "crypto", "--window"])
 
-    def test_wait_needs_window(self):
+    @pytest.mark.parametrize("command", [["authorize"], ["setup", "login"]])
+    def test_wait_needs_window(self, command):
         with pytest.raises(SystemExit):
-            onboarding.main(["setup", "login", "--wait", "20"])
+            onboarding.main([*command, "--wait", "20"])
 
     def test_plain_login_is_unchanged(self, monkeypatch):
         monkeypatch.setattr(onboarding, "setup_login", lambda: 0)
@@ -484,7 +508,9 @@ class TestLoginWithNoTerminal:
 
         assert code == 1
         assert "There is no terminal here to type a password into." in out.text
-        assert "setup login --window" in out.text
+        assert "An AI agent can open an authorization window on the user's screen" in out.text
+        assert "authorize --window" in out.text
+        assert "Robinhood email" not in out.text
 
     def test_with_a_terminal_it_asks_as_before(self, home, monkeypatch):
         monkeypatch.setattr(onboarding, "_has_terminal", lambda: True)
@@ -500,4 +526,4 @@ class TestLoginWithNoTerminal:
         code = onboarding.setup_login(prompt=cancel, out=out)
 
         assert code == 1
-        assert asked == ["Robinhood email/username: "]
+        assert asked == ["Robinhood email or username: "]

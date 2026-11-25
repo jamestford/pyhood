@@ -12,7 +12,7 @@ Install pyhood for me. Follow the install steps in https://raw.githubusercontent
 
 [That file](https://github.com/jamestford/pyhood/blob/main/AGENTS.md) is written for AI agents. It tells yours to run the install script described under [One command](#one-command), and gives it rules that keep it from improvising: stop if a step fails, do not use `pip` or `sudo`, and do not install anything else.
 
-An agent cannot log in for you. The login needs your password, which the agent must never see, and an approval on your phone. So the agent runs `pyhood setup login --window`, which opens a terminal window on your screen with the login in it, and waits for you. You type in that window, and nothing you type passes through the agent. See [First Login](#first-login).
+An agent cannot log in for you. The login needs your password, which the agent must never see, and an approval on your phone. So the agent runs `pyhood authorize --window`, which opens a terminal window on your screen, titled "pyhood Authorization", and waits for you. You type in that window, and nothing you type passes through the agent. See [First Login](#first-login).
 
 It needs [uv](https://docs.astral.sh/uv/getting-started/installation/) (`brew install uv` on macOS). If uv is missing, the agent stops and asks you.
 
@@ -29,7 +29,7 @@ curl -LsSf https://raw.githubusercontent.com/jamestford/pyhood/main/install.sh |
 1. Looks for [uv](https://docs.astral.sh/uv/getting-started/installation/), the tool pyhood is installed with. If uv is missing, it asks before installing it.
 2. Creates `~/pyhood` and installs pyhood into it, with the two commands under [By hand](#by-hand). If pyhood is already there, it upgrades it.
 3. Links the command into `~/.local/bin`, so that `pyhood` works from any folder.
-4. Runs `pyhood setup login`. See [First Login](#first-login).
+4. Runs `pyhood authorize`. See [First Login](#first-login).
 5. Runs `pyhood verify`, which reads live prices and changes nothing.
 
 It never uses `sudo`. It installs pyhood, and uv only if you say yes.
@@ -42,8 +42,8 @@ Then open your AI agent in `~/pyhood` and ask it something.
 | `~/pyhood` exists and is not a pyhood install | The script stops and changes nothing |
 | `~/.local/bin/pyhood` is already something else | It is left alone, and the script tells you to use `~/pyhood/bin/pyhood` |
 | `~/.local/bin` is not on your PATH | The script says so. Add it to your PATH to type just `pyhood` |
-| The login does not finish | pyhood stays installed. Log in later with `pyhood setup login` |
-| No terminal is attached, as when an agent runs it | It installs pyhood and leaves the login alone. The agent then opens a login window with `pyhood setup login --window` |
+| The authorization does not finish | pyhood stays installed. Do it later with `pyhood authorize` |
+| No terminal is attached, as when an agent runs it | It installs pyhood and leaves the authorizing alone. The agent then opens the window with `pyhood authorize --window` |
 
 A download that is cut off partway runs nothing: the script does its work only on its last line.
 
@@ -143,15 +143,17 @@ pyhood requires a one-time device approval through the Robinhood mobile app. Aft
 
 Open the Robinhood app on your phone. You'll need to tap "Yes, it's me" when prompted.
 
-### Step 2: Login
+### Step 2: Authorize
 
 ```bash
-pyhood setup login
+pyhood authorize
 ```
 
-It prompts for your username and password — the password is read without echoing and is never stored — then Robinhood sends a device approval push notification to your phone. Tap **"Yes, it's me"** to approve. The session is saved to `~/.pyhood/session.json`, readable only by you.
+It asks for your username and password. The password is sent to Robinhood and is not saved. Robinhood then sends a prompt to its app on your phone: tap **"Yes, it's me"**. What is saved is the key Robinhood hands back, in `~/.pyhood/session.json`, readable only by you.
 
-An AI agent runs `pyhood setup login --window` instead, which opens a terminal window on your screen with the same login in it. See [Setup](setup.md#logging-in-from-an-ai-agent).
+To remove the authorization later, open the Robinhood app and go to Account, then Menu, then Security and privacy, then Devices, and remove the device.
+
+An AI agent runs `pyhood authorize --window` instead, which opens a terminal window on your screen with the same login in it. See [Setup](setup.md#authorizing-from-an-ai-agent).
 
 To log in from code instead:
 

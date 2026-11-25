@@ -10,14 +10,14 @@
 #   2. Creates ~/pyhood and installs pyhood into it. If pyhood is already
 #      there, it upgrades it.
 #   3. Links the command into ~/.local/bin, so that `pyhood` works anywhere.
-#   4. Asks you to log in to Robinhood, then reads live prices to check the
-#      login works.
+#   4. Asks you to log in to Robinhood and authorize pyhood, then reads live
+#      prices to check it works.
 #
 # It never uses sudo. It installs pyhood, and uv only if you say yes. Your
 # password goes to Robinhood and is not stored.
 #
 # Run without a terminal, as an AI agent would, it installs pyhood and leaves
-# the login to you. It never asks for a password it cannot ask you for.
+# the authorizing to you. It never asks for a password it cannot ask you for.
 #
 # The same steps by hand: https://jamestford.github.io/pyhood/getting-started/
 
@@ -145,27 +145,27 @@ link_command() {
     fi
 }
 
-# Sets LOGGED_IN to yes when the login was made and checked.
+# Sets LOGGED_IN to yes when pyhood was authorized and that was checked.
 log_in() {
     LOGGED_IN=no
     if ! has_terminal; then
-        # Nobody to ask. A login saved by an earlier install may still work.
+        # Nobody to ask. An earlier install's authorization may still work.
         if "$BIN/pyhood" verify >/dev/null 2>&1; then
             LOGGED_IN=yes
         fi
         return 0
     fi
     say ""
-    if ! "$BIN/pyhood" setup login </dev/tty; then
+    if ! "$BIN/pyhood" authorize </dev/tty; then
         say ""
-        say "pyhood is installed, but the login did not finish. Log in when you are ready:"
-        say "    $COMMAND setup login"
+        say "pyhood is installed, but it is not authorized yet. When you are ready:"
+        say "    $COMMAND authorize"
         exit 1
     fi
     say ""
     if ! "$BIN/pyhood" verify; then
         say ""
-        say "pyhood is installed and the login was saved, but the check did not pass. Run it again with:"
+        say "pyhood is installed and authorized, but the check did not pass. Run it again with:"
         say "    $COMMAND verify"
         exit 1
     fi
@@ -176,15 +176,15 @@ finish() {
     installed=$("$BIN/pyhood" version 2>/dev/null || say "pyhood")
     say ""
     if [ "$LOGGED_IN" = yes ]; then
-        say "$installed is installed in $(short "$DIR"), and your login works."
+        say "$installed is installed in $(short "$DIR"), and it is authorized."
     else
-        say "$installed is installed in $(short "$DIR"). It is not logged in yet."
+        say "$installed is installed in $(short "$DIR"). It is not authorized yet."
         say ""
-        say "If you are an AI agent, open a login window on the user's screen:"
-        say "    $COMMAND setup login --window"
-        say "If you are a person, log in yourself, in your own terminal. It asks for"
+        say "If you are an AI agent, open the authorization window on the user's screen:"
+        say "    $COMMAND authorize --window"
+        say "If you are a person, authorize it yourself, in your own terminal. It asks for"
         say "your Robinhood username and password, then for an approval in the app:"
-        say "    $COMMAND setup login"
+        say "    $COMMAND authorize"
         say "Then check it, which reads live prices and changes nothing:"
         say "    $COMMAND verify"
     fi

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`pyhood authorize` is the new name for logging in**, and `pyhood authorize --window` for the window an agent opens. "Authorize" says what you are doing: letting pyhood use your Robinhood account. `pyhood setup login` still works, with or without `--window`.
+
+### Changed
+- **The text you see when you authorize is rewritten.** It says why you are logging in, that pyhood sends your password to Robinhood and does not save it, not to share the password with your agent, and how to remove the authorization afterwards: in the Robinhood app, under Account, Menu, Security and privacy, Devices. It used to talk about "a fresh login", "echoing" and "tokens".
+- **The window is titled "pyhood Authorization"**, and the agent is told that title so it can tell you which window to look for.
+- **It tells you when to pick up your phone.** After the password it says to open the Robinhood app and tap "Yes, it's me", and that it is waiting.
+- **Failures are in plain words.** "Robinhood did not get an approval from your phone in time. Nothing was saved." replaces `FAILED — DeviceApprovalRequiredError: ...`.
+- **The password prompt says that nothing shows as you type.**
+- A command run before pyhood is authorized now says `pyhood is not authorized` and names both commands: `pyhood authorize` for you, `pyhood authorize --window` for an agent. It used to say `Not logged in`.
+
 ## [0.25.0] - 2026-11-25
 
 ### Added
