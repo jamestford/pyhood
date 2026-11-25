@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-11-25
+
 ### Changed
 - `AGENTS.md` says that every merge is released as soon as it is merged, however small the change. It said that a change users would not notice waits for the next release.
 
