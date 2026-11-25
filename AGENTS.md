@@ -55,7 +55,7 @@ ruff check .
 2. **Commit.** Use a conventional subject, such as `fix: show orders in every account`, and a short body that says what was wrong and what changes. Add no `Co-Authored-By` line.
 3. **Push and open the pull request.** Give it the same title as the commit. In the body, say what was wrong, what changes, and how it was checked. If it was not checked against a real account, say so.
 4. **Merge.** When every check has passed, squash-merge it. If a check fails, fix the cause. Do not merge around a failing check.
-5. **Release.** A fix or a feature is released as soon as it is merged. A change that users would not notice, such as tests alone, waits for the next release.
+5. **Release.** Every merge is released, as soon as it is merged, however small the change. Nothing waits for a later release.
 
 To release:
 
