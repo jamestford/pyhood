@@ -25,7 +25,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from pyhood.onboarding import IN_WINDOW_VARIABLE, TITLE
+from pyhood.onboarding import IN_WINDOW_VARIABLE, OTHER_VERIFICATION, TITLE
 
 DEFAULT_WAIT = 90
 """Seconds to wait before handing back to the agent. Under two minutes,
@@ -38,6 +38,7 @@ LOGGED_IN = 0
 NOT_FINISHED = 1
 NO_WINDOW = 2
 STILL_WAITING = 3
+OTHER_CHECK = OTHER_VERIFICATION  # 4: Robinhood asked for a check pyhood cannot do
 
 Printer = Callable[[str], None]
 
@@ -197,7 +198,8 @@ def login_in_window(
 
     Returns:
         0 logged in, 1 the login did not finish, 2 no window could be
-        opened, 3 the user has not finished yet.
+        opened, 3 the user has not finished yet, 4 Robinhood asked for a
+        check that pyhood cannot do.
     """
     from pyhood.secure_files import OWNER_ONLY_DIR, ensure_private_dir
 
@@ -248,6 +250,13 @@ def login_in_window(
                 out("Authorized.")
                 out(f"Check it with: {program} verify")
                 return LOGGED_IN
+            if code == OTHER_CHECK:
+                out("Robinhood did not send an approval request to the user's phone.")
+                out("It asked for a different check, such as a bank verification,")
+                out("which pyhood cannot do. The window told the user which.")
+                out("Do not run this again now: trying again is unlikely to help.")
+                out("Tell the user, and stop here.")
+                return OTHER_CHECK
             out("The authorization in the window did not finish. Ask the user what happened.")
             out(f"To open the window again: {again}")
             return NOT_FINISHED

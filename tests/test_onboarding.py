@@ -433,6 +433,8 @@ class TestSetupLogin:
 
         def fake_login(*a, **k):
             said.append("LOGIN")
+            k["on_verification"]("prompt")  # Robinhood has sent the request
+            said.append("APPROVED")
             return object()
 
         monkeypatch.setattr("pyhood.login", fake_login)
@@ -443,7 +445,69 @@ class TestSetupLogin:
 
         phone = said.index('Now open the Robinhood app on your phone and tap "Yes, it\'s me".')
         assert said[phone + 1] == "Waiting for you..."
-        assert phone < said.index("LOGIN") < said.index("Authorized.")
+        assert said.index("Sending your login to Robinhood...") < said.index("LOGIN")
+        assert said.index("LOGIN") < phone < said.index("APPROVED") < said.index("Authorized.")
+
+    def test_the_phone_is_not_mentioned_until_robinhood_sends_the_request(
+        self, session_file, monkeypatch,
+    ):
+        """A login that needs no approval must not send anyone to their phone."""
+        monkeypatch.setattr("pyhood.login", lambda *a, **k: object())
+        out = Recorder()
+
+        code = onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=out,
+        )
+
+        assert code == 0
+        assert "phone" not in out.text.split("Password")[-1].split("Sending")[-1]
+        assert "Waiting for you" not in out.text
+
+    def test_waits_five_minutes_for_the_approval(self, session_file, monkeypatch):
+        seen = {}
+
+        def fake_login(*a, **k):
+            seen.update(k)
+            return object()
+
+        monkeypatch.setattr("pyhood.login", fake_login)
+
+        onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=Recorder(),
+        )
+
+        assert seen["timeout"] == 300
+
+    @pytest.mark.parametrize(
+        ("state", "name"),
+        [
+            ("PlaidBankList", "a bank verification"),
+            ("SomethingNew", "a different check (SomethingNew)"),
+            (None, "a different check"),
+        ],
+    )
+    def test_a_check_pyhood_cannot_do_is_said_plainly(
+        self, session_file, monkeypatch, state, name,
+    ):
+        from pyhood.exceptions import OtherVerificationRequiredError
+
+        def fake_login(*a, **k):
+            raise OtherVerificationRequiredError("internal words", state=state)
+
+        monkeypatch.setattr("pyhood.login", fake_login)
+        out = Recorder()
+
+        code = onboarding.setup_login(
+            prompt=lambda _: "me@example.com", secret_prompt=lambda _: "x", out=out,
+        )
+
+        assert code == onboarding.OTHER_VERIFICATION == 4
+        assert "Robinhood did not send an approval request to your phone." in out.text
+        assert f"It asked for {name} instead, which pyhood cannot do." in out.text
+        assert "Nothing was saved." in out.text
+        assert "internal words" not in out.text
+        assert "Waiting for you" not in out.text
+        assert not session_file.exists()
 
     def test_no_jargon(self, session_file, monkeypatch):
         monkeypatch.setattr("pyhood.login", lambda *a, **k: object())

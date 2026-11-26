@@ -30,6 +30,23 @@ class DeviceApprovalRequiredError(AuthError):
 DeviceApprovalRequired = DeviceApprovalRequiredError  # convenience alias
 
 
+class OtherVerificationRequiredError(AuthError):
+    """Robinhood asked for a check that pyhood cannot do.
+
+    Robinhood chooses how a new device is checked: an approval in its app, a
+    code, a bank verification, a selfie, or a photo of an ID. pyhood can
+    finish the first two. ``state`` is the name Robinhood gives the step it
+    asked for, such as ``"PlaidBankList"`` for a bank verification.
+    """
+
+    def __init__(self, message: str, state: str | None = None):
+        super().__init__(message)
+        self.state = state
+
+
+OtherVerificationRequired = OtherVerificationRequiredError  # convenience alias
+
+
 class MFARequiredError(AuthError):
     """Multi-factor authentication code required."""
 

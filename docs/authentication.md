@@ -77,6 +77,32 @@ On first login (or when the refresh token expires), Robinhood requires device ap
 
 Device approval is **phone app only** — it's not available through the web interface.
 
+### When Robinhood asks for something else
+
+Robinhood chooses how to check a new login, and it does not always choose a device approval. Its [support page](https://robinhood.com/us/en/support/articles/verify-its-you/) lists five checks: a device approval, a texted code, a bank verification, a selfie, and a photo of an ID.
+
+pyhood can finish a device approval. When Robinhood asks for a check that cannot be done from a script, pyhood raises `OtherVerificationRequiredError` as soon as it sees it, without waiting for the timeout. Its `state` attribute is Robinhood's name for the step, such as `"PlaidBankList"` for a bank verification.
+
+```python
+from pyhood.exceptions import OtherVerificationRequiredError
+
+try:
+    session = pyhood.login(username="...", password="...")
+except OtherVerificationRequiredError as e:
+    print(f"Robinhood asked for a check pyhood cannot do: {e.state}")
+```
+
+Nothing is sent to your phone in that case, so there is nothing to approve. Trying again right away is unlikely to change Robinhood's choice.
+
+To be told when to pick up your phone, pass `on_verification`. It is called with `"prompt"` once Robinhood has sent the approval request:
+
+```python
+session = pyhood.login(
+    username="...", password="...",
+    on_verification=lambda kind: print("Approve the request in the Robinhood app."),
+)
+```
+
 ### Timeouts
 
 The `timeout` parameter controls how long pyhood waits for approval:

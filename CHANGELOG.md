@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`pyhood authorize` no longer waits for a phone approval that Robinhood never sent.** Robinhood chooses how to check a new login, and sometimes it asks for a bank verification instead of an approval in its app. pyhood did not recognize that, told you to tap "Yes, it's me", waited a minute in silence and then said your phone had not answered. It now stops as soon as it sees the other check, and says which one Robinhood asked for and that pyhood cannot do it.
+- **You are told to pick up your phone only once Robinhood has sent the request.** Until then the command says it is sending your login to Robinhood.
+- **You have five minutes to approve, not one.** The first check for Robinhood's answer comes after 2 seconds, not 8.
+
+### Added
+- **`OtherVerificationRequiredError`**, raised by `pyhood.login()` when Robinhood asks for a check that cannot be done from a script. Its `state` is Robinhood's name for the step.
+- **`on_verification`**, an argument to `pyhood.login()` that is called once Robinhood has sent the approval request to your phone.
+- **Exit code 4 from `pyhood authorize` and `pyhood authorize --window`** for the same case. The window command tells an agent to stop and tell you, and not to try again.
+- **`scripts/login_trace.py`**, which logs in and shows what Robinhood asks for at each step: the address, the status and the field names, with no values. It is how the bank verification was found.
+
 ## [0.26.0] - 2026-11-25
 
 ### Added

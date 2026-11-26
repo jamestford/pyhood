@@ -451,6 +451,13 @@ can tell the user what to do with the window."""
 
 TITLE = "pyhood Authorization"
 
+APPROVAL_WAIT = 300
+"""Seconds `pyhood authorize` waits for the user to approve on their phone."""
+
+OTHER_VERIFICATION = 4
+"""Exit code of `pyhood authorize` when Robinhood asked for a check that
+pyhood cannot do, such as a bank verification."""
+
 
 def setup_login(
     prompt: Prompt = input,
@@ -472,11 +479,13 @@ def setup_login(
         Process exit code: 0 on success.
     """
     from pyhood import login
+    from pyhood.auth import verification_name
     from pyhood.exceptions import (
         AuthError,
         DeviceApprovalRequiredError,
         LoginTimeoutError,
         MFARequiredError,
+        OtherVerificationRequiredError,
     )
 
     in_window = os.environ.get(IN_WINDOW_VARIABLE) == "1"
@@ -530,19 +539,37 @@ def setup_login(
         out(f"Cancelled. Nothing was saved.{close}")
         return 1
 
+    def robinhood_asked(kind: str) -> None:
+        # Said only once Robinhood has sent the request, so that nobody is
+        # left looking at a phone for something that is not coming.
+        if kind == "prompt":
+            out("")
+            out('Now open the Robinhood app on your phone and tap "Yes, it\'s me".')
+            out("Waiting for you...")
+
     out("")
-    out('Now open the Robinhood app on your phone and tap "Yes, it\'s me".')
-    out("Waiting for you...")
+    out("Sending your login to Robinhood...")
     try:
         try:
-            login(username, password)
+            login(username, password, timeout=APPROVAL_WAIT, on_verification=robinhood_asked)
         except MFARequiredError:
             code = _ask(prompt, "Robinhood sent you a code. Enter it here: ").strip()
-            login(username, password, mfa_code=code)
+            login(
+                username, password, mfa_code=code,
+                timeout=APPROVAL_WAIT, on_verification=robinhood_asked,
+            )
     except CancelledError:
         out("")
         out(f"Cancelled. Nothing was saved.{close}")
         return 1
+    except OtherVerificationRequiredError as e:
+        out("")
+        out("Robinhood did not send an approval request to your phone.")
+        out(f"It asked for {verification_name(e.state)} instead, which pyhood cannot do.")
+        out("Robinhood chooses the check, and pyhood cannot change it.")
+        out("Trying again right away is unlikely to help.")
+        out(f"Nothing was saved.{close}")
+        return OTHER_VERIFICATION
     except (LoginTimeoutError, DeviceApprovalRequiredError):
         out("")
         out("Robinhood did not get an approval from your phone in time.")

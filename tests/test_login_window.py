@@ -165,6 +165,18 @@ class TestWaiting:
 
         assert list((home / "login-window").iterdir()) == []
 
+    def test_a_check_pyhood_cannot_do_stops_the_agent(self, home):
+        """Robinhood asked for a bank verification: more attempts will not help."""
+        clock = Clock()
+        clock.on_sleep = finish_after(home, 1, code="4")
+
+        code, text = run(home, Opener(), clock=clock)
+
+        assert code == login_window.OTHER_CHECK == 4
+        assert "Robinhood did not send an approval request to the user's phone." in text
+        assert "Do not run this again now" in text
+        assert "To open the window again" not in text
+
     def test_a_login_that_failed_is_reported(self, home):
         clock = Clock()
         clock.on_sleep = finish_after(home, 1, code="1")

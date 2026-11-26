@@ -141,7 +141,7 @@ pyhood requires a one-time device approval through the Robinhood mobile app. Aft
 
 ### Step 1: Have Your Phone Ready
 
-Open the Robinhood app on your phone. You'll need to tap "Yes, it's me" when prompted.
+Open the Robinhood app on your phone. You'll need to tap "Yes, it's me" when prompted. The command tells you when Robinhood has sent the prompt.
 
 ### Step 2: Authorize
 
@@ -149,7 +149,7 @@ Open the Robinhood app on your phone. You'll need to tap "Yes, it's me" when pro
 pyhood authorize
 ```
 
-It asks for your username and password. The password is sent to Robinhood and is not saved. Robinhood then sends a prompt to its app on your phone: tap **"Yes, it's me"**. What is saved is the key Robinhood hands back, in `~/.pyhood/session.json`, readable only by you.
+It asks for your username and password. The password is sent to Robinhood and is not saved. Robinhood then sends a prompt to its app on your phone: tap **"Yes, it's me"**. If Robinhood asks for a different check instead, such as a bank verification, the command says so and stops, because pyhood cannot do that check. What is saved is the key Robinhood hands back, in `~/.pyhood/session.json`, readable only by you.
 
 To remove the authorization later, open the Robinhood app and go to Account, then Menu, then Security and privacy, then Devices, and remove the device.
 

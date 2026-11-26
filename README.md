@@ -97,11 +97,15 @@ Account > Menu > Security and privacy > Devices, then remove the device.
 Robinhood email or username:
 Password (nothing shows as you type):
 
+Sending your login to Robinhood...
+
 Now open the Robinhood app on your phone and tap "Yes, it's me".
 Waiting for you...
 
 Authorized. You can close this window.
 ```
+
+Robinhood chooses how to check a new login. pyhood can finish an approval in the Robinhood app. If Robinhood asks for something else, such as a bank verification, the window says so and stops: nothing is coming to your phone, and pyhood cannot do that check.
 
 What you type never passes through your agent, or through the chat. What pyhood saves is a key that Robinhood hands back, in `~/.pyhood/session.json`. pyhood renews that key on its own, so you should rarely need to do this again.
 
