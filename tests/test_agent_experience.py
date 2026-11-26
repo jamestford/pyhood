@@ -408,7 +408,10 @@ class TestInstallByAgent:
         monkeypatch = pytest.MonkeyPatch()
         try:
             monkeypatch.setenv(onboarding.IN_WINDOW_VARIABLE, "1")
-            monkeypatch.setattr("pyhood.login", lambda *a, **k: object())
+            # Robinhood sends the approval request, and the user approves it.
+            monkeypatch.setattr(
+                "pyhood.login", lambda *a, **k: k["on_verification"]("prompt"),
+            )
             monkeypatch.setattr(
                 onboarding, "session_status", lambda: {"exists": False},
             )

@@ -9,6 +9,7 @@ Do these steps in order. If one fails, stop and tell the user what happened. Do 
 3. **Open the authorization window for the user.** Run `~/pyhood/bin/pyhood authorize --window`, and allow it two minutes. If pyhood is already authorized, it says so and you go to step 4. Otherwise a terminal window titled "pyhood Authorization" opens on the user's screen. Tell the user to type their Robinhood username and password in that window, and to approve the request in the Robinhood app on their phone. The command waits for them.
    - If it says the user has not finished, run it again. It does not open a second window.
    - If it says the authorization did not finish, ask the user what happened before running it again.
+   - If it says Robinhood asked for a different check, stop. Tell the user what it said. Do not run it again: Robinhood chose a check that pyhood cannot do, and more attempts will not change that.
    - If it says it could not open a window, tell the user to run `~/pyhood/bin/pyhood authorize` themselves, in their own terminal, and to tell you when they have.
    - Never ask for, read or type their password. Do not run `authorize` without `--window`: it needs a terminal, and you do not have one.
 4. **Confirm it works.** Run `~/pyhood/bin/pyhood verify`. It reads live prices and changes nothing.

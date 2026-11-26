@@ -59,6 +59,8 @@ Account > Menu > Security and privacy > Devices, then remove the device.
 Robinhood email or username:
 Password (nothing shows as you type):
 
+Sending your login to Robinhood...
+
 Now open the Robinhood app on your phone and tap "Yes, it's me".
 Waiting for you...
 
@@ -66,7 +68,8 @@ Authorized.
 ```
 
 - **Your password is sent to Robinhood and is not saved.** What is saved is the key Robinhood hands back, in `~/.pyhood/session.json`.
-- **The approval is on your phone.** Robinhood sends a prompt to its app, and you tap **"Yes, it's me"**. If Robinhood sends a code instead, the command asks for it.
+- **The approval is on your phone.** Robinhood sends a prompt to its app, and you tap **"Yes, it's me"**. The command tells you to pick up your phone only once Robinhood has sent the prompt, and then waits up to five minutes. If Robinhood sends a code instead, the command asks for it.
+- **Robinhood chooses the check, not pyhood.** For a new login it may ask for an approval in its app, a code, a bank verification, a selfie, or a photo of an ID. pyhood can finish the first two. For the others it stops and says which one Robinhood asked for.
 - **To remove the authorization,** open the Robinhood app and go to Account, then Menu, then Security and privacy, then Devices, and remove the device.
 
 `pyhood setup login` is an older name for the same command, and still works.
@@ -76,6 +79,7 @@ Authorized.
 | Nothing is typed | Nothing was entered, so nothing was sent |
 | You press Ctrl-C | Cancelled. Nothing was saved |
 | No approval arrives from your phone in time | Robinhood did not get an approval from your phone in time. Nothing was saved |
+| Robinhood asks for a check pyhood cannot do | Robinhood did not send an approval request to your phone. It asked for a bank verification instead, which pyhood cannot do. Nothing was saved |
 | Robinhood refuses the login | Robinhood did not accept the login, with Robinhood's reason. Nothing was saved |
 
 ### Authorizing from an AI agent
@@ -107,6 +111,7 @@ Agents stop a command that runs too long, so the wait is short and the command c
 | The login fails, or you close the window | Says the authorization did not finish | 1 |
 | No window can be opened | Prints `pyhood authorize` for you to run yourself | 2 |
 | You have not finished when the wait ends | Tells the agent to run it again | 3 |
+| Robinhood asks for a check pyhood cannot do | Tells the agent to stop and tell you, and not to run it again | 4 |
 
 - **Run again, it does not open a second window.** It goes back to waiting on the one that is open. A window nobody finished is taken to be gone after 15 minutes.
 - **A window you closed does not come back by itself.** The next run reports that the authorization did not finish. Only the run after that opens a new one.

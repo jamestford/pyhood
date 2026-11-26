@@ -14,7 +14,7 @@ import logging
 import secrets
 import signal
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -25,6 +25,7 @@ from pyhood.exceptions import (
     DeviceApprovalRequired,
     LoginTimeout,
     MFARequired,
+    OtherVerificationRequired,
     RateLimitError,
 )
 from pyhood.http import Session
@@ -154,11 +155,29 @@ class TokenStore:
         return data.get("device_token") if data else None
 
 
+BANK_VERIFICATION = "PlaidBankList"
+"""The step Robinhood shows when it wants the user to sign in to their bank."""
+
+UNKNOWN_STEP_POLLS = 3
+"""How many times in a row a step pyhood does not know is read before it
+gives up. A step it cannot answer does not change by being asked again."""
+
+
+def verification_name(state: str | None) -> str:
+    """What to call the check Robinhood asked for, in a sentence."""
+    if state == BANK_VERIFICATION:
+        return "a bank verification"
+    if state:
+        return f"a different check ({state})"
+    return "a different check"
+
+
 def _handle_verification(
     session: Session,
     device_token: str,
     workflow_id: str,
     timeout: float,
+    on_verification: Callable[[str], None] | None = None,
 ) -> None:
     """Handle Robinhood's device verification workflow.
 
@@ -166,8 +185,18 @@ def _handle_verification(
     - App push approval (most common)
     - SMS / email code verification
     - Raises DeviceApprovalRequired with clear instructions
+    - Raises OtherVerificationRequired when Robinhood asks for a check that
+      cannot be done from here, such as a bank verification
+
+    ``on_verification`` is called with ``"prompt"`` once Robinhood has sent
+    an approval request to the user's phone, and not before.
     """
     logger.info("Verification required, handling challenge...")
+
+    if timeout <= 0:
+        # 0 means no limit. Without this the loops below would not run at
+        # all, and the login would be retried before anything was approved.
+        timeout = float("inf")
 
     pathfinder_url = "https://api.robinhood.com/pathfinder/user_machine/"
     machine_payload = {
@@ -184,8 +213,12 @@ def _handle_verification(
     inquiries_url = f"https://api.robinhood.com/pathfinder/inquiries/{machine_id}/user_view/"
     start_time = time.monotonic()
 
+    first_poll = True
+    unknown_step_polls = 0
+
     while time.monotonic() - start_time < timeout:
-        time.sleep(8)
+        time.sleep(2 if first_poll else 5)
+        first_poll = False
         try:
             inquiries_response = session.get(inquiries_url)
         except RateLimitError:
@@ -198,20 +231,37 @@ def _handle_verification(
         if not inquiries_response:
             continue
 
-        context = inquiries_response.get("context", {})
-        challenge = context.get("sheriff_challenge", {})
+        context = inquiries_response.get("context") or {}
+        challenge = context.get("sheriff_challenge") or {}
 
         if not challenge:
+            # Robinhood is showing a step with no approval request in it.
+            # Nothing has been sent to the user's phone, and nothing will be.
+            state = inquiries_response.get("state_name")
+            if not state:
+                continue
+            unknown_step_polls += 1
+            if state == BANK_VERIFICATION or unknown_step_polls >= UNKNOWN_STEP_POLLS:
+                logger.info(f"Robinhood asked for a step pyhood cannot do: {state}")
+                raise OtherVerificationRequired(
+                    f"Robinhood asked for {verification_name(state)}, "
+                    "which pyhood cannot do. It did not send an approval request "
+                    "to the Robinhood app.",
+                    state=state,
+                )
             continue
 
+        unknown_step_polls = 0
         challenge_type = challenge.get("type")
         challenge_status = challenge.get("status")
         challenge_id = challenge.get("id")
 
         if challenge_type == "prompt":
             logger.info("Device approval required — check Robinhood app")
+            if on_verification is not None:
+                on_verification("prompt")
             prompt_url = f"https://api.robinhood.com/push/{challenge_id}/get_prompts_status/"
-            poll_delay = 10  # Start with 10s between polls
+            poll_delay = 5  # seconds between polls
 
             while time.monotonic() - start_time < timeout:
                 time.sleep(poll_delay)
@@ -221,7 +271,7 @@ def _handle_verification(
                         logger.info("Device approved via app")
                         break
                     # Reset delay on success
-                    poll_delay = 10
+                    poll_delay = 5
                 except RateLimitError as e:
                     # Back off more aggressively
                     poll_delay = min(poll_delay + 5, 30)
@@ -252,7 +302,10 @@ def _handle_verification(
 
     # Poll workflow status for final approval
     retry_attempts = 5
-    while time.monotonic() - start_time < timeout and retry_attempts > 0:
+    # Robinhood approves within seconds of the user's answer, so this is
+    # given a minute at most, even when the login has no time limit.
+    final_deadline = min(start_time + timeout, time.monotonic() + 60)
+    while time.monotonic() < final_deadline and retry_attempts > 0:
         try:
             inquiries_payload = {"sequence": 0, "user_input": {"status": "continue"}}
             resp = session.post(
@@ -294,6 +347,7 @@ def login(
     store_session: bool = True,
     token_path: Path | str | None = None,
     expires_in: int = 86400,
+    on_verification: Callable[[str], None] | None = None,
 ) -> Session:
     """Log in to Robinhood.
 
@@ -306,6 +360,9 @@ def login(
         store_session: Cache tokens to disk for reuse. Default: True.
         token_path: Custom path for token storage. Default: ~/.pyhood/session.json.
         expires_in: Token lifetime in seconds. Default: 86400 (24h).
+        on_verification: Called with ``"prompt"`` once Robinhood has sent an
+            approval request to the user's phone. Use it to tell the user to
+            look at their phone only when there is something there to see.
 
     Returns:
         Authenticated Session object.
@@ -313,6 +370,8 @@ def login(
     Raises:
         LoginTimeout: Login hung (likely device approval timeout).
         DeviceApprovalRequired: Robinhood wants app approval.
+        OtherVerificationRequired: Robinhood asked for a check that cannot be
+            done from here, such as a bank verification.
         MFARequired: Need to provide mfa_code.
         TokenExpired: Stored token expired, re-login needed.
         AuthError: Generic auth failure.
@@ -379,7 +438,9 @@ def login(
         # Handle verification workflow
         if "verification_workflow" in data:
             workflow_id = data["verification_workflow"]["id"]
-            _handle_verification(session, device_token, workflow_id, timeout)
+            _handle_verification(
+                session, device_token, workflow_id, timeout, on_verification
+            )
             # Re-attempt login after verification
             data = session.post(urls.LOGIN, data=login_payload, accept_codes=login_accept)
 

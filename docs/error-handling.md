@@ -10,6 +10,7 @@ PyhoodError
 │   ├── LoginTimeoutError      — Login hung (device approval timeout)
 │   ├── TokenExpiredError       — Refresh token expired, full re-login needed
 │   ├── DeviceApprovalRequiredError — Approval sent but not completed
+│   ├── OtherVerificationRequiredError — Robinhood asked for a check pyhood cannot do
 │   └── MFARequiredError        — SMS/email code needed
 ├── RateLimitError              — Too many requests (429)
 ├── APIError                    — Robinhood API returned an error
@@ -78,6 +79,7 @@ from pyhood.exceptions import (
     LoginTimeout,          # → LoginTimeoutError
     TokenExpired,          # → TokenExpiredError
     DeviceApprovalRequired,# → DeviceApprovalRequiredError
+    OtherVerificationRequired,  # → OtherVerificationRequiredError
     MFARequired,           # → MFARequiredError
     SymbolNotFound,        # → SymbolNotFoundError
 )
